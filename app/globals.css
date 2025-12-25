@@ -22,5 +22,18 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "ITC Avant Garde Gothic", "Avant Garde", "Montserrat", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, Helvetica, sans-serif;
+}
+
+/* Hero geometric pattern used as subtle overlay */
+.hero-pattern {
+  background-image: radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0 2px, transparent 2px 6px);
+  background-size: 40px 40px, 8px 8px;
+}
+
+/* Small utility for compact list scrolling inside layout */
+.scroll-area {
+  /* calc allowances for header + hero + paddings; tweak if layout changes */
+  max-height: calc(100vh - 260px);
+  overflow: auto;
 }

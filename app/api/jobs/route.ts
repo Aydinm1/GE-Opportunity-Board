@@ -7,6 +7,7 @@ type AirtableJobFields = {
   "Role Title"?: string;
   "Programme / Functional Area"?: string;
   "Team/Vertical"?: string;
+  "Displayed Status"?: string;
 
   "Published?"?: boolean;
 
@@ -75,15 +76,17 @@ export async function GET() {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const table = process.env.AIRTABLE_GEROLES_TABLE; // set this to your Roles table name
-  const view = process.env.AIRTABLE_JOBS_VIEW ?? "Roles Posted";
+  const view = process.env.AIRTABLE_JOBS_VIEW;
 
   if (!token || !baseId || !table) {
     return NextResponse.json({ error: "Missing Airtable env vars" }, { status: 500 });
   }
 
+  const encodedTable = encodeURIComponent(table);
+  const viewQuery = view ? `&view=${encodeURIComponent(view)}` : "";
   const url =
-    `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(table)}` +
-    `?view=${encodeURIComponent(view)}&pageSize=100`;
+    `https://api.airtable.com/v0/${baseId}/${encodedTable}` +
+    `?pageSize=100${viewQuery}`;
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
@@ -106,6 +109,7 @@ export async function GET() {
       id: r.id,
 
       roleTitle: r.fields["Role Title"] ?? "",
+      roleStatus: r.fields["Displayed Status"] ?? null,
       programmeArea: r.fields["Programme / Functional Area"] ?? null,
       teamVertical: r.fields["Team/Vertical"] ?? null,
 

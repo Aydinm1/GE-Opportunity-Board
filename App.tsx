@@ -1,61 +1,105 @@
-'use client';
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Job } from './types';
 import JobCard from './components/JobCard';
 import JobDetails from './components/JobDetails';
 
 const App: React.FC = () => {
-    const [searchQuery, setSearchQuery] = useState('');
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
     const [activeFilter, setActiveFilter] = useState<string | null>(null);
+    const [selectedFilters, setSelectedFilters] = useState<Record<string, string | null>>({
+        programmeArea: null,
+        teamVertical: null,
+        workType: null,
+        roleStatus: null,
+    });
 
     useEffect(() => {
-        let mounted = true;
-        async function load() {
+        const fetchJobs = async () => {
             try {
-                const res = await fetch('/api/jobs');
-                const data = await res.json();
-                const nextJobs = (data.jobs ?? []) as Job[];
-                if (!mounted) return;
-                setJobs(nextJobs);
-                if (nextJobs.length > 0) setSelectedJobId((prev) => prev ?? nextJobs[0].id);
-            } catch (e) {
-                console.error('Failed to load jobs', e);
+                setLoading(true);
+                const response = await fetch('/api/jobs');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch jobs');
+                }
+                const data = await response.json();
+                setJobs(data.jobs || []);
+                if (data.jobs && data.jobs.length > 0) {
+                    setSelectedJobId(data.jobs[0].id);
+                }
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'An error occurred');
+                console.error('Error fetching jobs:', err);
             } finally {
-                if (mounted) setLoading(false);
+                setLoading(false);
             }
-        }
-        load();
-        return () => {
-            mounted = false;
         };
+
+        fetchJobs();
     }, []);
 
     const filteredJobs = useMemo(() => {
-        const q = searchQuery.trim().toLowerCase();
-        return jobs.filter((job) => {
-            if (!q) return true;
-            return (
-                (job.roleTitle ?? '').toLowerCase().includes(q) ||
-                (job.teamVertical ?? '').toLowerCase().includes(q) ||
-                (job.programmeArea ?? '').toLowerCase().includes(q) ||
-                (job.purposeShort ?? '').toLowerCase().includes(q)
-            );
+        const q = searchQuery.toLowerCase();
+        let res = jobs.filter(job =>
+            job.roleTitle.toLowerCase().includes(q) ||
+            (job.teamVertical || '').toLowerCase().includes(q) ||
+            (job.programmeArea || '').toLowerCase().includes(q) ||
+            (job.purposeShort || '').toLowerCase().includes(q) ||
+            (job.locationBase || '').toLowerCase().includes(q)
+        );
+
+        // apply selected filters
+        Object.entries(selectedFilters).forEach(([key, val]) => {
+            if (!val) return;
+            res = res.filter(job => {
+                if (key === 'roleStatus') return ((job as any).roleStatus || '') === val;
+                return ((job as any)[key] || '') === val;
+            });
         });
-    }, [jobs, searchQuery]);
+
+        // always sort by start date (soonest first)
+        const toTime = (d?: string | null) => {
+            if (!d) return Infinity;
+            const t = Date.parse(d);
+            return Number.isNaN(t) ? Infinity : t;
+        };
+        res = res.slice().sort((a, b) => toTime(a.startDate) - toTime(b.startDate));
+
+        return res;
+    }, [jobs, searchQuery, selectedFilters]);
 
     const selectedJob = useMemo(() => {
-        return jobs.find((j) => j.id === selectedJobId) ?? jobs[0] ?? null;
+        if (!selectedJobId) return null;
+        return jobs.find(j => j.id === selectedJobId) || jobs[0] || null;
     }, [jobs, selectedJobId]);
 
     const filters = [
         { id: 'programmeArea', label: 'Programme Area' },
         { id: 'teamVertical', label: 'Team Vertical' },
-        { id: 'roleType', label: 'Role Type' },
         { id: 'workType', label: 'Work Type' },
+        { id: 'roleStatus', label: 'Role Status' },
     ];
+
+    const fieldOptions = useMemo(() => {
+        const opts: Record<string, Set<string>> = {
+            programmeArea: new Set(),
+            teamVertical: new Set(),
+            workType: new Set(),
+            roleStatus: new Set(),
+        };
+        jobs.forEach(j => {
+            if (j.programmeArea) opts.programmeArea.add(j.programmeArea);
+            if (j.teamVertical) opts.teamVertical.add(j.teamVertical);
+            if (j.workType) opts.workType.add(j.workType);
+            const rs = (j as any).roleStatus;
+            if (rs) opts.roleStatus.add(rs);
+        });
+        return Object.fromEntries(Object.entries(opts).map(([k, s]) => [k, Array.from(s).sort()]));
+    }, [jobs]);
+
 
     return (
         <div className="min-h-screen flex flex-col">
@@ -65,9 +109,6 @@ const App: React.FC = () => {
                     <div className="flex items-center space-x-2">
                         <span className="material-icons-round text-primary text-3xl">public</span>
                         <h1 className="text-xl font-display font-bold text-primary tracking-wide uppercase">Global Encounters</h1>
-                    </div>
-                    <div className="flex items-center">
-                         <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Job Portal</span>
                     </div>
                 </div>
             </nav>
@@ -108,6 +149,27 @@ const App: React.FC = () => {
                             </button>
                         ))}
                     </div>
+                    {activeFilter && (fieldOptions as any)[activeFilter] && (
+                        <div className="w-full flex justify-center mt-3">
+                            <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-3 flex gap-2 flex-wrap max-w-3xl">
+                                <button
+                                    onClick={() => { setSelectedFilters({ ...selectedFilters, [activeFilter]: null }); setActiveFilter(null); }}
+                                    className={`px-3 py-1 rounded text-sm bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200`}
+                                >
+                                    All
+                                </button>
+                                {((fieldOptions as any)[activeFilter] as string[]).map((opt: string) => (
+                                    <button
+                                        key={opt}
+                                        onClick={() => { setSelectedFilters({ ...selectedFilters, [activeFilter]: opt }); setActiveFilter(null); }}
+                                        className={`px-3 py-1 rounded text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-100`}
+                                    >
+                                        {opt}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -123,7 +185,15 @@ const App: React.FC = () => {
                                 </h2>
                             </div>
                             <div className="flex flex-col gap-4 overflow-y-auto lg:max-h-[800px] pr-2 scrollbar-hide">
-                                {filteredJobs.length > 0 ? (
+                                {loading ? (
+                                    <div className="p-8 text-center text-gray-500 font-medium">
+                                        Loading jobs...
+                                    </div>
+                                ) : error ? (
+                                    <div className="p-8 text-center text-red-500 font-medium">
+                                        Error: {error}
+                                    </div>
+                                ) : filteredJobs.length > 0 ? (
                                     filteredJobs.map(job => (
                                         <JobCard 
                                             key={job.id} 
@@ -145,7 +215,11 @@ const App: React.FC = () => {
 
                         {/* Detailed View */}
                         <div className="lg:col-span-8 border-l border-gray-100 dark:border-gray-800 pl-0 lg:pl-6 h-full min-h-[500px]">
-                            {selectedJob ? (
+                            {loading ? (
+                                <div className="h-full flex items-center justify-center text-gray-400">
+                                    Loading job details...
+                                </div>
+                            ) : selectedJob ? (
                                 <JobDetails job={selectedJob} />
                             ) : (
                                 <div className="h-full flex items-center justify-center text-gray-400">
@@ -162,14 +236,6 @@ const App: React.FC = () => {
                 <button className="flex flex-col items-center gap-1 text-primary p-2">
                     <span className="material-icons-round">home</span>
                     <span className="text-[10px] font-bold uppercase tracking-wide font-body">Home</span>
-                </button>
-                <button className="flex flex-col items-center gap-1 text-gray-400 p-2">
-                    <span className="material-icons-round">work_outline</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wide font-body">My Jobs</span>
-                </button>
-                <button className="flex flex-col items-center gap-1 text-gray-400 p-2">
-                    <span className="material-icons-round">person_outline</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wide font-body">Profile</span>
                 </button>
             </nav>
             <div className="h-20 lg:hidden"></div>

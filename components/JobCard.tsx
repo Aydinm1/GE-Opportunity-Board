@@ -9,15 +9,27 @@ interface JobCardProps {
 
 const JobCard: React.FC<JobCardProps> = ({ job, isSelected, onClick }) => {
     const getStatusStyles = (status: string | null) => {
-        // Since 'status' is not in new type, we'll use a placeholder or handle it. 
-        // Assuming 'Actively Hiring' as default for visuals.
-        return 'bg-sky-100 dark:bg-sky-900/40 text-[#00558C] dark:text-sky-300 border-sky-200 dark:border-sky-800';
+        switch (status) {
+            case 'Actively Hiring':
+                return 'bg-sky-100 dark:bg-sky-900/40 text-[#00558C] dark:text-sky-300 border-sky-200 dark:border-sky-800';
+            case 'Interviewing':
+                return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200';
+            case 'Screening Applicants':
+                return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border-indigo-200';
+            case 'Closed':
+                return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700';
+            default:
+                return 'bg-sky-100 dark:bg-sky-900/40 text-[#00558C] dark:text-sky-300 border-sky-200 dark:border-sky-800';
+        }
     };
 
     const getLocationStyles = (loc: string | null) => {
         switch (loc) {
             case 'Virtual': return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200';
-            case 'In-Person': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200';
+            case 'In-Person':
+            case 'Onsite':
+            case 'On-site':
+                return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200';
             case 'Hybrid': return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border-indigo-200';
             default: return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200';
         }
@@ -47,8 +59,8 @@ const JobCard: React.FC<JobCardProps> = ({ job, isSelected, onClick }) => {
             </div>
             <div className="flex justify-between items-end mt-4">
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${getStatusStyles('Actively Hiring')}`}>
-                        Actively Hiring
+                    <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${getStatusStyles(job.roleStatus || 'Actively Hiring')}`}>
+                        {job.roleStatus || 'Actively Hiring'}
                     </span>
                     <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${getLocationStyles(job.workType)}`}>
                         {job.workType}

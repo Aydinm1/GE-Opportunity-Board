@@ -6,14 +6,37 @@ interface JobDetailsProps {
 }
 
 const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
-    const locationName = job.locationBase ?? (job as any).locationName ?? '';
-    const locationType = job.workType ?? (locationName ? 'In-Person' : 'Virtual');
-    const showSpecificLocation = (locationType === 'In-Person' || locationType === 'Hybrid') && !!locationName;
+    const showSpecificLocation = (
+        job.workType === 'In-Person' ||
+        job.workType === 'Hybrid' ||
+        job.workType === 'Onsite' ||
+        job.workType === 'On-site'
+    ) && job.locationBase;
+    const formatStartDate = (dateStr?: string) => {
+        if (!dateStr) return '';
+        const m = dateStr.match(/^(\d{4})-(\d{2})/);
+        if (!m) return dateStr;
+        const [, year, month] = m;
+        const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const idx = parseInt(month, 10) - 1;
+        if (idx < 0 || idx > 11) return year;
+        return `${monthNames[idx]} ${year}`;
+    };
 
-    const responsibilities = job.keyResponsibilities ?? (job as any).responsibilities ?? [];
-    const requirements = job.requiredQualifications ?? (job as any).requirements ?? [];
-    const preferred = job.preferredQualifications ?? (job as any).preferredQualifications ?? [];
-    const languages = job.languagesRequired ?? (job as any).languages ?? [];
+    const getStatusStyles = (status: string | null) => {
+        switch (status) {
+            case 'Actively Hiring':
+                return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-sky-100 dark:bg-sky-900/30 text-primary dark:text-sky-300 border border-sky-200 dark:border-sky-800/50';
+            case 'Interviewing':
+                return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border border-amber-200';
+            case 'Screening Applicants':
+                return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border border-indigo-200';
+            case 'Closed':
+                return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700';
+            default:
+                return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-sky-100 dark:bg-sky-900/30 text-primary dark:text-sky-300 border border-sky-200 dark:border-sky-800/50';
+        }
+    };
 
     return (
         <div className="h-full flex flex-col">
@@ -27,8 +50,8 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                             <p className="text-xs font-bold text-primary uppercase tracking-widest">{job.programmeArea}</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-sky-100 dark:bg-sky-900/30 text-primary dark:text-sky-300 font-body uppercase tracking-wide border border-sky-200 dark:border-sky-800/50">
-                                Actively Hiring
+                            <span className={getStatusStyles(job.roleStatus || 'Actively Hiring')}>
+                                {job.roleStatus || 'Actively Hiring'}
                             </span>
                         </div>
                     </div>
@@ -58,14 +81,16 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                         <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Start Date</p>
                         <div className="flex items-center gap-1.5">
                             <span className="material-icons-round text-sm text-primary">event</span>
-                            <span className="text-xs font-semibold dark:text-white">{job.startDate}</span>
+                            <span className="text-xs font-semibold dark:text-white">{formatStartDate(job.startDate)}</span>
                         </div>
                     </div>
                     <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
                         <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Commitment</p>
                         <div className="flex items-center gap-1.5">
                             <span className="material-icons-round text-sm text-primary">update</span>
-                            <span className="text-xs font-semibold dark:text-white">{job.durationCategory}</span>
+                            <span className="text-xs font-semibold dark:text-white">
+                                {job.durationCategory && job.durationCategory !== 'TBD' ? `${job.durationCategory} Months` : (job.durationCategory || 'TBD')}
+                            </span>
                         </div>
                     </div>
                     <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
@@ -81,16 +106,16 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                     <div className="mb-8">
                         <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Role Overview</h3>
                         <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                            {job.purposeShort ?? (job as any).overview ?? ''}
+                            {job.purposeShort}
                         </p>
                     </div>
 
                     <div className="mb-8">
                         <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Key Responsibilities</h3>
                         <ul className="space-y-3 list-none pl-0 text-gray-600 dark:text-gray-300">
-                            {responsibilities.map((resp: string, idx: number) => (
-                                <li key={idx} className="flex gap-3 items-start">
-                                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></span>
+                            {job.keyResponsibilities.map((resp, idx) => (
+                                <li key={idx} className="flex gap-3 items-center">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></span>
                                     <span>{resp}</span>
                                 </li>
                             ))}
@@ -100,9 +125,9 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                     <div className="mb-8">
                         <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Required Qualifications</h3>
                         <ul className="space-y-3 list-none pl-0 text-gray-600 dark:text-gray-300">
-                            {requirements.map((req: string, idx: number) => (
-                                <li key={idx} className="flex gap-3 items-start">
-                                    <span className="material-icons-round text-green-600 dark:text-green-400 text-base mt-0.5">check_circle</span>
+                            {job.requiredQualifications.map((req, idx) => (
+                                <li key={idx} className="flex gap-3 items-center">
+                                    <span className="material-icons-round text-green-600 dark:text-green-400 text-base">check_circle</span>
                                     <span>{req}</span>
                                 </li>
                             ))}
@@ -113,12 +138,12 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                         <div className="mb-8">
                             <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Preferred Qualifications</h3>
                             <ul className="space-y-3 list-none pl-0 text-gray-600 dark:text-gray-300">
-                                {preferred.map((req: string, idx: number) => (
-                                        <li key={idx} className="flex gap-3 items-start">
-                                            <span className="material-icons-round text-primary/60 text-base mt-0.5">star</span>
-                                            <span>{req}</span>
-                                        </li>
-                                    ))}
+                                {job.preferredQualifications.map((req, idx) => (
+                                    <li key={idx} className="flex gap-3 items-start">
+                                        <span className="material-icons-round text-primary/60 text-base">star</span>
+                                        <span>{req}</span>
+                                    </li>
+                                ))}
                             </ul>
                         </div>
                     )}
@@ -126,7 +151,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                     <div className="mb-6">
                         <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Languages Required</h3>
                         <div className="flex flex-wrap gap-2">
-                            {languages.map((lang: string, idx: number) => (
+                            {job.languagesRequired.map((lang, idx) => (
                                 <span key={idx} className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
                                     {lang}
                                 </span>

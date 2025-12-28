@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 
 type AirtableRecord<T> = { id: string; fields: T; createdTime: string };
 type AirtableListResponse<T> = { records: AirtableRecord<T>[]; offset?: string };
@@ -72,14 +71,14 @@ function asStringArray(v: unknown): string[] {
   return [];
 }
 
-export async function GET() {
+export async function getJobs() {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const table = process.env.AIRTABLE_GEROLES_TABLE; // set this to your Roles table name
   const view = process.env.AIRTABLE_JOBS_VIEW;
 
   if (!token || !baseId || !table) {
-    return NextResponse.json({ error: "Missing Airtable env vars" }, { status: 500 });
+    throw new Error("Missing Airtable env vars");
   }
 
   const encodedTable = encodeURIComponent(table);
@@ -90,12 +89,11 @@ export async function GET() {
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
-    next: { revalidate: 30 },
   });
 
   if (!res.ok) {
     const details = await res.text();
-    return NextResponse.json({ error: "Airtable request failed", details }, { status: 500 });
+    throw new Error(`Airtable request failed: ${details}`);
   }
 
   const data = (await res.json()) as AirtableListResponse<AirtableJobFields>;
@@ -138,5 +136,5 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ jobs });
+  return { jobs };
 }

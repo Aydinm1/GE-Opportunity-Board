@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Job } from '../types';
+import ApplyModal from './ApplyModal';
 
 interface JobDetailsProps {
     job: Job;
 }
 
 const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
+    const [showApply, setShowApply] = useState(false);
     const showSpecificLocation = (
         job.workType === 'In-Person' ||
         job.workType === 'Hybrid' ||
@@ -39,6 +41,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
     };
 
     return (
+        <>
         <div className="h-full flex flex-col">
             <div className="mb-6">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -55,7 +58,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                             </span>
                         </div>
                     </div>
-                    <button className="bg-primary hover:bg-primary-hover text-white font-bold py-2.5 px-6 rounded-lg shadow-lg shadow-blue-900/10 transition-all transform active:scale-95 text-sm uppercase tracking-wide font-body whitespace-nowrap">
+                    <button onClick={() => setShowApply(true)} className="bg-primary hover:bg-primary-hover text-white font-bold py-2.5 px-6 rounded-lg shadow-lg shadow-blue-900/10 transition-all transform active:scale-95 text-sm uppercase tracking-wide font-body whitespace-nowrap">
                         Apply Now
                     </button>
                 </div>
@@ -161,7 +164,15 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                 </div>
             </div>
         </div>
+        {showApply && (
+            <ApplyModal job={job} onClose={() => setShowApply(false)} />
+        )}
+        </>
     );
 };
 
 export default JobDetails;
+
+// Render modal at end so it overlays page
+// Note: modal is controlled by internal state `showApply` set when Apply Now clicked
+// We render it outside the component return to avoid JSX duplication — instead anchor via a small wrapper.

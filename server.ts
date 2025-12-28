@@ -1,9 +1,11 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
-import { getJobs } from './route.js';
+import { getJobs, submitApplication } from './route.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 const execAsync = promisify(exec);
 
@@ -15,7 +17,12 @@ const app = express();
 const PORT = 3001;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+// Simple upload storage (local filesystem) to provide a URL for Airtable attachments
+const uploadDir = path.resolve(process.cwd(), 'uploads');
+fs.mkdirSync(uploadDir, { recursive: true });
+app.use('/uploads', express.static(uploadDir));
 
 app.get('/api/jobs', async (req, res) => {
   try {
@@ -30,6 +37,48 @@ app.get('/api/jobs', async (req, res) => {
       error: errorMessage,
       details: errorStack
     });
+  }
+});
+
+app.post('/api/applications', async (req, res) => {
+  try {
+    const body = req.body;
+    // Expect { person: {...}, jobId?: string, jobTitle?: string }
+    if (!body || !body.person || !body.person.emailAddress) {
+      return res.status(400).json({ error: 'Missing person data or email' });
+    }
+
+    const result = await submitApplication(body);
+    res.json({ ok: true, result });
+  } catch (err) {
+    console.error('Error submitting application:', err);
+    const message = err instanceof Error ? err.message : 'Failed to submit';
+    res.status(500).json({ error: message });
+  }
+});
+
+app.post('/api/upload', async (req, res) => {
+  try {
+    const { dataUrl, filename } = req.body || {};
+    if (!dataUrl || !filename) {
+      return res.status(400).json({ error: 'Missing file data' });
+    }
+    const match = /^data:(.+);base64,(.+)$/.exec(dataUrl);
+    if (!match) {
+      return res.status(400).json({ error: 'Invalid data URL' });
+    }
+    const [, mimeType, base64] = match;
+    const buffer = Buffer.from(base64, 'base64');
+    const safeName = `${Date.now()}-${String(filename).replace(/[^\w.\-]+/g, '_')}`;
+    const filePath = path.join(uploadDir, safeName);
+    await fs.promises.writeFile(filePath, buffer);
+    const baseUrl = process.env.AIRTABLE_APPLICATIONS_TABLE || `${req.protocol}://${req.get('host')}`;
+    const url = `${baseUrl.replace(/\/$/, '')}/uploads/${safeName}`;
+    res.json({ url, filename: safeName, mimeType });
+  } catch (error) {
+    console.error('Error handling upload:', error);
+    const message = error instanceof Error ? error.message : 'Upload failed';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -85,4 +134,3 @@ process.on('SIGINT', () => {
     process.exit(0);
   });
 });
-

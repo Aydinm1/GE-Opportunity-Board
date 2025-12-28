@@ -24,3 +24,31 @@ export interface FilterOptions {
     durationCategory: string;
     timeCommitment: string;
 }
+
+export interface Person {
+  id?: string; // Airtable record id when present
+  fullName: string;
+  candidateStatus?: string | null;
+  emailAddress: string;
+  normalizedEmail?: string;
+  phoneNumber?: string | null;
+  linkedIn?: string | null;
+  age?: string | null;
+  gender?: string | null;
+  countryOfOrigin?: string | null;
+  countryOfLiving?: string | null;
+  jurisdiction?: string | null;
+  education?: string | null;
+  profession?: string | null;
+  jamatiExperience?: string | null;
+}
+
+export interface Application {
+  id?: string; // Airtable record id when present
+  personId: string; // linked People record id
+  jobId?: string | null;
+  coverLetter?: { id: string; url: string }[] | null;
+  status?: string | null;
+  source?: string | null;
+  whyAreYouInterestedInOrQualifiedForThisJob?: string | null;
+}

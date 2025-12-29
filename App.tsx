@@ -16,6 +16,7 @@ const App: React.FC = () => {
         workType: null,
         roleStatus: null,
     });
+    const [showMobileList, setShowMobileList] = useState(true);
 
     useEffect(() => {
         const fetchJobs = async () => {
@@ -106,48 +107,71 @@ const App: React.FC = () => {
             {/* Header */}
             <nav className="bg-white dark:bg-surface-dark border-b border-gray-200 dark:border-gray-800 py-4 px-4 sm:px-6 lg:px-8 z-50 relative">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                        <span className="material-icons-round text-primary text-3xl">public</span>
-                        <h1 className="text-xl font-display font-bold text-primary tracking-wide uppercase">Global Encounters</h1>
+                    <div className="flex items-center space-x-3">
+                        <img
+                            src="./img/logo.png"
+                            alt="Global Encounters"
+                            className="h-10 w-auto object-contain drop-shadow-sm"
+                        />
                     </div>
                 </div>
             </nav>
 
             {/* Hero / Search Section */}
-            <div className="relative pattern-bg pt-12 pb-32 px-4 sm:px-6 lg:px-8 shadow-lg">
+            {/*. Use pattern again: <div className="relative pattern-bg pt-12 pb-32 px-4 sm:px-6 lg:px-8 shadow-lg">*/}
+            <div
+                className="relative pt-10 pb-24 sm:pt-12 sm:pb-32 px-4 sm:px-6 lg:px-8 shadow-lg bg-[#00558C]"
+                style={{
+                    backgroundImage: "url('/img/pattern.png')",
+                    backgroundRepeat: 'repeat',
+                    backgroundSize: '700px auto',
+                }}
+            >
                 <div className="max-w-4xl mx-auto flex flex-col items-center relative z-10">
-                    <div className="w-full max-w-3xl relative group mb-6">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <span className="material-icons-round text-gray-400 group-focus-within:text-primary text-xl">search</span>
+                    <div className="w-full max-w-3xl group mb-6">
+                        <div className="relative">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+                                <span className="material-icons-round text-gray-400 group-focus-within:text-primary text-xl">search</span>
+                            </div>
+                            <input 
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="block w-full pl-12 pr-4 sm:pr-28 py-3 sm:py-4 rounded-xl border-none shadow-xl bg-white text-sm sm:text-base font-body placeholder-gray-500 text-black focus:ring-4 focus:ring-blue-500/30 transition-all" 
+                                placeholder="Job title, keywords, location" 
+                                type="text"
+                            />
+                            <button className="hidden sm:flex absolute right-2 top-2 bottom-2 bg-primary hover:bg-primary-hover text-white px-6 rounded-lg text-sm font-semibold font-body uppercase tracking-wider transition-colors shadow-sm items-center justify-center">
+                                Search
+                            </button>
                         </div>
-                        <input 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="block w-full pl-12 pr-28 py-4 rounded-xl border-none shadow-xl bg-white text-base font-body placeholder-gray-500 text-black focus:ring-4 focus:ring-blue-500/30 transition-all" 
-                            placeholder="Job title, keywords, location" 
-                            type="text"
-                        />
-                        <button className="absolute right-2 top-2 bottom-2 bg-primary hover:bg-primary-hover text-white px-6 rounded-lg text-sm font-semibold font-body uppercase tracking-wider transition-colors shadow-sm">
+                        <button className="mt-3 w-full sm:hidden bg-primary hover:bg-primary-hover text-white px-4 py-3 rounded-lg text-sm font-semibold font-body uppercase tracking-wider transition-colors shadow-sm">
                             Search
                         </button>
                     </div>
-                    <div className="w-full flex flex-wrap justify-center gap-2">
-                        {filters.map((f) => (
-                            <button 
-                                key={f.id}
-                                onClick={() => setActiveFilter(activeFilter === f.id ? null : f.id)}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium font-body shadow-sm transition-all flex items-center gap-1 border border-transparent ${
-                                    activeFilter === f.id 
-                                    ? 'bg-primary text-white' 
-                                    : 'bg-white hover:bg-gray-50 text-gray-700 hover:border-gray-200'
-                                }`}
-                            >
-                                {f.label} 
-                                <span className={`material-icons-round text-[16px] transition-transform ${activeFilter === f.id ? 'rotate-180 text-white/70' : 'text-gray-400'}`}>
-                                    expand_more
-                                </span>
-                            </button>
-                        ))}
+                    <div className="w-full flex flex-nowrap overflow-x-auto scrollbar-hide justify-start sm:justify-center gap-2 -mx-2 px-2">
+                        {filters.map((f) => {
+                            const selectedValue = selectedFilters[f.id];
+                            const selectedText = selectedValue || f.label;
+                            const isActive = activeFilter === f.id;
+                            const isSelected = Boolean(selectedValue);
+                            const onState = isActive || isSelected;
+                            return (
+                                <button 
+                                    key={f.id}
+                                    onClick={() => setActiveFilter(isActive ? null : f.id)}
+                                    className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium font-body shadow-sm transition-all flex items-center gap-1 border border-transparent whitespace-nowrap ${
+                                        onState
+                                        ? 'bg-primary text-white'
+                                        : 'bg-white hover:bg-gray-50 text-gray-700 hover:border-gray-200'
+                                    }`}
+                                >
+                                    {selectedText}
+                                    <span className={`material-icons-round text-[16px] transition-transform ${isActive ? 'rotate-180' : ''} ${onState ? 'text-white/70' : 'text-gray-400'}`}>
+                                        expand_more
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                     {activeFilter && (fieldOptions as any)[activeFilter] && (
                         <div className="w-full flex justify-center mt-3">
@@ -175,16 +199,27 @@ const App: React.FC = () => {
 
             {/* Main Content */}
             <main className="-mt-20 relative z-20 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full flex-1">
-                <div className="bg-surface-light dark:bg-surface-dark rounded-3xl shadow-2xl overflow-hidden p-6 min-h-[600px] flex flex-col md:block">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start h-full">
+                <div className="bg-surface-light dark:bg-surface-dark rounded-3xl shadow-2xl overflow-hidden p-4 sm:p-6 min-h-[600px] flex flex-col md:block">
+                    <div className="flex items-center justify-between mb-3 lg:hidden">
+                        <div className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                            Jobs ({filteredJobs.length})
+                        </div>
+                        <button
+                            onClick={() => setShowMobileList(!showMobileList)}
+                            className="text-sm font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                            {showMobileList ? 'Hide list' : 'Show list'}
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start h-full">
                         {/* Sidebar */}
-                        <div className="lg:col-span-4 flex flex-col gap-4 h-full">
+                        <div className={`lg:col-span-4 flex flex-col gap-4 h-full ${showMobileList ? '' : 'hidden lg:flex'}`}>
                             <div className="pb-2 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center mb-2">
                                 <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 font-display">
                                     {filteredJobs.length} Positions Available
                                 </h2>
                             </div>
-                            <div className="flex flex-col gap-4 overflow-y-auto lg:max-h-[800px] pr-2 scrollbar-hide">
+                            <div className="flex flex-col gap-4 overflow-y-auto lg:max-h-[800px] pr-1 sm:pr-2 scrollbar-hide">
                                 {loading ? (
                                     <div className="p-8 text-center text-gray-500 font-medium">
                                         Loading jobs...
@@ -214,7 +249,7 @@ const App: React.FC = () => {
                         </div>
 
                         {/* Detailed View */}
-                        <div className="lg:col-span-8 border-l border-gray-100 dark:border-gray-800 pl-0 lg:pl-6 h-full min-h-[500px]">
+                        <div className="lg:col-span-8 border-t border-gray-100 dark:border-gray-800 lg:border-t-0 lg:border-l pl-0 lg:pl-6 pt-4 lg:pt-0 h-full min-h-[500px]">
                             {loading ? (
                                 <div className="h-full flex items-center justify-center text-gray-400">
                                     Loading job details...

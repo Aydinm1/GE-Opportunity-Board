@@ -261,7 +261,6 @@ const ApplyModal: React.FC<ApplyModalProps> = ({ job, onClose }) => {
     "India",
     "Kenya",
     "Angola",
-    "Iran",
     "Southeast Asia"
 ]
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Person, Job } from '../types';
 
 interface ApplyModalProps {
@@ -35,10 +35,244 @@ const ApplyModal: React.FC<ApplyModalProps> = ({ job, onClose }) => {
     setPerson((p) => ({ ...p, [k]: v }));
   };
 
-  const ageOptions = ['', '<18', '18-24', '25-34', '35-44', '45-54', '55+'];
-  const genderOptions = ['', 'Female', 'Male', 'Non-binary', 'Prefer not to say'];
-  const countryOptions = ['', 'United States', 'United Kingdom', 'Canada', 'India'];
-  const jurisdictionOptions = ['', 'North America', 'South America', 'Europe', 'Africa', 'Asia', 'Oceania', 'Other'];
+  const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Above 65+',"Prefer not to share"];
+  const genderOptions = ['', 'Female', 'Male', 'Non-binary', 'Prefer not to share'];
+  const countryOptions = ['',  "Afghanistan",
+    "Albania",
+    "Algeria",
+    "Andorra",
+    "Angola",
+    "Antigua & Deps",
+    "Argentina",
+    "Armenia",
+    "Australia",
+    "Austria",
+    "Azerbaijan",
+    "Bahamas",
+    "Bahrain",
+    "Bangladesh",
+    "Barbados",
+    "Belarus",
+    "Belgium",
+    "Belize",
+    "Benin",
+    "Bhutan",
+    "Bolivia",
+    "Bosnia Herzegovina",
+    "Botswana",
+    "Brazil",
+    "Brunei",
+    "Bulgaria",
+    "Burkina",
+    "Burundi",
+    "Cambodia",
+    "Cameroon",
+    "Canada",
+    "Cape Verde",
+    "Central African Rep",
+    "Chad",
+    "Chile",
+    "China",
+    "Colombia",
+    "Comoros",
+    "Congo",
+    "Congo {Democratic Rep}",
+    "Costa Rica",
+    "Croatia",
+    "Cuba",
+    "Cyprus",
+    "Czech Republic",
+    "Denmark",
+    "Djibouti",
+    "Dominica",
+    "Dominican Republic",
+    "East Timor",
+    "Ecuador",
+    "Egypt",
+    "El Salvador",
+    "Equatorial Guinea",
+    "Eritrea",
+    "Estonia",
+    "Ethiopia",
+    "Fiji",
+    "Finland",
+    "France",
+    "Gabon",
+    "Gambia",
+    "Georgia",
+    "Germany",
+    "Ghana",
+    "Greece",
+    "Grenada",
+    "Guatemala",
+    "Guinea",
+    "Guinea-Bissau",
+    "Guyana",
+    "Haiti",
+    "Honduras",
+    "Hungary",
+    "Iceland",
+    "India",
+    "Indonesia",
+    "Iran",
+    "Iraq",
+    "Ireland {Republic}",
+    "Israel",
+    "Italy",
+    "Ivory Coast",
+    "Jamaica",
+    "Japan",
+    "Jordan",
+    "Kazakhstan",
+    "Kenya",
+    "Kiribati",
+    "Korea North",
+    "Korea South",
+    "Kosovo",
+    "Kuwait",
+    "Kyrgyzstan",
+    "Laos",
+    "Latvia",
+    "Lebanon",
+    "Lesotho",
+    "Liberia",
+    "Libya",
+    "Liechtenstein",
+    "Lithuania",
+    "Luxembourg",
+    "Macedonia",
+    "Madagascar",
+    "Malawi",
+    "Malaysia",
+    "Maldives",
+    "Mali",
+    "Malta",
+    "Marshall Islands",
+    "Mauritania",
+    "Mauritius",
+    "Mexico",
+    "Micronesia",
+    "Moldova",
+    "Monaco",
+    "Mongolia",
+    "Montenegro",
+    "Morocco",
+    "Mozambique",
+    "Myanmar, {Burma}",
+    "Namibia",
+    "Nauru",
+    "Nepal",
+    "Netherlands",
+    "New Zealand",
+    "Nicaragua",
+    "Niger",
+    "Nigeria",
+    "Norway",
+    "Oman",
+    "Pakistan",
+    "Palau",
+    "Panama",
+    "Papua New Guinea",
+    "Paraguay",
+    "Peru",
+    "Philippines",
+    "Poland",
+    "Portugal",
+    "Qatar",
+    "Romania",
+    "Russian Federation",
+    "Rwanda",
+    "St Kitts & Nevis",
+    "St Lucia",
+    "Saint Vincent & the Grenadines",
+    "Samoa",
+    "San Marino",
+    "Sao Tome & Principe",
+    "Saudi Arabia",
+    "Senegal",
+    "Serbia",
+    "Seychelles",
+    "Sierra Leone",
+    "Singapore",
+    "Slovakia",
+    "Slovenia",
+    "Solomon Islands",
+    "Somalia",
+    "South Africa",
+    "South Sudan",
+    "Spain",
+    "Sri Lanka",
+    "Sudan",
+    "Suriname",
+    "Swaziland",
+    "Sweden",
+    "Switzerland",
+    "Syria",
+    "Taiwan",
+    "Tajikistan",
+    "Tanzania",
+    "Thailand",
+    "Togo",
+    "Tonga",
+    "Trinidad & Tobago",
+    "Tunisia",
+    "Turkey",
+    "Turkmenistan",
+    "Tuvalu",
+    "Uganda",
+    "Ukraine",
+    "United Arab Emirates",
+    "United Kingdom",
+    "United States",
+    "Uruguay",
+    "Uzbekistan",
+    "Vanuatu",
+    "Vatican City",
+    "Venezuela",
+    "Vietnam",
+    "Yemen",
+    "Zambia",
+    "Zimbabwe"];
+  const jurisdictionOptions = [
+    "",
+    "Afghanistan",
+    "Australia / New Zealand",
+    "Bangladesh",
+    "Far East",
+    "France",
+    "Madagascar",
+    "Mozambique",
+    "Pakistan",
+    "Portugal",
+    "Russia",
+    "Syria",
+    "Tajikistan",
+    "Tanzania",
+    "UAE",
+    "Uganda",
+    "UK ",
+    "USA",
+    "Iran",
+    "Germany",
+    "Canada",
+    "United Arab Emirates",
+    "United Kingdom",
+    "DR Congo",
+    "India",
+    "Kenya",
+    "Angola",
+    "Iran",
+    "Southeast Asia"
+]
+
+  // Prevent background scroll while modal is open
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +322,7 @@ const ApplyModal: React.FC<ApplyModalProps> = ({ job, onClose }) => {
       };
 
       const payload = {
-        person: { ...person, normalizedEmail: normalized },
+        person: { ...person, normalizedEmail: normalized, candidateStatus: '1a - Applicant' },
         jobId: job.id,
         extras,
         attachments,
@@ -133,30 +367,20 @@ const ApplyModal: React.FC<ApplyModalProps> = ({ job, onClose }) => {
             <input placeholder="Email Address" value={person.emailAddress} onChange={(e)=>update('emailAddress', e.target.value)} className="p-2 border rounded" />
             <input placeholder="Phone Number (incl. Country Code)" value={person.phoneNumber||''} onChange={(e)=>update('phoneNumber', e.target.value)} className="p-2 border rounded" />
             <input placeholder="LinkedIn Profile Link" value={person.linkedIn||''} onChange={(e)=>update('linkedIn', e.target.value)} className="p-2 border rounded" />
-
-            <label className="text-xs text-gray-600">Age</label>
             <select value={person.age||''} onChange={(e)=>update('age', e.target.value)} className="p-2 border rounded">
-              {ageOptions.map((o)=> (<option key={o} value={o}>{o || 'Select age'}</option>))}
+              {ageOptions.map((o)=> (<option key={o} value={o}>{o || 'Select Age'}</option>))}
             </select>
-
-            <label className="text-xs text-gray-600">Gender</label>
             <select value={person.gender||''} onChange={(e)=>update('gender', e.target.value)} className="p-2 border rounded">
-              {genderOptions.map((o)=> (<option key={o} value={o}>{o || 'Select gender'}</option>))}
+              {genderOptions.map((o)=> (<option key={o} value={o}>{o || 'Select Gender'}</option>))}
             </select>
-
-            <label className="text-xs text-gray-600">Country of Origin</label>
             <select value={person.countryOfOrigin||''} onChange={(e)=>update('countryOfOrigin', e.target.value)} className="p-2 border rounded">
-              {countryOptions.map((o)=> (<option key={o} value={o}>{o || 'Select country'}</option>))}
+              {countryOptions.map((o)=> (<option key={o} value={o}>{o || 'Select Country of Origin'}</option>))}
             </select>
-
-            <label className="text-xs text-gray-600">Country of Living (Current Location)</label>
             <select value={person.countryOfLiving||''} onChange={(e)=>update('countryOfLiving', e.target.value)} className="p-2 border rounded">
-              {countryOptions.map((o)=> (<option key={o} value={o}>{o || 'Select country'}</option>))}
+              {countryOptions.map((o)=> (<option key={o} value={o}>{o || 'Select Country of Living (Current Location)'}</option>))}
             </select>
-
-            <label className="text-xs text-gray-600">Jurisdiction</label>
             <select value={person.jurisdiction||''} onChange={(e)=>update('jurisdiction', e.target.value)} className="p-2 border rounded">
-              {jurisdictionOptions.map((o)=> (<option key={o} value={o}>{o || 'Select jurisdiction'}</option>))}
+              {jurisdictionOptions.map((o)=> (<option key={o} value={o}>{o || 'Select Jurisdiction'}</option>))}
             </select>
 
           </div>

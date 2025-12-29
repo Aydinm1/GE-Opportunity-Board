@@ -33,7 +33,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                 return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border border-amber-200';
             case 'Screening Applicants':
                 return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border border-indigo-200';
-            case 'Closed':
+            case 'Filled':
                 return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700';
             default:
                 return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-sky-100 dark:bg-sky-900/30 text-primary dark:text-sky-300 border border-sky-200 dark:border-sky-800/50';
@@ -172,7 +172,3 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
 };
 
 export default JobDetails;
-
-// Render modal at end so it overlays page
-// Note: modal is controlled by internal state `showApply` set when Apply Now clicked
-// We render it outside the component return to avoid JSX duplication — instead anchor via a small wrapper.

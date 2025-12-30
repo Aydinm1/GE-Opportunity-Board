@@ -24,7 +24,9 @@ const App: React.FC = () => {
                 setLoading(true);
                 const response = await fetch('/api/jobs');
                 if (!response.ok) {
-                    throw new Error('Failed to fetch jobs');
+                    const text = await response.text().catch(() => '');
+                    const msg = text || `Failed to fetch jobs (status ${response.status})`;
+                    throw new Error(msg);
                 }
                 const data = await response.json();
                 setJobs(data.jobs || []);

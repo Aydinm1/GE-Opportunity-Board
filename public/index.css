@@ -1,0 +1,4 @@
+/* Minimal placeholder stylesheet to satisfy /index.css requests. Add custom global styles here if needed. */
+body {
+  min-height: 100vh;
+}

@@ -81,7 +81,11 @@ export async function getJobs() {
   const view = process.env.AIRTABLE_JOBS_VIEW;
 
   if (!token || !baseId || !table) {
-    throw new Error("Missing Airtable env vars");
+    const missing = [];
+    if (!token) missing.push('AIRTABLE_TOKEN');
+    if (!baseId) missing.push('AIRTABLE_BASE_ID');
+    if (!table) missing.push('AIRTABLE_GEROLES_TABLE');
+    throw new Error(`Missing Airtable env vars: ${missing.join(', ') || 'unknown'}`);
   }
 
   const encodedTable = encodeURIComponent(table);

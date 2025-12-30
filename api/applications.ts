@@ -1,4 +1,4 @@
-import { submitApplication } from '../route';
+import { submitApplication } from '../route.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

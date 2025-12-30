@@ -1,4 +1,4 @@
-import { getJobs } from '../route';
+import { getJobs } from '../route.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {

@@ -15,6 +15,8 @@ const App: React.FC = () => {
         teamVertical: null,
         workType: null,
         roleStatus: null,
+        durationCategory: null,
+        timeCommitment: null,
     });
     const [showMobileList, setShowMobileList] = useState(true);
 
@@ -81,9 +83,32 @@ const App: React.FC = () => {
 
     const filters = [
         { id: 'programmeArea', label: 'Programme Area' },
-        { id: 'teamVertical', label: 'Team Vertical' },
-        { id: 'workType', label: 'Work Type' },
-        { id: 'roleStatus', label: 'Role Status' },
+        { id: 'teamVertical', label: 'Team' },
+        { id: 'workType', label: 'Type' },
+        //{ id: 'roleStatus', label: 'Role Status' },
+        { id: 'durationCategory', label: 'Project Duration' },
+        { id: 'timeCommitment', label: 'Weekly Time Commitment' },
+    ];
+
+     type FilterOption = string | { value: string; label: string };
+
+    const durationBuckets: { value: string; label: string }[] = [
+        { value: '0–3', label: '0–3 months' },
+        { value: '3–6', label: '3–6 months' },
+        { value: '6–9', label: '6–9 months' },
+        { value: '9–12', label: '9–12 months' },
+        { value: '12+', label: '12+ months' },
+        { value: 'TBD', label: 'TBD' },
+    ];
+    const timeCommitmentBuckets = [
+        '5-10 hours',
+        '10-15 hours',
+        '15-20 hours',
+        '20-25 hours',
+        '25-30 hours',
+        '30-35 hours',
+        '35-40 hours',
+        '40+ hours',
     ];
 
     const fieldOptions = useMemo(() => {
@@ -92,6 +117,8 @@ const App: React.FC = () => {
             teamVertical: new Set(),
             workType: new Set(),
             roleStatus: new Set(),
+            durationCategory: new Set(),
+            timeCommitment: new Set(),
         };
         jobs.forEach(j => {
             if (j.programmeArea) opts.programmeArea.add(j.programmeArea);
@@ -99,9 +126,47 @@ const App: React.FC = () => {
             if (j.workType) opts.workType.add(j.workType);
             const rs = (j as any).roleStatus;
             if (rs) opts.roleStatus.add(rs);
+            if (j.durationCategory) opts.durationCategory.add(j.durationCategory);
+            if (j.timeCommitment) opts.timeCommitment.add(j.timeCommitment);
         });
-        return Object.fromEntries(Object.entries(opts).map(([k, s]) => [k, Array.from(s).sort()]));
+        // Ensure required base options always show, then append any extras (alphabetized)
+        const mergeWithBase = (base: string[], set: Set<string>) => {
+            const extras = Array.from(set).filter(v => !base.includes(v)).sort();
+            return [...base, ...extras];
+        };
+
+         const mergeDuration = (base: { value: string; label: string }[], set: Set<string>) => {
+            const seen = new Set(base.map(b => b.value));
+            const extras = Array.from(set)
+                .filter(v => !seen.has(v))
+                .sort()
+                .map(v => ({ value: v, label: v }));
+            return [...base, ...extras];
+        };
+        
+        const mapped = Object.fromEntries(
+            Object.entries(opts).map(([k, s]) => {
+                if (k === 'durationCategory') return [k, mergeDuration(durationBuckets, s)];
+                if (k === 'timeCommitment') return [k, mergeWithBase(timeCommitmentBuckets, s)];
+                return [k, Array.from(s).sort()];
+            })
+        );
+        return mapped;
     }, [jobs]);
+
+    const clearAllFilters = () => {
+        setSelectedFilters({
+            programmeArea: null,
+            teamVertical: null,
+            workType: null,
+            roleStatus: null,
+            durationCategory: null,
+            timeCommitment: null,
+        });
+        setActiveFilter(null);
+    };
+
+    const anyFilterSelected = Object.values(selectedFilters).some(Boolean);
 
 
     return (
@@ -130,6 +195,10 @@ const App: React.FC = () => {
                 }}
             >
                 <div className="max-w-4xl mx-auto flex flex-col items-center relative z-10">
+                    <div className="w-full max-w-3xl text-center text-white mb-6">
+                        <p className="text-[11px] sm:text-xs uppercase tracking-[0.3em] font-semibold text-white/80">Opportunity Board</p>
+                        <h1 className="text-2xl sm:text-3xl font-bold mt-2 font-display leading-tight">Find your next Global Encounters role</h1>
+                    </div>
                     <div className="w-full max-w-3xl group mb-6">
                         <div className="relative">
                             <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
@@ -150,7 +219,7 @@ const App: React.FC = () => {
                             Search
                         </button>
                     </div>
-                    <div className="w-full flex flex-nowrap overflow-x-auto scrollbar-hide justify-start sm:justify-center gap-2 -mx-2 px-2">
+                    <div className="w-full flex flex-wrap justify-center gap-2 px-2">
                         {filters.map((f) => {
                             const selectedValue = selectedFilters[f.id];
                             const selectedText = selectedValue || f.label;
@@ -174,6 +243,14 @@ const App: React.FC = () => {
                                 </button>
                             );
                         })}
+                        {anyFilterSelected && (
+                            <button
+                                onClick={clearAllFilters}
+                                className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium font-body shadow-sm transition-all flex items-center gap-1 border border-transparent whitespace-nowrap bg-white hover:bg-gray-50 text-gray-700 hover:border-gray-200"
+                            >
+                                Clear All
+                            </button>
+                        )}
                     </div>
                     {activeFilter && (fieldOptions as any)[activeFilter] && (
                         <div className="w-full flex justify-center mt-3">
@@ -184,15 +261,19 @@ const App: React.FC = () => {
                                 >
                                     All
                                 </button>
-                                {((fieldOptions as any)[activeFilter] as string[]).map((opt: string) => (
+                                {((fieldOptions as any)[activeFilter] as FilterOption[]).map((opt: FilterOption) => {
+                                    const value = typeof opt === 'string' ? opt : opt.value;
+                                    const label = typeof opt === 'string' ? opt : opt.label;
+                                    return (
                                     <button
-                                        key={opt}
-                                        onClick={() => { setSelectedFilters({ ...selectedFilters, [activeFilter]: opt }); setActiveFilter(null); }}
+                                        key={value}
+                                        onClick={() => { setSelectedFilters({ ...selectedFilters, [activeFilter]: value }); setActiveFilter(null); }}
                                         className={`px-3 py-1 rounded text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-100`}
                                     >
-                                        {opt}
+                                        {label}
                                     </button>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}

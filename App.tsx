@@ -83,7 +83,7 @@ const App: React.FC = () => {
 
     const filters = [
         { id: 'programmeArea', label: 'Programme Area' },
-        { id: 'teamVertical', label: 'Team' },
+        { id: 'teamVertical', label: 'Functional Area' },
         { id: 'workType', label: 'Type' },
         //{ id: 'roleStatus', label: 'Role Status' },
         { id: 'durationCategory', label: 'Project Duration' },
@@ -196,8 +196,8 @@ const App: React.FC = () => {
             >
                 <div className="max-w-4xl mx-auto flex flex-col items-center relative z-10">
                     <div className="w-full max-w-3xl text-center text-white mb-6">
-                        <p className="text-[11px] sm:text-xs uppercase tracking-[0.3em] font-semibold text-white/80">Opportunity Board</p>
-                        <h1 className="text-2xl sm:text-3xl font-bold mt-2 font-display leading-tight">Find your next Global Encounters role</h1>
+                         <h1 className="text-3xl sm:text-4xl font-bold font-display leading-tight">Opportunity Board</h1>
+                        <p className="text-base sm:text-lg font-semibold mt-2 text-white/85">Find your next Global Encounters role</p>
                     </div>
                     <div className="w-full max-w-3xl group mb-6">
                         <div className="relative">

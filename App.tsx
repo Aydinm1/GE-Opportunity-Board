@@ -197,7 +197,7 @@ const App: React.FC = () => {
                 <div className="max-w-4xl mx-auto flex flex-col items-center relative z-10">
                     <div className="w-full max-w-3xl text-center text-white mb-6">
                          <h1 className="text-3xl sm:text-4xl font-bold font-display leading-tight">Opportunity Board</h1>
-                        <p className="text-base sm:text-lg font-semibold mt-2 text-white/85">Find your next Global Encounters role</p>
+                        <p className="text-base sm:text-lg font-semibold mt-2 text-white/85">Find your next role today</p>
                     </div>
                     <div className="w-full max-w-3xl group mb-6">
                         <div className="relative">

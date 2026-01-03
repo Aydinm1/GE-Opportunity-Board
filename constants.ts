@@ -22,10 +22,12 @@ export const MOCK_JOBS: Job[] = [
             '5+ years of experience in program management, preferably in the non-profit sector.',
             'Fluency in English and Spanish is required; French is a plus.'
         ],
+        otherQualifications: null,
         preferredQualifications: [
             'Master\'s degree in relevant field.',
             'Experience with cross-cultural communication in professional settings.'
         ],
+        additionalQualifications: null,
         timeCommitment: '40 Hrs/Wk',
         languagesRequired: ['English', 'Spanish', 'French']
     },
@@ -50,10 +52,12 @@ export const MOCK_JOBS: Job[] = [
             'Deep knowledge of the Nairobi metropolitan area.',
             'Valid Kenyan driving license and clean record.'
         ],
+        otherQualifications: null,
         preferredQualifications: [
             'Certification in Logistics or Supply Chain.',
             'First Aid certification.'
         ],
+        additionalQualifications: null,
         timeCommitment: '20 Hrs/Wk',
         languagesRequired: ['English', 'Swahili']
     },
@@ -78,10 +82,12 @@ export const MOCK_JOBS: Job[] = [
             'Advanced proficiency in Microsoft Excel and project software.',
             'Excellent written and verbal communication skills.'
         ],
+        otherQualifications: null,
         preferredQualifications: [
             'Experience with European urban development grants.',
             'PMP or PRINCE2 certification.'
         ],
+        additionalQualifications: null,
         timeCommitment: '15 Hrs/Wk',
         languagesRequired: ['English']
     },
@@ -106,10 +112,12 @@ export const MOCK_JOBS: Job[] = [
             'Experience working in Southeast Asian health systems.',
             'Grant writing experience is highly desirable.'
         ],
+        otherQualifications: null,
         preferredQualifications: [
             'Background in epidemiology.',
             'Fluent in at least one regional language.'
         ],
+        additionalQualifications: null,
         timeCommitment: '30 Hrs/Wk',
         languagesRequired: ['English', 'Vietnamese', 'Thai']
     }

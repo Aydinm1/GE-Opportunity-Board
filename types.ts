@@ -11,7 +11,9 @@ export interface Job {
   purposeShort: string | null;
   keyResponsibilities: string[];
   requiredQualifications: string[];
+  otherQualifications: string | null;
   preferredQualifications: string[];
+  additionalQualifications: string | null;
   timeCommitment: string | null;
   languagesRequired: string[];
 };

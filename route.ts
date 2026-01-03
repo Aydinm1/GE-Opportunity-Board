@@ -74,6 +74,12 @@ function asStringArray(v: unknown): string[] {
   return [];
 }
 
+function asOptionalTrimmedString(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const trimmed = v.trim();
+  return trimmed ? trimmed : null;
+}
+
 export async function getJobs() {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
@@ -131,10 +137,10 @@ export async function getJobs() {
       keyResponsibilities: splitBullets(r.fields["Key Responsibilities"]),
 
       requiredQualifications: asStringArray(r.fields["10. Required Qualifications"]),
-      requiredOther: r.fields["Other"] ?? null,
+      otherQualifications: asOptionalTrimmedString(r.fields["Other"]),
 
       preferredQualifications: asStringArray(r.fields["Preferred Qualifications"]),
-      additionalSkillNotes: r.fields["Additional Skill Notes"] ?? null,
+      additionalQualifications: asOptionalTrimmedString(r.fields["Additional Skill Notes"]),
 
       timeCommitment: r.fields["Estimated Time Commitment copy"] ?? null,
 

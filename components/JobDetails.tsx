@@ -8,6 +8,32 @@ interface JobDetailsProps {
 
 const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
     const [showApply, setShowApply] = useState(false);
+    const splitLines = (val?: string | null) =>
+        val
+            ? val
+                  .split(/\r?\n/)
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+            : [];
+    const otherQualifications = splitLines(job.otherQualifications);
+    const requiredQualifications = otherQualifications.length
+        ? [...job.requiredQualifications, ...otherQualifications]
+        : job.requiredQualifications;
+
+    const additionalQualifications = splitLines(job.additionalQualifications);
+    const normalizedPreferred = job.preferredQualifications
+        .map((pref) => pref.trim())
+        .filter(Boolean);
+    const hasOtherPreferredSelection = normalizedPreferred.some(
+        (pref) => pref.toLowerCase() === 'other (please specify below)'
+    );
+    const preferredQualifications =
+        hasOtherPreferredSelection && additionalQualifications.length
+            ? normalizedPreferred.filter((pref) => pref.toLowerCase() !== 'other (please specify below)')
+            : normalizedPreferred;
+    if ((hasOtherPreferredSelection || additionalQualifications.length) && additionalQualifications.length) {
+        preferredQualifications.push(...additionalQualifications);
+    }
     const showSpecificLocation = (
         job.workType === 'In-Person' ||
         job.workType === 'Hybrid' ||
@@ -128,7 +154,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                     <div className="mb-8">
                         <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Required Qualifications</h3>
                         <ul className="space-y-3 list-none pl-0 text-gray-600 dark:text-gray-300">
-                            {job.requiredQualifications.map((req, idx) => (
+                            {requiredQualifications.map((req, idx) => (
                                 <li key={idx} className="flex gap-3 items-center">
                                     <span className="material-icons-round text-green-600 dark:text-green-400 text-base">check_circle</span>
                                     <span>{req}</span>
@@ -137,11 +163,11 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                         </ul>
                     </div>
 
-                    {job.preferredQualifications.length > 0 && (
+                    {preferredQualifications.length > 0 && (
                         <div className="mb-8">
                             <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Preferred Qualifications</h3>
                             <ul className="space-y-3 list-none pl-0 text-gray-600 dark:text-gray-300">
-                                {job.preferredQualifications.map((req, idx) => (
+                                {preferredQualifications.map((req, idx) => (
                                     <li key={idx} className="flex gap-3 items-start">
                                         <span className="material-icons-round text-primary/60 text-base">star</span>
                                         <span>{req}</span>

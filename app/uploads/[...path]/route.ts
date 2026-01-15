@@ -16,13 +16,12 @@ const CONTENT_TYPES: Record<string, string> = {
   '.rtf': 'application/rtf',
 };
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { path: string[] } }
-) {
+export async function GET(_req: Request) {
   try {
     const uploadDir = path.resolve(process.cwd(), 'uploads');
-    const requestedPath = params.path.join('/');
+    const url = new URL(_req.url);
+    let requestedPath = url.pathname.replace(/^\/uploads(?:\/|$)/, '');
+    requestedPath = decodeURIComponent(requestedPath);
     const fullPath = path.resolve(uploadDir, requestedPath);
 
     if (!fullPath.startsWith(uploadDir + path.sep)) {

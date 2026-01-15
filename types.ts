@@ -1,6 +1,7 @@
 export interface Job {
   id: string;
   roleTitle: string;
+  roleStatus?: string | null;
   programmeArea: string | null;
   teamVertical: string | null;
   locationBase: string | null;

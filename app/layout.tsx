@@ -29,7 +29,21 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/icon?family=Material+Icons+Round"
           rel="stylesheet"
         />
-         <script src="https://cdn.tailwindcss.com?plugins=forms,typography" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Remove known extension attributes that can cause hydration mismatches
+              try {
+                var attrs = ['data-new-gr-c-s-check-loaded', 'data-gr-ext-installed'];
+                var b = document && document.body;
+                var h = document && document.documentElement;
+                if (b) attrs.forEach(function(a){ if (b.hasAttribute && b.hasAttribute(a)) b.removeAttribute(a); });
+                if (h) attrs.forEach(function(a){ if (h.hasAttribute && h.hasAttribute(a)) h.removeAttribute(a); });
+              } catch (e) {}
+            `,
+          }}
+        />
+        <script src="https://cdn.tailwindcss.com?plugins=forms,typography" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

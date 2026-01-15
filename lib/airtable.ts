@@ -1,3 +1,4 @@
+import type { Person } from '../types';
 
 type AirtableRecord<T> = { id: string; fields: T; createdTime: string };
 type AirtableListResponse<T> = { records: AirtableRecord<T>[]; offset?: string };
@@ -32,8 +33,6 @@ type AirtableJobFields = {
   "Languages Required"?: string[] | string;
   "OTHER LANGUAGES"?: string;
 };
-
-import type { Person, Application } from './types';
 
 function splitBullets(text?: string): string[] {
   if (!text) return [];

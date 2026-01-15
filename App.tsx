@@ -172,7 +172,7 @@ const App: React.FC = () => {
     return (
         <div className="min-h-screen flex flex-col">
             {/* Header */}
-            <nav className="bg-white dark:bg-surface-dark border-b border-gray-200 dark:border-gray-800 py-4 px-4 sm:px-6 lg:px-8 z-50 relative">
+            {/* <nav className="bg-white dark:bg-surface-dark border-b border-gray-200 dark:border-gray-800 py-4 px-4 sm:px-6 lg:px-8 z-50 relative">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                         <img
@@ -182,7 +182,7 @@ const App: React.FC = () => {
                         />
                     </div>
                 </div>
-            </nav>
+            </nav> */}
 
             {/* Hero / Search Section */}
             {/*. Use pattern again: <div className="relative pattern-bg pt-12 pb-32 px-4 sm:px-6 lg:px-8 shadow-lg">*/}

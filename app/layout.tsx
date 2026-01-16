@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import Script from 'next/script';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -44,6 +45,7 @@ export default function RootLayout({
           }}
         />
         <script src="https://cdn.tailwindcss.com?plugins=forms,typography" />
+        <Script src="/resize-child.js" strategy="afterInteractive" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

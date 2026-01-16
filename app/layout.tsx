@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import Script from 'next/script';
 import './globals.css';
-import { Analytics } from '@vercel/analytics/next';
 export const metadata: Metadata = {
   title: 'GE Opportunity Board',
   description: 'Global Encounters Opportunity Board',
@@ -80,7 +79,6 @@ export default function RootLayout({
       </head>
       <body className="bg-background-light dark:bg-background-dark text-black dark:text-white font-body antialiased transition-colors duration-200">
         {children}
-        <Analytics />
       </body>
     </html>
   );

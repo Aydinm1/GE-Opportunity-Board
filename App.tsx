@@ -352,12 +352,13 @@ const App: React.FC = () => {
             </main>
 
             {/* Mobile Bottom Nav */}
-            <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-surface-dark border-t border-gray-200 dark:border-gray-800 pb-safe pt-2 px-6 flex justify-center z-50 lg:hidden shadow-lg">
+            {/* <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-surface-dark border-t border-gray-200 dark:border-gray-800 pb-safe pt-2 px-6 flex justify-center z-50 lg:hidden shadow-lg">
                 <button className="flex flex-col items-center gap-1 text-primary p-2">
                     <span className="material-icons-round">home</span>
                     <span className="text-[10px] font-bold uppercase tracking-wide font-body">Home</span>
                 </button>
             </nav>
+            */}
             <div className="h-20 lg:hidden"></div>
         </div>
     );

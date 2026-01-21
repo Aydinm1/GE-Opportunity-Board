@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Job } from '../types';
-import { splitBullets } from '../lib/utils';
+import { splitBullets, formatStartDate, statusVariant } from '../lib/utils';
 import ApplyModal from './ApplyModal';
 
 interface JobDetailsProps {
@@ -34,31 +34,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
         job.workType === 'Onsite' ||
         job.workType === 'On-site'
     ) && job.locationBase;
-    const formatStartDate = (dateStr?: string) => {
-        if (!dateStr) return '';
-        const m = dateStr.match(/^(\d{4})-(\d{2})/);
-        if (!m) return dateStr;
-        const [, year, month] = m;
-        const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        const idx = parseInt(month, 10) - 1;
-        if (idx < 0 || idx > 11) return year;
-        return `${monthNames[idx]} ${year}`;
-    };
-
-    const getStatusStyles = (status: string | null) => {
-        switch (status) {
-            case 'Actively Hiring':
-                return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-sky-100 dark:bg-sky-900/30 text-primary dark:text-sky-300 border border-sky-200 dark:border-sky-800/50';
-            case 'Interviewing':
-                return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border border-amber-200';
-            case 'Screening Applicants':
-                return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border border-indigo-200';
-            case 'Filled':
-                return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700';
-            default:
-                return 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-sky-100 dark:bg-sky-900/30 text-primary dark:text-sky-300 border border-sky-200 dark:border-sky-800/50';
-        }
-    };
+    const getStatusStyles = (status: string | null) => statusVariant(status).details;
 
     return (
         <>

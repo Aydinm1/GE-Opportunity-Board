@@ -58,3 +58,46 @@ export function asOptionalTrimmedString(v: unknown): string | null {
   const t = v.trim();
   return t ? t : null;
 }
+
+export function formatStartDate(dateStr?: string) {
+  if (!dateStr) return '';
+  const m = dateStr.match(/^(\d{4})-(\d{2})/);
+  if (!m) return dateStr;
+  const [, year, month] = m;
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const idx = parseInt(month, 10) - 1;
+  if (idx < 0 || idx > 11) return year;
+  return `${monthNames[idx]} ${year}`;
+}
+
+export function statusVariant(status?: string | null) {
+  const s = status || 'Actively Hiring';
+  switch (s) {
+    case 'Actively Hiring':
+      return {
+        details: 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-sky-100 dark:bg-sky-900/30 text-primary dark:text-sky-300 border border-sky-200 dark:border-sky-800/50',
+        card: 'bg-sky-100 dark:bg-sky-900/40 text-[#00558C] dark:text-sky-300 border-sky-200 dark:border-sky-800',
+      };
+    case 'Interviewing':
+      return {
+        details: 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border border-amber-200',
+        card: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200',
+      };
+    case 'Screening Applicants':
+      return {
+        details: 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border border-indigo-200',
+        card: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border-indigo-200',
+      };
+    case 'Filled':
+    case 'Closed':
+      return {
+        details: 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700',
+        card: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700',
+      };
+    default:
+      return {
+        details: 'inline-flex items-center px-2.5 py-1 rounded text-[10px] font-semibold bg-sky-100 dark:bg-sky-900/30 text-primary dark:text-sky-300 border border-sky-200 dark:border-sky-800/50',
+        card: 'bg-sky-100 dark:bg-sky-900/40 text-[#00558C] dark:text-sky-300 border-sky-200 dark:border-sky-800',
+      };
+  }
+}

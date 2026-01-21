@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Person, Job } from '../types';
 
 interface ApplyModalProps {
@@ -273,6 +273,22 @@ const ApplyModal: React.FC<ApplyModalProps> = ({ job, onClose }) => {
     };
   }, []);
 
+  // Scroll progress for the modal content
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const pct = Math.max(0, Math.min(1, scrollTop / (scrollHeight - clientHeight || 1)));
+      setProgress(pct);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [contentRef.current]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -353,51 +369,98 @@ const ApplyModal: React.FC<ApplyModalProps> = ({ job, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-4xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between mb-4">
-          <h2 className="text-lg font-bold">Apply — {job.roleTitle}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="relative bg-white dark:bg-gray-900 px-4 pt-4 pb-3 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center justify-between">
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700 w-8 text-left">✕</button>
+            <div className="text-center">
+              <h2 className="text-base font-semibold">Apply</h2>
+              <div className="text-sm text-primary/90 mt-0.5">{job.roleTitle}</div>
+            </div>
+            <div className="w-8" />
+          </div>
+          {/* progress bar */}
+          <div className="mt-3 h-1 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+            <div className="h-1 bg-primary transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <h3 className="text-sm font-semibold mb-2">Your details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-            <input placeholder="Full Name" value={person.fullName} onChange={(e)=>update('fullName', e.target.value)} className="p-2 border rounded" />
-            <input placeholder="Email Address" value={person.emailAddress} onChange={(e)=>update('emailAddress', e.target.value)} className="p-2 border rounded" />
-            <input placeholder="Phone Number (incl. Country Code)" value={person.phoneNumber||''} onChange={(e)=>update('phoneNumber', e.target.value)} className="p-2 border rounded" />
-            <input placeholder="LinkedIn Profile Link" value={person.linkedIn||''} onChange={(e)=>update('linkedIn', e.target.value)} className="p-2 border rounded" />
-            <select value={person.age||''} onChange={(e)=>update('age', e.target.value)} className="p-2 border rounded">
-              {ageOptions.map((o)=> (<option key={o} value={o}>{o || 'Select Age'}</option>))}
-            </select>
-            <select value={person.gender||''} onChange={(e)=>update('gender', e.target.value)} className="p-2 border rounded">
-              {genderOptions.map((o)=> (<option key={o} value={o}>{o || 'Select Gender'}</option>))}
-            </select>
-            <select value={person.countryOfOrigin||''} onChange={(e)=>update('countryOfOrigin', e.target.value)} className="p-2 border rounded">
-              {countryOptions.map((o)=> (<option key={o} value={o}>{o || 'Select Country of Origin'}</option>))}
-            </select>
-            <select value={person.countryOfLiving||''} onChange={(e)=>update('countryOfLiving', e.target.value)} className="p-2 border rounded">
-              {countryOptions.map((o)=> (<option key={o} value={o}>{o || 'Select Country of Living (Current Location)'}</option>))}
-            </select>
-            <select value={person.jurisdiction||''} onChange={(e)=>update('jurisdiction', e.target.value)} className="p-2 border rounded">
-              {jurisdictionOptions.map((o)=> (<option key={o} value={o}>{o || 'Select Jurisdiction'}</option>))}
-            </select>
+        <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
+          <h3 className="text-xs font-bold uppercase tracking-widest mb-3 px-6 pt-4">Your details</h3>
+          <div ref={contentRef} className="flex-1 overflow-y-auto p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
+                <input placeholder="Enter your full name" value={person.fullName} onChange={(e)=>update('fullName', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              </div>
 
-          </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                <input placeholder="email@example.com" value={person.emailAddress} onChange={(e)=>update('emailAddress', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Academic / Professional Education</label>
-            <textarea placeholder="Academic / Professional Education" value={person.education||''} onChange={(e)=>update('education', e.target.value)} className="w-full p-2 border rounded h-24" />
-          </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Phone Number</label>
+                <input placeholder="+1 (555) 000-0000" value={person.phoneNumber||''} onChange={(e)=>update('phoneNumber', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Profession / Occupation</label>
-            <textarea placeholder="Profession / Occupation" value={person.profession||''} onChange={(e)=>update('profession', e.target.value)} className="w-full p-2 border rounded h-24" />
-          </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-gray-700 mb-1">LinkedIn Profile</label>
+                <input placeholder="https://linkedin.com/in/username" value={person.linkedIn||''} onChange={(e)=>update('linkedIn', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Jamati Experience</label>
-            <textarea placeholder="Jamati Experience" value={person.jamatiExperience||''} onChange={(e)=>update('jamatiExperience', e.target.value)} className="w-full p-2 border rounded h-24" />
-          </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Age Range</label>
+                <select value={person.age||''} onChange={(e)=>update('age', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  {ageOptions.map((o)=> (<option key={o} value={o}>{o || 'Select age range'}</option>))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
+                <select value={person.gender||''} onChange={(e)=>update('gender', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  {genderOptions.map((o)=> (<option key={o} value={o}>{o || 'Select gender'}</option>))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Country of Origin</label>
+                <select value={person.countryOfOrigin||''} onChange={(e)=>update('countryOfOrigin', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  {countryOptions.map((o)=> (<option key={o} value={o}>{o || 'Select country'}</option>))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Current Country</label>
+                <select value={person.countryOfLiving||''} onChange={(e)=>update('countryOfLiving', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  {countryOptions.map((o)=> (<option key={o} value={o}>{o || 'Select country'}</option>))}
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Jurisdiction</label>
+                <select value={person.jurisdiction||''} onChange={(e)=>update('jurisdiction', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  {jurisdictionOptions.map((o)=> (<option key={o} value={o}>{o || 'Select jurisdiction'}</option>))}
+                </select>
+              </div>
+
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Academic / Professional Education</label>
+              <textarea placeholder="Academic / Professional Education" value={person.education||''} onChange={(e)=>update('education', e.target.value)} className="w-full p-2 border rounded h-24" />
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Profession / Occupation</label>
+              <textarea placeholder="Profession / Occupation" value={person.profession||''} onChange={(e)=>update('profession', e.target.value)} className="w-full p-2 border rounded h-24" />
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Jamati Experience</label>
+              <textarea placeholder="Jamati Experience" value={person.jamatiExperience||''} onChange={(e)=>update('jamatiExperience', e.target.value)} className="w-full p-2 border rounded h-24" />
+            </div>
 
           <div className="mb-4">
             <label className="block text-sm font-medium mb-1">CV / Resume (attachment)</label>
@@ -410,29 +473,38 @@ const ApplyModal: React.FC<ApplyModalProps> = ({ job, onClose }) => {
             />
           </div>
 
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-1">Why are you interested in or qualified for this job?</label>
-            <textarea
-              placeholder="Share why this opportunity is a fit for you"
-              value={whyText}
-              onChange={(e) => setWhyText(e.target.value)}
-              className="w-full p-2 border rounded h-28"
-            />
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-1">Why are you interested in or qualified for this job?</label>
+              <textarea
+                placeholder="Share why this opportunity is a fit for you"
+                value={whyText}
+                onChange={(e) => setWhyText(e.target.value)}
+                className="w-full p-2 border rounded h-28"
+              />
+            </div>
+
+            {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
+            {success && <p className="text-sm text-primary mt-3">{success}</p>}
+
           </div>
 
-          <div className="flex items-center gap-3 justify-end">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded border">Cancel</button>
-            <button type="submit" className="px-4 py-2 rounded bg-primary text-white" disabled={loading}>
-              {loading ? 'Submitting...' : 'Submit'}
-            </button>
+          {/* Sticky footer with big submit button */}
+          <div className="p-5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+            <div className="max-w-full mx-auto">
+              <div className="flex gap-3">
+                <button type="button" onClick={onClose} className="flex-1 px-4 py-3 rounded-lg border">Cancel</button>
+                <button type="submit" className="flex-1 bg-primary text-white px-4 py-3 rounded-lg font-bold shadow-lg flex items-center justify-center gap-2" disabled={loading}>
+                  <span>{loading ? 'Submitting...' : 'Submit Application'}</span>
+                  <span className="material-icons-round">send</span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
-          {success && <p className="text-sm text-green-600 mt-3">{success}</p>}
         </form>
       </div>
     </div>
-  );
-};
+    );
+  };
 
-export default ApplyModal;
+  export default ApplyModal;

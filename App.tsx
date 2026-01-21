@@ -103,13 +103,10 @@ const App: React.FC = () => {
         { value: 'TBD', label: 'TBD' },
     ];
     const timeCommitmentBuckets = [
-        '5-10 hours',
-        '10-15 hours',
-        '15-20 hours',
-        '20-25 hours',
-        '25-30 hours',
-        '30-35 hours',
-        '35-40 hours',
+        '1-10 hours',
+        '10-20 hours',
+        '20-30 hours',
+        '30-40 hours',
         '40+ hours',
     ];
 

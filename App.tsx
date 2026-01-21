@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Job } from './types';
+import { Job, FilterOptions } from './types';
 import JobCard from './components/JobCard';
 import JobDetails from './components/JobDetails';
 import Filters from './components/Filters';
@@ -11,7 +11,7 @@ const App: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-    const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
+    const [selectedFilters, setSelectedFilters] = useState<FilterOptions>({
         programmeArea: [],
         teamVertical: [],
         workType: [],

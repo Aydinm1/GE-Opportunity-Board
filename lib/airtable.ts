@@ -1,4 +1,5 @@
 import type { Person } from '../types';
+import { splitBullets, parseDurationMonths, bucketFromMonths, asStringArray, asOptionalTrimmedString } from './utils';
 
 type AirtableRecord<T> = { id: string; fields: T; createdTime: string };
 type AirtableListResponse<T> = { records: AirtableRecord<T>[]; offset?: string };
@@ -14,6 +15,7 @@ type AirtableJobFields = {
 
   "Location / Base"?: string;
   "Work Type"?: string;
+  "Role Type"?: string;
 
   "Start Date"?: string; // Airtable date as "YYYY-MM-DD"
   "Duration (Months)"?: number | string; // Number field preferred; but tolerate string
@@ -34,50 +36,7 @@ type AirtableJobFields = {
   "OTHER LANGUAGES"?: string;
 };
 
-function splitBullets(text?: string): string[] {
-  if (!text) return [];
-  return text
-    .split(/\r?\n/)
-    .map((s) => s.replace(/^[-•\d.)\s]+/, "").trim())
-    .filter(Boolean);
-}
-
-function parseDurationMonths(v: number | string | undefined): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string") {
-    const m = v.match(/(\d+(\.\d+)?)/);
-    if (!m) return null;
-    const n = Number(m[1]);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-
-// Fallback bucket logic if Airtable field is blank/missing
-function bucketFromMonths(months: number | null): string {
-  if (!months) return "TBD";
-  if (months <= 3) return "0–3";
-  if (months <= 6) return "3–6";
-  if (months <= 9) return "6–9";
-  if (months <= 12) return "9–12";
-  return "12+";
-}
-
-function asStringArray(v: unknown): string[] {
-  if (Array.isArray(v)) return v.filter((x) => typeof x === "string") as string[];
-  if (typeof v === "string")
-    return v
-      .split(/\r?\n|,/g)
-      .map((s) => s.trim())
-      .filter(Boolean);
-  return [];
-}
-
-function asOptionalTrimmedString(v: unknown): string | null {
-  if (typeof v !== "string") return null;
-  const trimmed = v.trim();
-  return trimmed ? trimmed : null;
-}
+// Shared helpers moved to lib/utils.ts
 
 export async function getJobs() {
   const token = process.env.AIRTABLE_TOKEN;
@@ -125,6 +84,7 @@ export async function getJobs() {
 
       locationBase: r.fields["Location / Base"] ?? null,
       workType: r.fields["Work Type"] ?? null,
+      roleType: r.fields["Role Type"] ?? null,
 
       startDate: r.fields["Start Date"] ?? null,
 

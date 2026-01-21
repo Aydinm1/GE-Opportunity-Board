@@ -1,20 +1,21 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Job } from '../types';
+import { Job, FilterOptions } from '../types';
+import { DURATION_BUCKETS, TIME_COMMITMENT_BUCKETS } from '../lib/utils';
 
 type FilterOption = string | { value: string; label: string };
 
 interface Props {
   jobs: Job[];
-  selectedFilters: Record<string, string[]>;
-  setSelectedFilters: (s: Record<string, string[]>) => void;
+  selectedFilters: FilterOptions;
+  setSelectedFilters: React.Dispatch<React.SetStateAction<FilterOptions>>;
 }
 
 const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters }) => {
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<keyof FilterOptions | null>(null);
   const filtersRowRef = useRef<HTMLDivElement | null>(null);
   const optionsPanelRef = useRef<HTMLDivElement | null>(null);
 
-  const filters = [
+  const filters: { id: keyof FilterOptions; label: string }[] = [
     { id: 'programmeArea', label: 'Programme Area' },
     { id: 'teamVertical', label: 'Functional Area' },
     { id: 'workType', label: 'Type' },
@@ -22,24 +23,10 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters })
     { id: 'timeCommitment', label: 'Weekly Time Commitment' },
   ];
 
-  const durationBuckets: { value: string; label: string }[] = [
-    { value: '0–3', label: '0–3 months' },
-    { value: '3–6', label: '3–6 months' },
-    { value: '6–9', label: '6–9 months' },
-    { value: '9–12', label: '9–12 months' },
-    { value: '12+', label: '12+ months' },
-    { value: 'TBD', label: 'TBD' },
-  ];
+  const durationBuckets = DURATION_BUCKETS;
+  const timeCommitmentBuckets = TIME_COMMITMENT_BUCKETS;
 
-  const timeCommitmentBuckets = [
-    '1-10 hours',
-    '10-20 hours',
-    '20-30 hours',
-    '30-40 hours',
-    '40+ hours',
-  ];
-
-  const fieldOptions = useMemo(() => {
+  const fieldOptions = useMemo((): Record<string, FilterOption[]> => {
     const opts: Record<string, Set<string>> = {
       programmeArea: new Set(),
       teamVertical: new Set(),
@@ -79,11 +66,11 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters })
         return [k, Array.from(s).sort()];
       })
     );
-    return mapped;
+    return mapped as Record<string, FilterOption[]>;
   }, [jobs]);
 
-  const getOptionLabel = (filterId: string, val: string) => {
-    const opts = (fieldOptions as any)[filterId] as FilterOption[] | undefined;
+  const getOptionLabel = (filterId: keyof FilterOptions | string, val: string) => {
+    const opts = fieldOptions[filterId as string] as FilterOption[] | undefined;
     if (!opts) return val;
     for (const opt of opts) {
       if (typeof opt === 'string') {
@@ -134,6 +121,10 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters })
     setActiveFilter(null);
   };
 
+  const updateFilter = (filterId: keyof FilterOptions, next: string[]) => {
+    setSelectedFilters(prev => ({ ...prev, [filterId]: next } as FilterOptions));
+  };
+
   const anyFilterSelected = Object.values(selectedFilters).some(arr => Array.isArray(arr) && arr.length > 0);
 
   useEffect(() => {
@@ -152,8 +143,8 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters })
     <>
       <div ref={filtersRowRef} className="w-full flex flex-wrap justify-center gap-2 px-2">
         {filters.map((f) => {
-          const selectedValues = selectedFilters[f.id] || [];
-          const sortedValues = sortSelectedValues(f.id, selectedValues);
+          const selectedValues = selectedFilters[f.id] ?? [];
+          const sortedValues = sortSelectedValues(f.id as string, selectedValues);
           const selectedText = (sortedValues && sortedValues.length > 0)
             ? (sortedValues.length <= 2
                 ? sortedValues.map(v => getOptionLabel(f.id, v)).join(', ')
@@ -189,27 +180,27 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters })
         )}
       </div>
 
-      {activeFilter && (fieldOptions as any)[activeFilter] && (
+      {activeFilter && fieldOptions[activeFilter as string] && (
         <div className="w-full flex justify-center mt-3">
           <div ref={optionsPanelRef} className="bg-white dark:bg-gray-900 rounded-lg shadow p-3 inline-flex gap-2 flex-wrap justify-center w-fit mx-auto">
             <button
-              onClick={() => { setSelectedFilters({ ...selectedFilters, [activeFilter]: [] }); }}
+              onClick={() => { updateFilter(activeFilter as keyof FilterOptions, []); }}
               className={`px-3 py-1 rounded text-sm bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 whitespace-nowrap`}
             >
               All
             </button>
-            {((fieldOptions as any)[activeFilter] as FilterOption[]).map((opt: FilterOption) => {
+            {fieldOptions[activeFilter as string].map((opt: FilterOption) => {
               const value = typeof opt === 'string' ? opt : opt.value;
               const label = typeof opt === 'string' ? opt : opt.label;
-              const currently = selectedFilters[activeFilter] || [];
-              const isPicked = Array.isArray(currently) && currently.includes(value);
+              const curr = selectedFilters[activeFilter as keyof FilterOptions] || [];
+              const isPicked = Array.isArray(curr) && curr.includes(value);
               return (
                 <button
                   key={value}
                   onClick={() => {
-                    const curr = selectedFilters[activeFilter] || [];
-                    const next = curr.includes(value) ? curr.filter(v => v !== value) : [...curr, value];
-                    setSelectedFilters({ ...selectedFilters, [activeFilter]: next });
+                    const currVals = selectedFilters[activeFilter as keyof FilterOptions] || [];
+                    const next = currVals.includes(value) ? currVals.filter((v) => v !== value) : [...currVals, value];
+                    updateFilter(activeFilter as keyof FilterOptions, next);
                   }}
                   className={`px-3 py-1 rounded text-sm border whitespace-nowrap ${isPicked ? 'bg-primary text-white border-transparent' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-100'}`}
                 >

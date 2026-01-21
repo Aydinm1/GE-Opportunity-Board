@@ -6,6 +6,7 @@ export interface Job {
   teamVertical: string | null;
   locationBase: string | null;
   workType: string | null;
+  roleType: string | null;
   startDate: string | null;
   durationMonths: number | null;
   durationCategory: string;
@@ -20,12 +21,12 @@ export interface Job {
 };
 
 export interface FilterOptions {
-    programmeArea: string | null;
-    teamVertical: string | null;
-    roleType: string;
-    startDate: string;
-    durationCategory: string;
-    timeCommitment: string;
+  programmeArea: string[];
+  teamVertical: string[];
+  workType: string[];
+  roleStatus?: string[];
+  durationCategory: string[];
+  timeCommitment: string[];
 }
 
 export interface Person {

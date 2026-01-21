@@ -4,6 +4,7 @@ export const MOCK_JOBS: Job[] = [
     {
         id: '1',
         roleTitle: 'International Program Lead',
+        roleType: null,
         programmeArea: 'International Program Lead',
         teamVertical: 'Global Encounters',
         locationBase: 'Global Programs Team',
@@ -34,6 +35,7 @@ export const MOCK_JOBS: Job[] = [
     {
         id: '2',
         roleTitle: 'Field Logistics Officer',
+        roleType: null,
         programmeArea: 'Africa Initiatives',
         teamVertical: 'Kenya Operations Team',
         locationBase: 'Nairobi, Kenya',
@@ -64,6 +66,7 @@ export const MOCK_JOBS: Job[] = [
     {
         id: '3',
         roleTitle: 'Deputy Project Lead',
+        roleType: null,
         programmeArea: 'Global Encounters',
         teamVertical: 'Operations Team',
         locationBase: 'Lisbon, Portugal',
@@ -94,6 +97,7 @@ export const MOCK_JOBS: Job[] = [
     {
         id: '4',
         roleTitle: 'Regional Health Coordinator',
+        roleType: null,
         programmeArea: 'Southeast Asia Recovery',
         teamVertical: 'Health Initiatives',
         locationBase: 'Bangkok, Thailand',

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Job } from '../types';
+import { splitBullets } from '../lib/utils';
 import ApplyModal from './ApplyModal';
 
 interface JobDetailsProps {
@@ -8,19 +9,12 @@ interface JobDetailsProps {
 
 const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
     const [showApply, setShowApply] = useState(false);
-    const splitLines = (val?: string | null) =>
-        val
-            ? val
-                  .split(/\r?\n/)
-                  .map((s) => s.trim())
-                  .filter(Boolean)
-            : [];
-    const otherQualifications = splitLines(job.otherQualifications);
+    const otherQualifications = splitBullets(job.otherQualifications);
     const requiredQualifications = otherQualifications.length
         ? [...job.requiredQualifications, ...otherQualifications]
         : job.requiredQualifications;
 
-    const additionalQualifications = splitLines(job.additionalQualifications);
+    const additionalQualifications = splitBullets(job.additionalQualifications);
     const normalizedPreferred = job.preferredQualifications
         .map((pref) => pref.trim())
         .filter(Boolean);

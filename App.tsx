@@ -146,9 +146,6 @@ const App: React.FC = () => {
             <main className="-mt-20 relative z-20 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full flex-1">
                 <div className="bg-surface-light dark:bg-surface-dark rounded-3xl shadow-2xl overflow-hidden p-4 sm:p-6 min-h-[600px] flex flex-col md:block">
                     <div className="flex items-center justify-between mb-3 lg:hidden">
-                        <div className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                            Jobs ({filteredJobs.length})
-                        </div>
                         <button
                             onClick={() => setShowMobileList(!showMobileList)}
                             className="text-sm font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-lg transition-colors"
@@ -161,7 +158,7 @@ const App: React.FC = () => {
                         <div className={`lg:col-span-4 flex flex-col gap-4 h-full ${showMobileList ? '' : 'hidden lg:flex'}`}>
                             <div className="pb-2 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center mb-2">
                                 <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 font-display">
-                                    {filteredJobs.length} Positions Available
+                                    {filteredJobs.length} {filteredJobs.length === 1 ? 'Position Available' : 'Positions Available'}
                                 </h2>
                             </div>
                             <div className="flex flex-col gap-4 overflow-y-auto lg:max-h-[800px] pr-1 sm:pr-2 scrollbar-hide">

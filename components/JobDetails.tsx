@@ -52,6 +52,11 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                             <span className={getStatusStyles(job.roleStatus || 'Actively Hiring')}>
                                 {job.roleStatus || 'Actively Hiring'}
                             </span>
+                            {job.roleType && (
+                                <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700">
+                                    {job.roleType}
+                                </span>
+                            )}
                         </div>
                     </div>
                     <button onClick={() => setShowApply(true)} className="bg-primary hover:bg-primary-hover text-white font-bold py-2.5 px-6 rounded-lg shadow-lg shadow-blue-900/10 transition-all transform active:scale-95 text-sm uppercase tracking-wide font-body whitespace-nowrap">

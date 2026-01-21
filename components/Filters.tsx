@@ -141,7 +141,7 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters })
 
   return (
     <>
-      <div ref={filtersRowRef} className="w-full flex flex-wrap justify-center gap-2 px-2">
+      <div ref={filtersRowRef} className="w-full flex flex-wrap lg:flex-nowrap justify-center gap-2 px-2">
         {filters.map((f) => {
           const selectedValues = selectedFilters[f.id] ?? [];
           const sortedValues = sortSelectedValues(f.id as string, selectedValues);
@@ -173,7 +173,7 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters })
         {anyFilterSelected && (
           <button
             onClick={clearAllFilters}
-            className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium font-body shadow-sm transition-colors flex items-center gap-1 border border-transparent whitespace-nowrap bg-gray-600 hover:bg-gray-700 text-white"
+            className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium font-body shadow-sm transition-colors flex items-center gap-1 border border-transparent whitespace-nowrap bg-gray-600 hover:bg-gray-700 text-white flex-shrink-0"
           >
             Clear All
           </button>
@@ -189,6 +189,7 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters })
             >
               All
             </button>
+            {/* Clear All is shown in-line with the filter row to avoid awkward wrapping above this panel */}
             {fieldOptions[activeFilter as string].map((opt: FilterOption) => {
               const value = typeof opt === 'string' ? opt : opt.value;
               const label = typeof opt === 'string' ? opt : opt.label;

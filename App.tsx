@@ -307,7 +307,7 @@ const App: React.FC = () => {
                         {anyFilterSelected && (
                             <button
                                 onClick={clearAllFilters}
-                                className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium font-body shadow-sm transition-colors flex items-center gap-1 border border-transparent whitespace-nowrap bg-gray-600 hover:bg-gray-800 text-white"
+                                className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium font-body shadow-sm transition-colors flex items-center gap-1 border border-transparent whitespace-nowrap bg-gray-600 hover:bg-gray-700 text-white"
                             >
                                 Clear All
                             </button>

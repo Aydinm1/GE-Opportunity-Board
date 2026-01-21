@@ -98,7 +98,7 @@ const ApplyModal: React.FC<ApplyModalProps> = ({ job, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col">
+      <div className="bg-white dark:bg-gray-900 rounded-md shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col">
         <div className="relative px-4 pt-4 pb-3 border-b">
           <div className="flex items-center justify-between">
             <button onClick={onClose} className="text-gray-500 w-8">✕</button>
@@ -115,76 +115,76 @@ const ApplyModal: React.FC<ApplyModalProps> = ({ job, onClose }) => {
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
           <div ref={contentRef} className="flex-1 overflow-y-auto p-6">
-            <section className="mb-6">
+            <section className="mb-8">
               <h4 className="text-xs font-bold uppercase tracking-widest mb-3">Personal Information</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
-                  <input placeholder="Enter your full name" value={person.fullName} onChange={(e) => update('fullName', e.target.value)} className="w-full px-3 py-2 border rounded-lg" />
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Full Name</label>
+                  <input placeholder="Enter your full name" value={person.fullName} onChange={(e) => update('fullName', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                  <input placeholder="email@example.com" value={person.emailAddress} onChange={(e) => update('emailAddress', e.target.value)} className="w-full px-3 py-2 border rounded-lg" />
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Email</label>
+                  <input placeholder="email@example.com" value={person.emailAddress} onChange={(e) => update('emailAddress', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
-                  <input placeholder="+1 (555) 000-0000" value={person.phoneNumber || ''} onChange={(e) => update('phoneNumber', e.target.value)} className="w-full px-3 py-2 border rounded-lg" />
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Phone</label>
+                  <input placeholder="+1 (555) 000-0000" value={person.phoneNumber || ''} onChange={(e) => update('phoneNumber', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">LinkedIn Profile</label>
-                  <input placeholder="https://linkedin.com/in/username" value={person.linkedIn || ''} onChange={(e) => update('linkedIn', e.target.value)} className="w-full px-3 py-2 border rounded-lg" />
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">LinkedIn Profile</label>
+                  <input placeholder="https://linkedin.com/in/username" value={person.linkedIn || ''} onChange={(e) => update('linkedIn', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
                 </div>
               </div>
             </section>
 
-            <section className="mb-6">
+            <section className="mb-8">
               <h4 className="text-xs font-bold uppercase tracking-widest mb-3">Location Details</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Country of Origin</label>
-                  <select value={person.countryOfOrigin || ''} onChange={(e) => update('countryOfOrigin', e.target.value)} className="w-full px-3 py-2 border rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Country of Origin</label>
+                  <select value={person.countryOfOrigin || ''} onChange={(e) => update('countryOfOrigin', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
                     {countryOptions.map((o) => (<option key={o} value={o}>{o || 'Select country'}</option>))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Current Country</label>
-                  <select value={person.countryOfLiving || ''} onChange={(e) => update('countryOfLiving', e.target.value)} className="w-full px-3 py-2 border rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Current Country</label>
+                  <select value={person.countryOfLiving || ''} onChange={(e) => update('countryOfLiving', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
                     {countryOptions.map((o) => (<option key={o} value={o}>{o || 'Select country'}</option>))}
                   </select>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Jurisdiction</label>
-                  <select value={person.jurisdiction || ''} onChange={(e) => update('jurisdiction', e.target.value)} className="w-full px-3 py-2 border rounded-lg">
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Jurisdiction</label>
+                  <select value={person.jurisdiction || ''} onChange={(e) => update('jurisdiction', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
                     {jurisdictionOptions.map((o) => (<option key={o} value={o}>{o || 'Select jurisdiction'}</option>))}
                   </select>
                 </div>
               </div>
             </section>
 
-            <section className="mb-6">
+            <section className="mb-8">
               <h4 className="text-xs font-bold uppercase tracking-widest mb-3">Experience & Background</h4>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">Academic / Professional Education</label>
-                <textarea placeholder="Academic / Professional Education" value={person.education || ''} onChange={(e) => update('education', e.target.value)} className="w-full p-3 border rounded-lg h-28" />
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Academic / Professional Education</label>
+                <textarea placeholder="Academic / Professional Education" value={person.education || ''} onChange={(e) => update('education', e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">Profession / Occupation</label>
-                <textarea placeholder="Profession / Occupation" value={person.profession || ''} onChange={(e) => update('profession', e.target.value)} className="w-full p-3 border rounded-lg h-28" />
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Profession / Occupation</label>
+                <textarea placeholder="Profession / Occupation" value={person.profession || ''} onChange={(e) => update('profession', e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">Jamati Experience</label>
-                <textarea placeholder="Jamati Experience" value={person.jamatiExperience || ''} onChange={(e) => update('jamatiExperience', e.target.value)} className="w-full p-3 border rounded-lg h-28" />
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Jamati Experience</label>
+                <textarea placeholder="Jamati Experience" value={person.jamatiExperience || ''} onChange={(e) => update('jamatiExperience', e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
               </div>
             </section>
 
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-1">CV / Resume (attachment)</label>
-              <input type="file" accept=".pdf,.doc,.docx,.txt" onChange={(e) => setCoverLetterFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)} className="w-full p-2 border rounded" />
+              <label className="block text-sm font-semibold text-gray-600 mb-2">CV / Resume (attachment)</label>
+              <input type="file" accept=".pdf,.doc,.docx,.txt" onChange={(e) => setCoverLetterFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)} className="w-full p-3 border border-gray-200 rounded-md bg-white shadow-sm" />
             </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-1">Why are you interested in or qualified for this job?</label>
-              <textarea placeholder="Share why this opportunity is a fit for you" value={whyText} onChange={(e) => setWhyText(e.target.value)} className="w-full p-3 border rounded h-28" />
+            <div className="mb-8">
+              <label className="block text-sm font-semibold text-gray-600 mb-2">Why are you interested in or qualified for this job?</label>
+              <textarea placeholder="Share why this opportunity is a fit for you" value={whyText} onChange={(e) => setWhyText(e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
             </div>
 
             {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
@@ -193,7 +193,7 @@ const ApplyModal: React.FC<ApplyModalProps> = ({ job, onClose }) => {
 
           <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t p-4 flex items-center justify-end">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-gray-100 text-sm text-gray-700 mr-3">Cancel</button>
-            <button type="submit" disabled={loading} className="px-5 py-3 bg-primary text-white rounded-lg shadow text-sm">{loading ? 'Submitting…' : 'Submit Application'}</button>
+            <button type="submit" disabled={loading} className="px-5 py-3 bg-primary text-white rounded-md shadow text-sm">{loading ? 'Submitting…' : 'Submit Application'}</button>
           </div>
         </form>
       </div>

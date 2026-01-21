@@ -15,7 +15,7 @@ const App: React.FC = () => {
         programmeArea: [],
         teamVertical: [],
         workType: [],
-        roleStatus: [],
+        roleType: [],
         durationCategory: [],
         timeCommitment: [],
     });
@@ -64,7 +64,7 @@ const App: React.FC = () => {
             res = res.filter(job => {
                 const fieldVal = ((job as any)[key] || '') as string;
                 if (!fieldVal) return false;
-                if (key === 'roleStatus') return vals.includes((job as any).roleStatus || '');
+                if (key === 'roleType') return vals.includes((job as any).roleType || '');
                 return vals.includes(fieldVal);
             });
         });

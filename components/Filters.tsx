@@ -18,7 +18,8 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters })
   const filters: { id: keyof FilterOptions; label: string }[] = [
     { id: 'programmeArea', label: 'Programme Area' },
     { id: 'teamVertical', label: 'Functional Area' },
-    { id: 'workType', label: 'Type' },
+    { id: 'workType', label: 'Work Type' },
+    { id: 'roleType', label: 'Role Type' },
     { id: 'durationCategory', label: 'Project Duration' },
     { id: 'timeCommitment', label: 'Weekly Time Commitment' },
   ];
@@ -31,7 +32,7 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters })
       programmeArea: new Set(),
       teamVertical: new Set(),
       workType: new Set(),
-      roleStatus: new Set(),
+      roleType: new Set(),
       durationCategory: new Set(),
       timeCommitment: new Set(),
     };
@@ -39,8 +40,7 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters })
       if (j.programmeArea) opts.programmeArea.add(j.programmeArea);
       if (j.teamVertical) opts.teamVertical.add(j.teamVertical);
       if (j.workType) opts.workType.add(j.workType);
-      const rs = (j as any).roleStatus;
-      if (rs) opts.roleStatus.add(rs);
+      if (j.roleType) opts.roleType.add(j.roleType);
       if (j.durationCategory) opts.durationCategory.add(j.durationCategory);
       if (j.timeCommitment) opts.timeCommitment.add(j.timeCommitment);
     });
@@ -114,7 +114,7 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters })
       programmeArea: [],
       teamVertical: [],
       workType: [],
-      roleStatus: [],
+      roleType: [],
       durationCategory: [],
       timeCommitment: [],
     });

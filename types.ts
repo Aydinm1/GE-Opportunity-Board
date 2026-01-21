@@ -24,7 +24,7 @@ export interface FilterOptions {
   programmeArea: string[];
   teamVertical: string[];
   workType: string[];
-  roleStatus?: string[];
+  roleType: string[];
   durationCategory: string[];
   timeCommitment: string[];
 }

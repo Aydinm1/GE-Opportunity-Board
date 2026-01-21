@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Job } from './types';
 import JobCard from './components/JobCard';
 import JobDetails from './components/JobDetails';
@@ -12,15 +12,17 @@ const App: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
     const [activeFilter, setActiveFilter] = useState<string | null>(null);
-    const [selectedFilters, setSelectedFilters] = useState<Record<string, string | null>>({
-        programmeArea: null,
-        teamVertical: null,
-        workType: null,
-        roleStatus: null,
-        durationCategory: null,
-        timeCommitment: null,
+    const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
+        programmeArea: [],
+        teamVertical: [],
+        workType: [],
+        roleStatus: [],
+        durationCategory: [],
+        timeCommitment: [],
     });
     const [showMobileList, setShowMobileList] = useState(true);
+    const filtersRowRef = useRef<HTMLDivElement | null>(null);
+    const optionsPanelRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         const fetchJobs = async () => {
@@ -58,12 +60,14 @@ const App: React.FC = () => {
             (job.locationBase || '').toLowerCase().includes(q)
         );
 
-        // apply selected filters
-        Object.entries(selectedFilters).forEach(([key, val]) => {
-            if (!val) return;
+        // apply selected filters (support multiple selections per filter)
+        Object.entries(selectedFilters).forEach(([key, vals]) => {
+            if (!Array.isArray(vals) || vals.length === 0) return;
             res = res.filter(job => {
-                if (key === 'roleStatus') return ((job as any).roleStatus || '') === val;
-                return ((job as any)[key] || '') === val;
+                const fieldVal = ((job as any)[key] || '') as string;
+                if (!fieldVal) return false;
+                if (key === 'roleStatus') return vals.includes((job as any).roleStatus || '');
+                return vals.includes(fieldVal);
             });
         });
 
@@ -153,19 +157,72 @@ const App: React.FC = () => {
         return mapped;
     }, [jobs]);
 
+    const getOptionLabel = (filterId: string, val: string) => {
+        const opts = (fieldOptions as any)[filterId] as FilterOption[] | undefined;
+        if (!opts) return val;
+        for (const opt of opts) {
+            if (typeof opt === 'string') {
+                if (opt === val) return opt;
+            } else {
+                if (opt.value === val) return opt.label;
+            }
+        }
+        return val;
+    };
+
+    const sortSelectedValues = (filterId: string, vals: string[]) => {
+        if (!vals || vals.length <= 1) return vals;
+        if (filterId === 'durationCategory') {
+            const order = durationBuckets.map(b => b.value);
+            return vals.slice().sort((a, b) => {
+                const ia = order.indexOf(a);
+                const ib = order.indexOf(b);
+                if (ia !== -1 && ib !== -1) return ia - ib;
+                if (ia !== -1) return -1;
+                if (ib !== -1) return 1;
+                return a.localeCompare(b);
+            });
+        }
+        if (filterId === 'timeCommitment') {
+            const order = timeCommitmentBuckets;
+            return vals.slice().sort((a, b) => {
+                const ia = order.indexOf(a);
+                const ib = order.indexOf(b);
+                if (ia !== -1 && ib !== -1) return ia - ib;
+                if (ia !== -1) return -1;
+                if (ib !== -1) return 1;
+                return a.localeCompare(b);
+            });
+        }
+        return vals;
+    };
+
+    // Close filter panel when clicking outside of filter controls
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as Node;
+            if (activeFilter === null) return;
+            if (optionsPanelRef.current && optionsPanelRef.current.contains(target)) return;
+            if (filtersRowRef.current && filtersRowRef.current.contains(target)) return;
+            setActiveFilter(null);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [activeFilter]);
+
     const clearAllFilters = () => {
         setSelectedFilters({
-            programmeArea: null,
-            teamVertical: null,
-            workType: null,
-            roleStatus: null,
-            durationCategory: null,
-            timeCommitment: null,
+            programmeArea: [],
+            teamVertical: [],
+            workType: [],
+            roleStatus: [],
+            durationCategory: [],
+            timeCommitment: [],
         });
         setActiveFilter(null);
     };
 
-    const anyFilterSelected = Object.values(selectedFilters).some(Boolean);
+    const anyFilterSelected = Object.values(selectedFilters).some(arr => Array.isArray(arr) && arr.length > 0);
 
 
     return (
@@ -193,7 +250,7 @@ const App: React.FC = () => {
                     backgroundSize: '700px auto',
                 }}
             >
-                <div className="max-w-4xl mx-auto flex flex-col items-center relative z-10">
+                <div className="max-w-6xl mx-auto flex flex-col items-center relative z-10">
                     <div className="w-full max-w-3xl text-center text-white mb-6">
                          <h1 className="text-3xl sm:text-4xl font-bold font-display leading-tight">Opportunity Board</h1>
                         <p className="text-base sm:text-lg font-semibold mt-2 text-white/85">Find your next role today</p>
@@ -218,12 +275,17 @@ const App: React.FC = () => {
                             Search
                         </button>
                     </div>
-                    <div className="w-full flex flex-wrap justify-center gap-2 px-2">
+                    <div ref={filtersRowRef} className="w-full flex flex-wrap justify-center gap-2 px-2">
                         {filters.map((f) => {
-                            const selectedValue = selectedFilters[f.id];
-                            const selectedText = selectedValue || f.label;
+                            const selectedValues = selectedFilters[f.id] || [];
+                            const sortedValues = sortSelectedValues(f.id, selectedValues);
+                            const selectedText = (sortedValues && sortedValues.length > 0)
+                                ? (sortedValues.length <= 2
+                                    ? sortedValues.map(v => getOptionLabel(f.id, v)).join(', ')
+                                    : `${f.label} (${sortedValues.length})`)
+                                : f.label;
                             const isActive = activeFilter === f.id;
-                            const isSelected = Boolean(selectedValue);
+                            const isSelected = selectedValues && selectedValues.length > 0;
                             const onState = isActive || isSelected;
                             return (
                                 <button 
@@ -253,21 +315,27 @@ const App: React.FC = () => {
                     </div>
                     {activeFilter && (fieldOptions as any)[activeFilter] && (
                         <div className="w-full flex justify-center mt-3">
-                            <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-3 flex gap-2 flex-wrap max-w-3xl">
+                            <div ref={optionsPanelRef} className="bg-white dark:bg-gray-900 rounded-lg shadow p-3 inline-flex gap-2 flex-wrap justify-center w-fit mx-auto">
                                 <button
-                                    onClick={() => { setSelectedFilters({ ...selectedFilters, [activeFilter]: null }); setActiveFilter(null); }}
-                                    className={`px-3 py-1 rounded text-sm bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200`}
+                                    onClick={() => { setSelectedFilters({ ...selectedFilters, [activeFilter]: [] }); }}
+                                    className={`px-3 py-1 rounded text-sm bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 whitespace-nowrap`}
                                 >
                                     All
                                 </button>
                                 {((fieldOptions as any)[activeFilter] as FilterOption[]).map((opt: FilterOption) => {
                                     const value = typeof opt === 'string' ? opt : opt.value;
                                     const label = typeof opt === 'string' ? opt : opt.label;
+                                    const currently = selectedFilters[activeFilter] || [];
+                                    const isPicked = Array.isArray(currently) && currently.includes(value);
                                     return (
                                     <button
                                         key={value}
-                                        onClick={() => { setSelectedFilters({ ...selectedFilters, [activeFilter]: value }); setActiveFilter(null); }}
-                                        className={`px-3 py-1 rounded text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-100`}
+                                        onClick={() => {
+                                            const curr = selectedFilters[activeFilter] || [];
+                                            const next = curr.includes(value) ? curr.filter(v => v !== value) : [...curr, value];
+                                            setSelectedFilters({ ...selectedFilters, [activeFilter]: next });
+                                        }}
+                                        className={`px-3 py-1 rounded text-sm border whitespace-nowrap ${isPicked ? 'bg-primary text-white border-transparent' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-100'}`}
                                     >
                                         {label}
                                     </button>

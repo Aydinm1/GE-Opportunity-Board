@@ -280,6 +280,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   };
 
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [justAttached, setJustAttached] = useState(false);
   const attachTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -310,6 +311,58 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
       window.removeEventListener('resize', onScroll);
       if (ro) ro.disconnect();
     };
+  }, []);
+
+  // Notify parent (host) about modal height so host can resize iframe to fit
+  useEffect(() => {
+    const postHeight = () => {
+      try {
+        const m = modalRef.current || contentRef.current;
+        if (!m || !window.parent) return;
+        const rect = m.getBoundingClientRect();
+        const height = Math.ceil(window.pageYOffset + rect.bottom + 24);
+        window.parent.postMessage({ type: 'resize-iframe', height }, '*');
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    const postOpen = () => {
+      try { if (window.parent) window.parent.postMessage({ type: 'opportunityboard:modal-open' }, '*'); } catch (e) {}
+    };
+
+    const postClose = () => {
+      try { if (window.parent) window.parent.postMessage({ type: 'opportunityboard:modal-close' }, '*'); } catch (e) {}
+    };
+
+    const debounced = (() => {
+      let t: ReturnType<typeof setTimeout> | null = null;
+      return () => { if (t) clearTimeout(t); t = setTimeout(() => { postHeight(); t = null; }, 80); };
+    })();
+
+    // Post once on mount (modal open)
+    postOpen();
+    postHeight();
+    // Observe size changes of the modal/content
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(debounced);
+      if (modalRef.current) ro.observe(modalRef.current);
+      if (contentRef.current) ro.observe(contentRef.current);
+      window.addEventListener('resize', debounced);
+      const mo = new MutationObserver(debounced);
+      mo.observe(document.body, { subtree: true, childList: true, attributes: true });
+
+      return () => {
+        ro.disconnect();
+        mo.disconnect();
+        window.removeEventListener('resize', debounced);
+        // Notify host modal closed
+        postClose();
+      };
+    }
+    // Fallback
+    window.addEventListener('resize', debounced);
+    return () => { window.removeEventListener('resize', debounced); postClose(); };
   }, []);
 
     useEffect(() => {

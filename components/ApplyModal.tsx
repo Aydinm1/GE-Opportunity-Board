@@ -272,7 +272,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     return () => { if (changed) document.body.style.overflow = prev; };
   }, []);
 
-  const WORD_LIMIT = 250; // change this in one place to update all word limits
+  const WORD_LIMIT = 100; // change this in one place to update all word limits
   const ATTACH_FEEDBACK_MS = 2200; // ms the button shows the 'attached' state
   const countWords = (text = '') => {
     return (text || '').trim().split(/\s+/).filter(Boolean).length;

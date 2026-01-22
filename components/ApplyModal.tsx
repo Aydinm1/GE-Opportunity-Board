@@ -268,6 +268,16 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     return () => { document.body.style.overflow = prev; };
   }, []);
 
+  const WORD_LIMIT = 250; // change this in one place to update all word limits
+  const countWords = (text = '') => {
+    return (text || '').trim().split(/\s+/).filter(Boolean).length;
+  };
+  const enforceWordLimit = (text = '', limit = WORD_LIMIT) => {
+    const words = (text || '').trim().split(/\s+/).filter(Boolean);
+    if (words.length <= limit) return text;
+    return words.slice(0, limit).join(' ');
+  };
+
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [progress, setProgress] = useState(0);
   useEffect(() => {
@@ -404,16 +414,19 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
             <section className="mb-8">
               <h4 className="text-xs font-bold uppercase tracking-widest mb-3">Experience & Background</h4>
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-600 mb-2">Academic / Professional Education<span className="text-red-600 ml-1">*</span></label>
-                <textarea required aria-required placeholder="Academic / Professional Education" value={person.education || ''} onChange={(e) => update('education', e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Academic / Professional Education <span className="text-gray-500 text-xs">({WORD_LIMIT} words max)</span><span className="text-red-600 ml-1">*</span></label>
+                <textarea required aria-required placeholder="Academic / Professional Education" value={person.education || ''} onChange={(e) => update('education', enforceWordLimit(e.target.value, WORD_LIMIT))} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                <div className="text-xs text-gray-500 mt-1">{countWords(person.education || '')} / {WORD_LIMIT} words</div>
               </div>
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-600 mb-2">Profession / Occupation<span className="text-red-600 ml-1">*</span></label>
-                <textarea required aria-required placeholder="Profession / Occupation" value={person.profession || ''} onChange={(e) => update('profession', e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Profession / Occupation <span className="text-gray-500 text-xs">({WORD_LIMIT} words max)</span><span className="text-red-600 ml-1">*</span></label>
+                <textarea required aria-required placeholder="Profession / Occupation" value={person.profession || ''} onChange={(e) => update('profession', enforceWordLimit(e.target.value, WORD_LIMIT))} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                <div className="text-xs text-gray-500 mt-1">{countWords(person.profession || '')} / {WORD_LIMIT} words</div>
               </div>
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-600 mb-2">Jamati Experience<span className="text-red-600 ml-1">*</span></label>
-                <textarea required aria-required placeholder="Jamati Experience" value={person.jamatiExperience || ''} onChange={(e) => update('jamatiExperience', e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Jamati Experience <span className="text-gray-500 text-xs">({WORD_LIMIT} words max)</span><span className="text-red-600 ml-1">*</span></label>
+                <textarea required aria-required placeholder="Jamati Experience" value={person.jamatiExperience || ''} onChange={(e) => update('jamatiExperience', enforceWordLimit(e.target.value, WORD_LIMIT))} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                <div className="text-xs text-gray-500 mt-1">{countWords(person.jamatiExperience || '')} / {WORD_LIMIT} words</div>
               </div>
             </section>
 
@@ -423,8 +436,9 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
             </div>
 
             <div className="mb-8">
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Why are you interested in or qualified for this job?<span className="text-red-600 ml-1">*</span></label>
-              <textarea required aria-required placeholder="Share why this opportunity is a fit for you" value={whyText} onChange={(e) => setWhyText(e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              <label className="block text-sm font-semibold text-gray-600 mb-2">Why are you interested in or qualified for this job? <span className="text-gray-500 text-xs">({WORD_LIMIT} words max)</span><span className="text-red-600 ml-1">*</span></label>
+              <textarea required aria-required placeholder="Share why this opportunity is a fit for you" value={whyText} onChange={(e) => setWhyText(enforceWordLimit(e.target.value, WORD_LIMIT))} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              <div className="text-xs text-gray-500 mt-1">{countWords(whyText)} / {WORD_LIMIT} words</div>
             </div>
 
             {error && <p className="text-sm text-red-600 mt-3">{error}</p>}

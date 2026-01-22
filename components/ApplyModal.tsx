@@ -264,12 +264,8 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
 
   useEffect(() => {
     const prev = document.body.style.overflow;
-    let changed = false;
-    if (typeof window !== 'undefined' && window.self === window.top) {
-      document.body.style.overflow = 'hidden';
-      changed = true;
-    }
-    return () => { if (changed) document.body.style.overflow = prev; };
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
   }, []);
 
   const WORD_LIMIT = 100; // change this in one place to update all word limits
@@ -350,7 +346,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white dark:bg-gray-900 rounded-md shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col">
+      <div className="bg-white dark:bg-gray-900 rounded-md shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col" style={{ maxHeight: '90vh' }}>
         <div className="relative px-4 pt-4 pb-3 border-b">
           <div className="flex items-center justify-between">
             <button onClick={onClose} className="text-gray-500 w-8">✕</button>
@@ -366,7 +362,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-          <div ref={contentRef} className="flex-1 overflow-y-auto p-6">
+          <div ref={contentRef} className="flex-1 overflow-y-auto p-6" style={{ WebkitOverflowScrolling: 'touch' }}>
             <section className="mb-8">
               <h4 className="text-xs font-bold uppercase tracking-widest mb-3">Personal Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

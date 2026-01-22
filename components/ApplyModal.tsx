@@ -279,6 +279,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   };
 
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [progress, setProgress] = useState(0);
   useEffect(() => {
     const el = contentRef.current;
@@ -384,6 +385,32 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
                   <label className="block text-sm font-semibold text-gray-600 mb-2">LinkedIn Profile</label>
                   <input placeholder="https://linkedin.com/in/username" value={person.linkedIn || ''} onChange={(e) => update('linkedIn', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
                 </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">CV / Resume (attachment)<span className="text-red-600 ml-1">*</span></label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-md shadow-sm text-sm font-semibold"
+                    >
+                      <span className="material-icons-round">attach_file</span>
+                      Attach CV / Resume
+                    </button>
+
+                    <div className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-xs">
+                      {coverLetterFile ? coverLetterFile.name : 'No file chosen'}
+                    </div>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    required
+                    aria-required
+                    type="file"
+                    accept=".pdf,.doc,.docx,.txt"
+                    onChange={(e) => setCoverLetterFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+                    className="hidden"
+                  />
+                </div>
               </div>
             </section>
 
@@ -430,10 +457,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
               </div>
             </section>
 
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-600 mb-2">CV / Resume (attachment)<span className="text-red-600 ml-1">*</span></label>
-              <input required aria-required type="file" accept=".pdf,.doc,.docx,.txt" onChange={(e) => setCoverLetterFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)} className="w-full p-3 border border-gray-200 rounded-md bg-white shadow-sm" />
-            </div>
+            
 
             <div className="mb-8">
               <label className="block text-sm font-semibold text-gray-600 mb-2">Why are you interested in or qualified for this job? <span className="text-gray-500 text-xs">({WORD_LIMIT} words max)</span><span className="text-red-600 ml-1">*</span></label>

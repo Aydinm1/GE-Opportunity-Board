@@ -264,8 +264,12 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
 
   useEffect(() => {
     const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    let changed = false;
+    if (typeof window !== 'undefined' && window.self === window.top) {
+      document.body.style.overflow = 'hidden';
+      changed = true;
+    }
+    return () => { if (changed) document.body.style.overflow = prev; };
   }, []);
 
   const WORD_LIMIT = 250; // change this in one place to update all word limits

@@ -269,6 +269,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   }, []);
 
   const WORD_LIMIT = 250; // change this in one place to update all word limits
+  const ATTACH_FEEDBACK_MS = 2200; // ms the button shows the 'attached' state
   const countWords = (text = '') => {
     return (text || '').trim().split(/\s+/).filter(Boolean).length;
   };
@@ -280,6 +281,8 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
 
   const contentRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [justAttached, setJustAttached] = useState(false);
+  const attachTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [progress, setProgress] = useState(0);
   useEffect(() => {
     const el = contentRef.current;
@@ -308,6 +311,12 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
       if (ro) ro.disconnect();
     };
   }, []);
+
+    useEffect(() => {
+      return () => {
+        if (attachTimeoutRef.current) clearTimeout(attachTimeoutRef.current);
+      };
+    }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -391,14 +400,31 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-md shadow-sm text-sm font-semibold"
+                      className={`inline-flex items-center gap-2 px-4 py-3 text-sm font-semibold rounded-md shadow-sm ${justAttached ? 'bg-primary text-white border border-primary' : 'bg-white text-primary border border-gray-200 hover:bg-gray-50'} transition-all duration-700 ease-in-out`}
                     >
-                      <span className="material-icons-round">attach_file</span>
-                      Attach CV / Resume
+                      <span className="material-icons-round">{justAttached ? 'check_circle' : 'attach_file'}</span>
+                      {justAttached ? 'File attached' : 'Choose File'}
                     </button>
 
-                    <div className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-xs">
-                      {coverLetterFile ? coverLetterFile.name : 'No file chosen'}
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-xs">
+                        {coverLetterFile ? coverLetterFile.name : 'No file chosen'}
+                      </div>
+                      {coverLetterFile && (
+                        <button
+                          type="button"
+                          aria-label="Remove attached file"
+                          onClick={() => {
+                            setCoverLetterFile(null);
+                            setJustAttached(false);
+                            if (attachTimeoutRef.current) { clearTimeout(attachTimeoutRef.current); attachTimeoutRef.current = null; }
+                            if (fileInputRef.current) fileInputRef.current.value = '';
+                          }}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-300 border"
+                        >
+                          <span className="material-icons-round text-base">close</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                   <input
@@ -407,7 +433,18 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
                     aria-required
                     type="file"
                     accept=".pdf,.doc,.docx,.txt"
-                    onChange={(e) => setCoverLetterFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+                    onChange={(e) => {
+                      const f = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+                      setCoverLetterFile(f);
+                        if (f) {
+                        setJustAttached(true);
+                        if (attachTimeoutRef.current) clearTimeout(attachTimeoutRef.current);
+                        attachTimeoutRef.current = setTimeout(() => setJustAttached(false), ATTACH_FEEDBACK_MS);
+                      } else {
+                        setJustAttached(false);
+                        if (attachTimeoutRef.current) { clearTimeout(attachTimeoutRef.current); attachTimeoutRef.current = null; }
+                      }
+                    }}
                     className="hidden"
                   />
                 </div>

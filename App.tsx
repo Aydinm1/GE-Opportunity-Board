@@ -23,6 +23,9 @@ const App: React.FC = () => {
     
 
     useEffect(() => {
+        const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const jobParam = params?.get('job') || null;
+
         const fetchJobs = async () => {
             try {
                 setLoading(true);
@@ -35,7 +38,11 @@ const App: React.FC = () => {
                 const data = await response.json();
                 setJobs(data.jobs || []);
                 if (data.jobs && data.jobs.length > 0) {
-                    setSelectedJobId(data.jobs[0].id);
+                    if (jobParam && data.jobs.find((j: Job) => j.id === jobParam)) {
+                        setSelectedJobId(jobParam);
+                    } else {
+                        setSelectedJobId(data.jobs[0].id);
+                    }
                 }
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'An error occurred');

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Job } from '../types';
 import { splitBullets, formatStartDate, statusVariant } from '../lib/utils';
 import ApplyModal from './ApplyModal';
@@ -9,6 +9,13 @@ interface JobDetailsProps {
 
 const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
     const [showApply, setShowApply] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        return () => {
+            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+        };
+    }, []);
     const otherQualifications = splitBullets(job.otherQualifications);
     const requiredQualifications = otherQualifications.length
         ? [...job.requiredQualifications, ...otherQualifications]
@@ -59,9 +66,45 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                             )}
                         </div>
                     </div>
-                    <button onClick={() => setShowApply(true)} className="bg-primary hover:bg-primary-hover text-white font-bold py-2.5 px-6 rounded-lg shadow-lg shadow-blue-900/10 transition-all transform active:scale-95 text-sm uppercase tracking-wide font-body whitespace-nowrap">
-                        Apply Now
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button onClick={async () => {
+                            if (typeof navigator !== 'undefined' && navigator.clipboard && typeof window !== 'undefined') {
+                                const link = `${window.location.origin}/?job=${job.id}`;
+                                try {
+                                    await navigator.clipboard.writeText(link);
+                                    setCopied(true);
+                                    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+                                    copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+                                } catch (e) {
+                                    // fallback below
+                                }
+                                return;
+                            }
+                            // fallback for environments without navigator.clipboard
+                            if (typeof window !== 'undefined') {
+                                const link = `${window.location.origin}/?job=${job.id}`;
+                                const el = document.createElement('textarea');
+                                el.value = link;
+                                document.body.appendChild(el);
+                                el.select();
+                                try {
+                                    document.execCommand('copy');
+                                    setCopied(true);
+                                    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+                                    copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+                                } catch (e) {
+                                    // ignore
+                                }
+                                document.body.removeChild(el);
+                            }
+                        }} aria-label="Share job" className="inline-flex items-center justify-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-primary hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                            {copied ? 'Copied!' : 'Share'}
+                        </button>
+
+                        <button onClick={() => setShowApply(true)} className="bg-primary hover:bg-primary-hover text-white font-bold py-2.5 px-6 rounded-lg shadow-lg shadow-blue-900/10 transition-all transform active:scale-95 text-sm uppercase tracking-wide font-body whitespace-nowrap">
+                            Apply Now
+                        </button>
+                    </div>
                 </div>
             </div>
 

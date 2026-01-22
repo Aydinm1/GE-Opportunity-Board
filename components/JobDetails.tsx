@@ -16,6 +16,40 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
             if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
         };
     }, []);
+
+    // Resolve the host/parent URL for share links.
+    // Strategy: try same-origin parent access -> document.referrer -> postMessage request to parent
+    const resolveParentUrl = async (timeout = 1000): Promise<string> => {
+        // 1) same-origin access
+        try {
+            if (window.parent && window.parent.location && window.parent.location.href) {
+                return window.parent.location.href;
+            }
+        } catch (e) {
+            // cross-origin - continue to fallbacks
+        }
+
+        // 2) referrer
+        if (document.referrer) return document.referrer;
+
+        // 3) ask parent via postMessage
+        return await new Promise((resolve) => {
+            const id = Math.random().toString(36).slice(2);
+            function onMsg(e: MessageEvent) {
+                if (!e.data || e.data.type !== 'opportunityboard:parent-url' || e.data.id !== id) return;
+                window.removeEventListener('message', onMsg);
+                resolve(e.data.url || window.location.href);
+            }
+            window.addEventListener('message', onMsg);
+            try {
+                // ask parent to reply with its URL; host should validate origin in prod
+                window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*');
+            } catch (e) {
+                // ignore
+            }
+            setTimeout(() => { window.removeEventListener('message', onMsg); resolve(window.location.href); }, timeout);
+        });
+    };
     const otherQualifications = splitBullets(job.otherQualifications);
     const requiredQualifications = otherQualifications.length
         ? [...job.requiredQualifications, ...otherQualifications]
@@ -68,21 +102,26 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                     </div>
                     <div className="flex items-center gap-3">
                         <button onClick={async () => {
-                            if (typeof navigator !== 'undefined' && navigator.clipboard && typeof window !== 'undefined') {
-                                const link = `${window.location.origin}/?job=${job.id}`;
+                            // Resolve parent URL (origin) then copy origin + ?job= to clipboard
+                            const parentHref = await resolveParentUrl();
+                            let origin = '';
+                            try { origin = new URL(parentHref).origin; } catch (e) { origin = window.location.origin; }
+                            const link = `${origin}/?job=${job.id}`;
+
+                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
                                 try {
                                     await navigator.clipboard.writeText(link);
                                     setCopied(true);
                                     if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
                                     copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
                                 } catch (e) {
-                                    // fallback below
+                                    // fallback to textarea
                                 }
                                 return;
                             }
+
                             // fallback for environments without navigator.clipboard
                             if (typeof window !== 'undefined') {
-                                const link = `${window.location.origin}/?job=${job.id}`;
                                 const el = document.createElement('textarea');
                                 el.value = link;
                                 document.body.appendChild(el);

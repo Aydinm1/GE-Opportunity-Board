@@ -302,8 +302,10 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     e.preventDefault();
     setError(null);
     setSuccess(null);
-    if (!person.fullName || !person.emailAddress) { setError('Please enter your full name and email.'); return; }
-    if (!coverLetterFile) { setError('Please attach your CV / Resume file.'); return; }
+    if (!person.fullName || !person.emailAddress || !person.phoneNumber || !person.age || !person.gender || !person.countryOfOrigin || !person.countryOfLiving || !person.jurisdiction || !person.education || !person.profession || !person.jamatiExperience || !coverLetterFile || !whyText) {
+      setError('Please fill all required fields.');
+      return;
+    }
     setLoading(true);
     try {
       const normalized = person.emailAddress.trim().toLowerCase();
@@ -345,26 +347,26 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
               <h4 className="text-xs font-bold uppercase tracking-widest mb-3">Personal Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-600 mb-2">Full Name</label>
-                  <input placeholder="Enter your full name" value={person.fullName} onChange={(e) => update('fullName', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Full Name<span className="text-red-600 ml-1">*</span></label>
+                  <input required aria-required value={person.fullName} placeholder="Enter your full name" onChange={(e) => update('fullName', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-600 mb-2">Email</label>
-                  <input placeholder="email@example.com" value={person.emailAddress} onChange={(e) => update('emailAddress', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Email<span className="text-red-600 ml-1">*</span></label>
+                  <input required aria-required type="email" placeholder="email@example.com" value={person.emailAddress} onChange={(e) => update('emailAddress', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-600 mb-2">Phone</label>
-                  <input placeholder="+1 (555) 000-0000" value={person.phoneNumber || ''} onChange={(e) => update('phoneNumber', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Phone<span className="text-red-600 ml-1">*</span></label>
+                  <input required aria-required placeholder="+1 (555) 000-0000" value={person.phoneNumber || ''} onChange={(e) => update('phoneNumber', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-600 mb-2">Age</label>
-                  <select value={person.age || ''} onChange={(e) => update('age', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Age<span className="text-red-600 ml-1">*</span></label>
+                  <select required aria-required value={person.age || ''} onChange={(e) => update('age', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
                     {ageOptions.map((a) => (<option key={a} value={a}>{a || 'Select age range'}</option>))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-600 mb-2">Gender</label>
-                  <select value={person.gender || ''} onChange={(e) => update('gender', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Gender<span className="text-red-600 ml-1">*</span></label>
+                  <select required aria-required value={person.gender || ''} onChange={(e) => update('gender', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
                     {genderOptions.map((g) => (<option key={g} value={g}>{g || 'Select gender'}</option>))}
                   </select>
                 </div>
@@ -379,20 +381,20 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
               <h4 className="text-xs font-bold uppercase tracking-widest mb-3">Location Details</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-600 mb-2">Country of Origin</label>
-                  <select value={person.countryOfOrigin || ''} onChange={(e) => update('countryOfOrigin', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Country of Origin<span className="text-red-600 ml-1">*</span></label>
+                  <select required aria-required value={person.countryOfOrigin || ''} onChange={(e) => update('countryOfOrigin', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
                     {countryOptions.map((o) => (<option key={o} value={o}>{o || 'Select country'}</option>))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-600 mb-2">Current Country</label>
-                  <select value={person.countryOfLiving || ''} onChange={(e) => update('countryOfLiving', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Current Country<span className="text-red-600 ml-1">*</span></label>
+                  <select required aria-required value={person.countryOfLiving || ''} onChange={(e) => update('countryOfLiving', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
                     {countryOptions.map((o) => (<option key={o} value={o}>{o || 'Select country'}</option>))}
                   </select>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-600 mb-2">Jurisdiction</label>
-                  <select value={person.jurisdiction || ''} onChange={(e) => update('jurisdiction', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  <label className="block text-sm font-semibold text-gray-600 mb-2">Jurisdiction<span className="text-red-600 ml-1">*</span></label>
+                  <select required aria-required value={person.jurisdiction || ''} onChange={(e) => update('jurisdiction', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
                     {jurisdictionOptions.map((o) => (<option key={o} value={o}>{o || 'Select jurisdiction'}</option>))}
                   </select>
                 </div>
@@ -402,27 +404,27 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
             <section className="mb-8">
               <h4 className="text-xs font-bold uppercase tracking-widest mb-3">Experience & Background</h4>
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-600 mb-2">Academic / Professional Education</label>
-                <textarea placeholder="Academic / Professional Education" value={person.education || ''} onChange={(e) => update('education', e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Academic / Professional Education<span className="text-red-600 ml-1">*</span></label>
+                <textarea required aria-required placeholder="Academic / Professional Education" value={person.education || ''} onChange={(e) => update('education', e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
               </div>
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-600 mb-2">Profession / Occupation</label>
-                <textarea placeholder="Profession / Occupation" value={person.profession || ''} onChange={(e) => update('profession', e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Profession / Occupation<span className="text-red-600 ml-1">*</span></label>
+                <textarea required aria-required placeholder="Profession / Occupation" value={person.profession || ''} onChange={(e) => update('profession', e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
               </div>
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-600 mb-2">Jamati Experience</label>
-                <textarea placeholder="Jamati Experience" value={person.jamatiExperience || ''} onChange={(e) => update('jamatiExperience', e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Jamati Experience<span className="text-red-600 ml-1">*</span></label>
+                <textarea required aria-required placeholder="Jamati Experience" value={person.jamatiExperience || ''} onChange={(e) => update('jamatiExperience', e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
               </div>
             </section>
 
             <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-600 mb-2">CV / Resume (attachment)</label>
-              <input type="file" accept=".pdf,.doc,.docx,.txt" onChange={(e) => setCoverLetterFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)} className="w-full p-3 border border-gray-200 rounded-md bg-white shadow-sm" />
+              <label className="block text-sm font-semibold text-gray-600 mb-2">CV / Resume (attachment)<span className="text-red-600 ml-1">*</span></label>
+              <input required aria-required type="file" accept=".pdf,.doc,.docx,.txt" onChange={(e) => setCoverLetterFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)} className="w-full p-3 border border-gray-200 rounded-md bg-white shadow-sm" />
             </div>
 
             <div className="mb-8">
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Why are you interested in or qualified for this job?</label>
-              <textarea placeholder="Share why this opportunity is a fit for you" value={whyText} onChange={(e) => setWhyText(e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              <label className="block text-sm font-semibold text-gray-600 mb-2">Why are you interested in or qualified for this job?<span className="text-red-600 ml-1">*</span></label>
+              <textarea required aria-required placeholder="Share why this opportunity is a fit for you" value={whyText} onChange={(e) => setWhyText(e.target.value)} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
             </div>
 
             {error && <p className="text-sm text-red-600 mt-3">{error}</p>}

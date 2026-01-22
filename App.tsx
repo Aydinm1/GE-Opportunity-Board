@@ -168,7 +168,7 @@ const App: React.FC = () => {
                                     {filteredJobs.length} {filteredJobs.length === 1 ? 'Position Available' : 'Positions Available'}
                                 </h2>
                             </div>
-                            <div className="flex flex-col gap-4 overflow-y-auto lg:max-h-[800px] pr-1 sm:pr-2 scrollbar-hide">
+                            <div className="flex flex-col gap-4 overflow-y-auto max-h-[50vh] lg:max-h-[800px] pr-1 sm:pr-2 scrollbar-hide">
                                 {loading ? (
                                     <div className="p-8 text-center text-gray-500 font-medium">
                                         Loading jobs...
@@ -178,17 +178,19 @@ const App: React.FC = () => {
                                         Error: {error}
                                     </div>
                                 ) : filteredJobs.length > 0 ? (
-                                    filteredJobs.map(job => (
-                                        <JobCard 
-                                            key={job.id} 
-                                            job={job} 
-                                            isSelected={selectedJobId === job.id}
-                                            onClick={() => {
-                                                setSelectedJobId(job.id);
-                                                window.scrollTo({ top: 400, behavior: 'smooth' });
-                                            }}
-                                        />
-                                    ))
+                                            filteredJobs.map(job => (
+                                                <JobCard 
+                                                    key={job.id} 
+                                                    job={job} 
+                                                    isSelected={selectedJobId === job.id}
+                                                    onClick={() => {
+                                                        setSelectedJobId(job.id);
+                                                        if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+                                                            window.scrollTo({ top: 400, behavior: 'smooth' });
+                                                        }
+                                                    }}
+                                                />
+                                            ))
                                 ) : (
                                     <div className="p-8 text-center text-gray-500 font-medium italic">
                                         No jobs found matching your search.

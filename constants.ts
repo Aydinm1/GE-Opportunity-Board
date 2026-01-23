@@ -1,4 +1,7 @@
 import { Job } from './types';
+import hostOriginJson from './host-origin.json';
+
+export const HOST_ORIGIN: string = hostOriginJson.HOST_ORIGIN;
 
 export const MOCK_JOBS: Job[] = [
     {

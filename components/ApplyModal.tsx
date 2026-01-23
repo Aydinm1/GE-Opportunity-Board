@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Person, Job } from '../types';
+import { HOST_ORIGIN } from '../constants';
 
 interface ApplyModalProps {
   job: Job;
@@ -321,18 +322,18 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
         if (!m || !window.parent) return;
         const rect = m.getBoundingClientRect();
         const height = Math.ceil(window.pageYOffset + rect.bottom + 24);
-        window.parent.postMessage({ type: 'resize-iframe', height }, '*');
+        window.parent.postMessage({ type: 'resize-iframe', height }, HOST_ORIGIN);
       } catch (e) {
         // ignore
       }
     };
 
     const postOpen = () => {
-      try { if (window.parent) window.parent.postMessage({ type: 'opportunityboard:modal-open' }, '*'); } catch (e) {}
+      try { if (window.parent) window.parent.postMessage({ type: 'opportunityboard:modal-open' }, HOST_ORIGIN); } catch (e) {}
     };
 
     const postClose = () => {
-      try { if (window.parent) window.parent.postMessage({ type: 'opportunityboard:modal-close' }, '*'); } catch (e) {}
+      try { if (window.parent) window.parent.postMessage({ type: 'opportunityboard:modal-close' }, HOST_ORIGIN); } catch (e) {}
     };
 
     const debounced = (() => {

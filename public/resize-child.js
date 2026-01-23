@@ -26,12 +26,16 @@ function computeFullHeight() {
   return Math.ceil(Math.max(base, maxBottom, viewportBottom));
 }
 
+let PARENT_ORIGIN = 'https://the.ismaili';
+// Try to load host origin from a JSON file served at project root (host-origin.json)
+fetch('/host-origin.json').then(r => r.json()).then(j => { if (j && j.HOST_ORIGIN) PARENT_ORIGIN = j.HOST_ORIGIN; }).catch(() => {});
+
 let resizeTimeout = null;
 function sendHeightToParentDebounced() {
   if (resizeTimeout) clearTimeout(resizeTimeout);
   resizeTimeout = setTimeout(() => {
     const height = computeFullHeight();
-    parent.postMessage({ type: 'resize-iframe', height }, '*');
+    parent.postMessage({ type: 'resize-iframe', height }, PARENT_ORIGIN);
     resizeTimeout = null;
   }, 100);
 }

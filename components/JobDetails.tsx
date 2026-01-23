@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Job } from '../types';
+import { HOST_ORIGIN } from '../constants';
 import { splitBullets, formatStartDate, statusVariant } from '../lib/utils';
 import ApplyModal from './ApplyModal';
 
@@ -41,9 +42,9 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                 resolve(e.data.url || window.location.href);
             }
             window.addEventListener('message', onMsg);
-            try {
+                try {
                 // ask parent to reply with its URL; host should validate origin in prod
-                window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*');
+                window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, HOST_ORIGIN);
             } catch (e) {
                 // ignore
             }
@@ -62,7 +63,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
             }
             window.addEventListener('message', onMsg);
             try {
-                window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, '*');
+                window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, HOST_ORIGIN);
             } catch (err) {
                 window.removeEventListener('message', onMsg);
                 resolve(false);

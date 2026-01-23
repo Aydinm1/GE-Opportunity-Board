@@ -342,7 +342,8 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
         const height = computeFullHeight();
         if (Math.abs(height - (lastPostedRef.current || 0)) <= POST_THRESHOLD) return;
         lastPostedRef.current = height;
-        window.parent.postMessage({ type: 'resize-iframe', height, source: 'opportunityboard-modal' }, HOST_ORIGIN);
+        try { window.parent.postMessage({ type: 'resize-iframe', height, source: 'opportunityboard-modal' }, HOST_ORIGIN); }
+        catch (err) { try { window.parent.postMessage({ type: 'resize-iframe', height, source: 'opportunityboard-modal' }, '*'); } catch {} }
       } catch (e) {
         // ignore
       }
@@ -351,11 +352,13 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     const postOpen = () => {
       try {
         if (window.parent) {
-          window.parent.postMessage({ type: 'opportunityboard:modal-open' }, HOST_ORIGIN);
+          try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, HOST_ORIGIN); }
+          catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, '*'); } catch {} }
           // force a resize immediately on open so host applies height even if within threshold
           try {
             const h = computeFullHeight();
-            window.parent.postMessage({ type: 'resize-iframe', height: h, source: 'opportunityboard-modal', force: true }, HOST_ORIGIN);
+            try { window.parent.postMessage({ type: 'resize-iframe', height: h, source: 'opportunityboard-modal', force: true }, HOST_ORIGIN); }
+            catch (err) { try { window.parent.postMessage({ type: 'resize-iframe', height: h, source: 'opportunityboard-modal', force: true }, '*'); } catch {} }
           } catch (e) {
             // ignore
           }
@@ -364,7 +367,12 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     };
 
     const postClose = () => {
-      try { if (window.parent) window.parent.postMessage({ type: 'opportunityboard:modal-close' }, HOST_ORIGIN); } catch (e) {}
+      try {
+        if (window.parent) {
+          try { window.parent.postMessage({ type: 'opportunityboard:modal-close' }, HOST_ORIGIN); }
+          catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:modal-close' }, '*'); } catch {} }
+        }
+      } catch (e) {}
     };
 
     const debounced = (() => {

@@ -43,8 +43,9 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
             }
             window.addEventListener('message', onMsg);
                 try {
-                // ask parent to reply with its URL; host should validate origin in prod
-                window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, HOST_ORIGIN);
+                    // ask parent to reply with its URL; host should validate origin in prod
+                    try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, HOST_ORIGIN); }
+                    catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*'); } catch {} }
             } catch (e) {
                 // ignore
             }
@@ -63,7 +64,8 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
             }
             window.addEventListener('message', onMsg);
             try {
-                window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, HOST_ORIGIN);
+                try { window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, HOST_ORIGIN); }
+                catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, '*'); } catch {} }
             } catch (err) {
                 window.removeEventListener('message', onMsg);
                 resolve(false);

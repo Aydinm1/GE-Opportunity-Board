@@ -319,12 +319,27 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     const lastPostedRef = { current: 0 } as { current: number };
     const POST_THRESHOLD = 30; // px, only notify parent when height changes more than this
 
+    const computeFullHeight = () => {
+      const doc = document.documentElement;
+      const body = document.body;
+      const base = Math.max(doc.scrollHeight || 0, body.scrollHeight || 0, doc.offsetHeight || 0, body.offsetHeight || 0);
+      let maxBottom = 0;
+      const nodes = document.querySelectorAll('body *');
+      for (let i = 0; i < nodes.length; i++) {
+        try {
+          const r = (nodes[i] as HTMLElement).getBoundingClientRect();
+          const bottom = r.bottom + window.pageYOffset;
+          if (bottom > maxBottom) maxBottom = bottom;
+        } catch (e) { /* ignore */ }
+      }
+      const viewportBottom = window.pageYOffset + window.innerHeight;
+      return Math.ceil(Math.max(base, maxBottom, viewportBottom) + 24);
+    };
+
     const postHeight = () => {
       try {
-        const m = modalRef.current || contentRef.current;
-        if (!m || !window.parent) return;
-        const rect = m.getBoundingClientRect();
-        const height = Math.ceil(window.pageYOffset + rect.bottom + 24);
+        if (!window.parent) return;
+        const height = computeFullHeight();
         if (Math.abs(height - (lastPostedRef.current || 0)) <= POST_THRESHOLD) return;
         lastPostedRef.current = height;
         window.parent.postMessage({ type: 'resize-iframe', height, source: 'opportunityboard-modal' }, HOST_ORIGIN);

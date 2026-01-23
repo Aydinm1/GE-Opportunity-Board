@@ -19,7 +19,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
     }, []);
 
     // Resolve the host/parent URL for share links.
-    // Strategy: try same-origin parent access -> document.referrer -> postMessage request to parent
+    // Strategy: try same-origin parent access -> document.referrer (if has path) -> postMessage request to parent
     const resolveParentUrl = async (timeout = 1000): Promise<string> => {
         // 1) same-origin access
         try {
@@ -30,8 +30,18 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
             // cross-origin - continue to fallbacks
         }
 
-        // 2) referrer
-        if (document.referrer) return document.referrer;
+        // 2) referrer - only use if it has a meaningful path (some sites strip path via Referrer-Policy)
+        if (document.referrer) {
+            try {
+                const refUrl = new URL(document.referrer);
+                // Only return referrer if it has a path beyond '/' (not stripped by Referrer-Policy: origin)
+                if (refUrl.pathname && refUrl.pathname !== '/') {
+                    return document.referrer;
+                }
+            } catch (e) {
+                // Invalid URL, continue to postMessage fallback
+            }
+        }
 
         // 3) ask parent via postMessage, retrying if parent returns only the origin root
         const tries = 3;

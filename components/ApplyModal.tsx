@@ -316,13 +316,18 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
 
   // Notify parent (host) about modal height so host can resize iframe to fit
   useEffect(() => {
+    const lastPostedRef = { current: 0 } as { current: number };
+    const POST_THRESHOLD = 30; // px, only notify parent when height changes more than this
+
     const postHeight = () => {
       try {
         const m = modalRef.current || contentRef.current;
         if (!m || !window.parent) return;
         const rect = m.getBoundingClientRect();
         const height = Math.ceil(window.pageYOffset + rect.bottom + 24);
-        window.parent.postMessage({ type: 'resize-iframe', height }, HOST_ORIGIN);
+        if (Math.abs(height - (lastPostedRef.current || 0)) <= POST_THRESHOLD) return;
+        lastPostedRef.current = height;
+        window.parent.postMessage({ type: 'resize-iframe', height, source: 'opportunityboard-modal' }, HOST_ORIGIN);
       } catch (e) {
         // ignore
       }
@@ -338,7 +343,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
 
     const debounced = (() => {
       let t: ReturnType<typeof setTimeout> | null = null;
-      return () => { if (t) clearTimeout(t); t = setTimeout(() => { postHeight(); t = null; }, 80); };
+      return () => { if (t) clearTimeout(t); t = setTimeout(() => { postHeight(); t = null; }, 120); };
     })();
 
     // Post once on mount (modal open)

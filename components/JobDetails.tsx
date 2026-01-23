@@ -50,6 +50,27 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
             setTimeout(() => { window.removeEventListener('message', onMsg); resolve(window.location.href); }, timeout);
         });
     };
+
+    // Ask parent to copy text to clipboard on our behalf (cross-origin fallback)
+    const copyViaParent = async (text: string, timeout = 1500): Promise<boolean> => {
+        return await new Promise((resolve) => {
+            const id = Math.random().toString(36).slice(2);
+            function onMsg(e: MessageEvent) {
+                if (!e.data || e.data.type !== 'opportunityboard:copy-result' || e.data.id !== id) return;
+                window.removeEventListener('message', onMsg);
+                resolve(Boolean(e.data.ok));
+            }
+            window.addEventListener('message', onMsg);
+            try {
+                window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, '*');
+            } catch (err) {
+                window.removeEventListener('message', onMsg);
+                resolve(false);
+                return;
+            }
+            setTimeout(() => { window.removeEventListener('message', onMsg); resolve(false); }, timeout);
+        });
+    };
     const otherQualifications = splitBullets(job.otherQualifications);
     const requiredQualifications = otherQualifications.length
         ? [...job.requiredQualifications, ...otherQualifications]
@@ -114,13 +135,26 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                                     setCopied(true);
                                     if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
                                     copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+                                    return;
                                 } catch (e) {
-                                    // fallback to textarea
+                                    // Clipboard API blocked (permissions policy) or failed — try parent copy
                                 }
-                                return;
                             }
 
-                            // fallback for environments without navigator.clipboard
+                            // Try asking parent to copy (useful if Clipboard API blocked in iframe)
+                            try {
+                                const ok = await copyViaParent(link);
+                                if (ok) {
+                                    setCopied(true);
+                                    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+                                    copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+                                    return;
+                                }
+                            } catch (e) {
+                                // ignore
+                            }
+
+                            // Last-resort fallback: textarea + execCommand
                             if (typeof window !== 'undefined') {
                                 const el = document.createElement('textarea');
                                 el.value = link;

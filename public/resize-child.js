@@ -26,16 +26,42 @@ function computeFullHeight() {
   return Math.ceil(Math.max(base, maxBottom, viewportBottom));
 }
 
-let PARENT_ORIGIN = 'https://the.ismaili';
-// Try to load host origin from a JSON file served at project root (host-origin.json)
-fetch('/host-origin.json').then(r => r.json()).then(j => { if (j && j.HOST_ORIGIN) PARENT_ORIGIN = j.HOST_ORIGIN; }).catch(() => {});
+let PARENT_ORIGIN = '*';
+
+// Initialize parent origin with best-effort sources:
+// 1) /host-origin.json served from iframe origin
+// 2) document.referrer (origin)
+// 3) fallback to '*'
+(async function initParentOrigin() {
+  try {
+    const res = await fetch('/host-origin.json');
+    if (res.ok) {
+      const j = await res.json();
+      if (j && j.HOST_ORIGIN) { PARENT_ORIGIN = j.HOST_ORIGIN; return; }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  try {
+    if (document.referrer) {
+      const u = new URL(document.referrer);
+      if (u && u.origin) { PARENT_ORIGIN = u.origin; return; }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // leave as '*'
+})();
 
 let resizeTimeout = null;
 function sendHeightToParentDebounced() {
   if (resizeTimeout) clearTimeout(resizeTimeout);
   resizeTimeout = setTimeout(() => {
     const height = computeFullHeight();
-    parent.postMessage({ type: 'resize-iframe', height }, PARENT_ORIGIN);
+    try { parent.postMessage({ type: 'resize-iframe', height }, PARENT_ORIGIN); }
+    catch (err) { try { parent.postMessage({ type: 'resize-iframe', height }, '*'); } catch (e) {} }
     resizeTimeout = null;
   }, 100);
 }

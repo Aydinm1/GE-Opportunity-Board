@@ -33,24 +33,40 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
         // 2) referrer
         if (document.referrer) return document.referrer;
 
-        // 3) ask parent via postMessage
-        return await new Promise((resolve) => {
-            const id = Math.random().toString(36).slice(2);
-            function onMsg(e: MessageEvent) {
-                if (!e.data || e.data.type !== 'opportunityboard:parent-url' || e.data.id !== id) return;
-                window.removeEventListener('message', onMsg);
-                resolve(e.data.url || window.location.href);
-            }
-            window.addEventListener('message', onMsg);
+        // 3) ask parent via postMessage, retrying if parent returns only the origin root
+        const tries = 3;
+        const retryDelay = 400; // ms
+        for (let attempt = 0; attempt < tries; attempt++) {
+            const url = await new Promise<string>((resolve) => {
+                const id = Math.random().toString(36).slice(2);
+                function onMsg(e: MessageEvent) {
+                    if (!e.data || e.data.type !== 'opportunityboard:parent-url' || e.data.id !== id) return;
+                    window.removeEventListener('message', onMsg);
+                    resolve(e.data.url || window.location.href);
+                }
+                window.addEventListener('message', onMsg);
                 try {
-                    // ask parent to reply with its URL; host should validate origin in prod
                     try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, HOST_ORIGIN); }
                     catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*'); } catch {} }
+                } catch (e) {
+                    // ignore
+                }
+                setTimeout(() => { window.removeEventListener('message', onMsg); resolve(window.location.href); }, timeout);
+            });
+
+            try {
+                const parsed = new URL(url);
+                if (parsed.pathname && parsed.pathname !== '/') return url;
             } catch (e) {
-                // ignore
+                return url;
             }
-            setTimeout(() => { window.removeEventListener('message', onMsg); resolve(window.location.href); }, timeout);
-        });
+
+            // if we only got the origin, wait and retry
+            await new Promise((r) => setTimeout(r, retryDelay));
+        }
+
+        // final fallback
+        return window.location.href;
     };
 
     // Ask parent to copy text to clipboard on our behalf (cross-origin fallback)

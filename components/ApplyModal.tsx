@@ -431,7 +431,9 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
           height: '90vh',
           maxHeight: '90vh',
           width: 'min(960px, calc(100% - 2rem))',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column'
         }}
       >
         <div className="relative px-4 pt-4 pb-3 border-b">

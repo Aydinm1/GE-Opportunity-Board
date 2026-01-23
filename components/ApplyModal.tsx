@@ -419,8 +419,21 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 py-8">
-     <div className="bg-white dark:bg-gray-900 rounded-md shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col" style={{ maxHeight: '90vh' }}>
+    <div className="fixed inset-0 z-50 bg-black/40">
+      <div
+        ref={modalRef}
+        className="bg-white dark:bg-gray-900 rounded-md shadow-xl"
+        style={{
+          position: 'fixed',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          top: '5vh',
+          height: '90vh',
+          maxHeight: '90vh',
+          width: 'min(960px, calc(100% - 2rem))',
+          overflow: 'hidden'
+        }}
+      >
         <div className="relative px-4 pt-4 pb-3 border-b">
           <div className="flex items-center justify-between">
             <button onClick={onClose} className="text-gray-500 w-8">✕</button>

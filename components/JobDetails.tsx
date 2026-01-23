@@ -126,6 +126,8 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                     </div>
                     <div className="flex items-center gap-3">
                         <button onClick={async () => {
+                                try { console.log('Share clicked', job.id); } catch (e) {}
+                                try { if (window.parent) { try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, HOST_ORIGIN); } catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, '*'); } catch {} } } } catch (e) {}
                             // Resolve parent URL (prefers full URL when available) then build share link
                             const parentHref = await resolveParentUrl();
                             let link = '';
@@ -157,7 +159,8 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                                 try {
                                     console.log('resolveParentUrl ->', parentHref, 'link ->', link);
                                     if (window.parent) {
-                                        try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, HOST_ORIGIN); } catch (e) { /* ignore */ }
+                                        try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, HOST_ORIGIN); }
+                                        catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, '*'); } catch {} }
                                     }
                                 } catch (e) { /* ignore */ }
                             }

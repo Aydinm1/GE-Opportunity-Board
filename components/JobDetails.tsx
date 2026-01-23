@@ -24,34 +24,44 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
         // 1) same-origin access
         try {
             if (window.parent && window.parent.location && window.parent.location.href) {
+                console.log('[resolveParentUrl] same-origin access succeeded:', window.parent.location.href);
                 return window.parent.location.href;
             }
         } catch (e) {
             // cross-origin - continue to fallbacks
+            console.log('[resolveParentUrl] same-origin access failed (cross-origin)');
         }
 
         // 2) referrer - only use if it has a meaningful path (some sites strip path via Referrer-Policy)
+        console.log('[resolveParentUrl] document.referrer:', document.referrer);
         if (document.referrer) {
             try {
                 const refUrl = new URL(document.referrer);
+                console.log('[resolveParentUrl] referrer pathname:', refUrl.pathname);
                 // Only return referrer if it has a path beyond '/' (not stripped by Referrer-Policy: origin)
                 if (refUrl.pathname && refUrl.pathname !== '/') {
+                    console.log('[resolveParentUrl] using referrer (has path):', document.referrer);
                     return document.referrer;
                 }
+                console.log('[resolveParentUrl] referrer has no path, falling through to postMessage');
             } catch (e) {
                 // Invalid URL, continue to postMessage fallback
+                console.log('[resolveParentUrl] referrer URL parse failed:', e);
             }
         }
 
         // 3) ask parent via postMessage, retrying if parent returns only the origin root
+        console.log('[resolveParentUrl] trying postMessage to parent');
         const tries = 3;
         const retryDelay = 400; // ms
         for (let attempt = 0; attempt < tries; attempt++) {
+            console.log('[resolveParentUrl] postMessage attempt', attempt + 1);
             const url = await new Promise<string>((resolve) => {
                 const id = Math.random().toString(36).slice(2);
                 function onMsg(e: MessageEvent) {
                     if (!e.data || e.data.type !== 'opportunityboard:parent-url' || e.data.id !== id) return;
                     window.removeEventListener('message', onMsg);
+                    console.log('[resolveParentUrl] received parent-url response:', e.data.url);
                     resolve(e.data.url || window.location.href);
                 }
                 window.addEventListener('message', onMsg);
@@ -61,12 +71,15 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                 } catch (e) {
                     // ignore
                 }
-                setTimeout(() => { window.removeEventListener('message', onMsg); resolve(window.location.href); }, timeout);
+                setTimeout(() => { window.removeEventListener('message', onMsg); console.log('[resolveParentUrl] postMessage timeout, using fallback'); resolve(window.location.href); }, timeout);
             });
 
             try {
                 const parsed = new URL(url);
-                if (parsed.pathname && parsed.pathname !== '/') return url;
+                if (parsed.pathname && parsed.pathname !== '/') {
+                    console.log('[resolveParentUrl] got valid URL with path:', url);
+                    return url;
+                }
             } catch (e) {
                 return url;
             }
@@ -76,6 +89,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
         }
 
         // final fallback
+        console.log('[resolveParentUrl] all attempts failed, using window.location.href');
         return window.location.href;
     };
 

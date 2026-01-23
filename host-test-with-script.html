@@ -86,8 +86,17 @@
                 if (data.type === 'resize-iframe') {
                   const h = Number(data.height) || 0; if (h <= 0) { dbg('resize ignored 0'); return; }
                   const iframe = document.getElementById(IFRAME_ID); if (!iframe) { dbg('iframe not found', IFRAME_ID); return; }
-                  if (h > lastHeight + MIN_DELTA) { iframe.style.height = h + 'px'; lastHeight = h; if (shrinkTimer) { clearTimeout(shrinkTimer); shrinkTimer = null; } dbg('iframe grew ->', h); }
-                  else if (h < lastHeight - MIN_DELTA) { if (shrinkTimer) clearTimeout(shrinkTimer); shrinkTimer = setTimeout(() => { iframe.style.height = h + 'px'; lastHeight = h; shrinkTimer = null; dbg('iframe shrunk ->', h); }, SHRINK_DELAY); dbg('shrink scheduled ->', h); }
+                  // If sender requests a forced resize, or if this is a modal resize
+                  // apply the height even when it equals lastHeight.
+                  const forced = !!data.force || data.source === 'opportunityboard-modal';
+                  if (h > lastHeight + MIN_DELTA || forced && h >= lastHeight) {
+                    iframe.style.height = h + 'px'; lastHeight = h; if (shrinkTimer) { clearTimeout(shrinkTimer); shrinkTimer = null; } dbg('iframe grew ->', h, forced ? '(forced/modal)' : '');
+                  }
+                  else if (h < lastHeight - MIN_DELTA) {
+                    if (shrinkTimer) clearTimeout(shrinkTimer);
+                    shrinkTimer = setTimeout(() => { iframe.style.height = h + 'px'; lastHeight = h; shrinkTimer = null; dbg('iframe shrunk ->', h); }, SHRINK_DELAY);
+                    dbg('shrink scheduled ->', h);
+                  }
                   else { dbg('small delta ignored', { lastHeight, requested: h }); }
                   return;
                 }

@@ -349,7 +349,18 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     };
 
     const postOpen = () => {
-      try { if (window.parent) window.parent.postMessage({ type: 'opportunityboard:modal-open' }, HOST_ORIGIN); } catch (e) {}
+      try {
+        if (window.parent) {
+          window.parent.postMessage({ type: 'opportunityboard:modal-open' }, HOST_ORIGIN);
+          // force a resize immediately on open so host applies height even if within threshold
+          try {
+            const h = computeFullHeight();
+            window.parent.postMessage({ type: 'resize-iframe', height: h, source: 'opportunityboard-modal', force: true }, HOST_ORIGIN);
+          } catch (e) {
+            // ignore
+          }
+        }
+      } catch (e) {}
     };
 
     const postClose = () => {

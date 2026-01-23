@@ -124,11 +124,22 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                     </div>
                     <div className="flex items-center gap-3">
                         <button onClick={async () => {
-                            // Resolve parent URL (origin) then copy origin + ?job= to clipboard
+                            // Resolve parent URL (prefers full URL when available) then build share link
                             const parentHref = await resolveParentUrl();
-                            let origin = '';
-                            try { origin = new URL(parentHref).origin; } catch (e) { origin = window.location.origin; }
-                            const link = `${origin}/?job=${job.id}`;
+                            let link = '';
+                            try {
+                                const u = new URL(parentHref);
+                                // If parentHref has a path beyond '/', append query param to that URL
+                                if (u.pathname && u.pathname !== '/') {
+                                    link = `${parentHref}${parentHref.includes('?') ? '&' : '?'}job=${job.id}`;
+                                } else {
+                                    // fallback to origin root with query
+                                    link = `${u.origin}/?job=${job.id}`;
+                                }
+                            } catch (e) {
+                                // fallback to current origin
+                                link = `${window.location.origin}/?job=${job.id}`;
+                            }
 
                             if (typeof navigator !== 'undefined' && navigator.clipboard) {
                                 try {

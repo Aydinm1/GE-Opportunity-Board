@@ -129,7 +129,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                                 try { console.log('Share clicked', job.id); } catch (e) {}
                                 try { if (window.parent) { try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, HOST_ORIGIN); } catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, '*'); } catch {} } } } catch (e) {}
                             // Resolve parent URL (prefers full URL when available) then build share link
-                            const parentHref = await resolveParentUrl();
+                            const parentHref = await resolveParentUrl(3000);
                             let link = '';
                             try {
                                 const u = new URL(parentHref);

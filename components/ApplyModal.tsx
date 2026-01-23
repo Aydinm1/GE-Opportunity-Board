@@ -317,7 +317,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   // Notify parent (host) about modal height so host can resize iframe to fit
   useEffect(() => {
     const lastPostedRef = { current: 0 } as { current: number };
-    const POST_THRESHOLD = 30; // px, only notify parent when height changes more than this
+    const POST_THRESHOLD = 8; // px, only notify parent when height changes more than this
 
     const computeFullHeight = () => {
       const doc = document.documentElement;

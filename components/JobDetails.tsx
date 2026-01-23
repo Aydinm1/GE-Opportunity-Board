@@ -151,6 +151,13 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                                 } catch (e) {
                                     // Clipboard API blocked (permissions policy) or failed — try parent copy
                                 }
+                                // Debug: report resolved parent href and link to host and console
+                                try {
+                                    console.log('resolveParentUrl ->', parentHref, 'link ->', link);
+                                    if (window.parent) {
+                                        try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, HOST_ORIGIN); } catch (e) { /* ignore */ }
+                                    }
+                                } catch (e) { /* ignore */ }
                             }
 
                             // Try asking parent to copy (useful if Clipboard API blocked in iframe)

@@ -58,8 +58,13 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
             console.log('[resolveParentUrl] postMessage attempt', attempt + 1);
             const url = await new Promise<string>((resolve) => {
                 const id = Math.random().toString(36).slice(2);
+                let resolved = false;
+                let timeoutId: ReturnType<typeof setTimeout>;
                 function onMsg(e: MessageEvent) {
                     if (!e.data || e.data.type !== 'opportunityboard:parent-url' || e.data.id !== id) return;
+                    if (resolved) return;
+                    resolved = true;
+                    clearTimeout(timeoutId);
                     window.removeEventListener('message', onMsg);
                     console.log('[resolveParentUrl] received parent-url response:', e.data.url);
                     resolve(e.data.url || window.location.href);
@@ -71,7 +76,13 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                 } catch (e) {
                     // ignore
                 }
-                setTimeout(() => { window.removeEventListener('message', onMsg); console.log('[resolveParentUrl] postMessage timeout, using fallback'); resolve(window.location.href); }, timeout);
+                timeoutId = setTimeout(() => {
+                    if (resolved) return;
+                    resolved = true;
+                    window.removeEventListener('message', onMsg);
+                    console.log('[resolveParentUrl] postMessage timeout, using fallback');
+                    resolve(window.location.href);
+                }, timeout);
             });
 
             try {

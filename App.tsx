@@ -30,11 +30,17 @@ const getJobParamFromParentUrl = async (timeout = 500): Promise<string | null> =
     // Ask parent via postMessage
     return new Promise((resolve) => {
         const id = Math.random().toString(36).slice(2);
+        let resolved = false;
+        let timeoutId: ReturnType<typeof setTimeout>;
         function onMsg(e: MessageEvent) {
             if (!e.data || e.data.type !== 'opportunityboard:parent-url' || e.data.id !== id) return;
+            if (resolved) return;
+            resolved = true;
+            clearTimeout(timeoutId);
             window.removeEventListener('message', onMsg);
             try {
                 const parentUrl = new URL(e.data.url || '');
+                console.log('[App] received parent URL:', e.data.url);
                 resolve(parentUrl.searchParams.get('job'));
             } catch {
                 resolve(null);
@@ -47,7 +53,12 @@ const getJobParamFromParentUrl = async (timeout = 500): Promise<string | null> =
         } catch {
             // ignore
         }
-        setTimeout(() => { window.removeEventListener('message', onMsg); resolve(null); }, timeout);
+        timeoutId = setTimeout(() => {
+            if (resolved) return;
+            resolved = true;
+            window.removeEventListener('message', onMsg);
+            resolve(null);
+        }, timeout);
     });
 };
 

@@ -52,8 +52,8 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
 
         // 3) ask parent via postMessage, retrying if parent returns only the origin root
         console.log('[resolveParentUrl] trying postMessage to parent');
-        const tries = 3;
-        const retryDelay = 400; // ms
+        const tries = 2;
+        const retryDelay = 150; // ms
         for (let attempt = 0; attempt < tries; attempt++) {
             console.log('[resolveParentUrl] postMessage attempt', attempt + 1);
             const url = await new Promise<string>((resolve) => {
@@ -169,10 +169,12 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                                 try { console.log('Share clicked', job.id); } catch (e) {}
                                 try { if (window.parent) { try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, HOST_ORIGIN); } catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, '*'); } catch {} } } } catch (e) {}
                             // Resolve parent URL (prefers full URL when available) then build share link
-                            const parentHref = await resolveParentUrl(3000);
+                            const parentHref = await resolveParentUrl(500);
+                            console.log('[Share] resolveParentUrl returned:', parentHref);
                             let link = '';
                             try {
                                 const u = new URL(parentHref);
+                                console.log('[Share] parsed URL pathname:', u.pathname);
                                 // If parentHref has a path beyond '/', append query param to that URL
                                 if (u.pathname && u.pathname !== '/') {
                                     link = `${parentHref}${parentHref.includes('?') ? '&' : '?'}job=${job.id}`;
@@ -184,6 +186,15 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                                 // fallback to current origin
                                 link = `${window.location.origin}/?job=${job.id}`;
                             }
+                            console.log('[Share] final link:', link);
+
+                            // Debug: report resolved parent href and link to host
+                            try {
+                                if (window.parent) {
+                                    try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, HOST_ORIGIN); }
+                                    catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, '*'); } catch {} }
+                                }
+                            } catch (e) { /* ignore */ }
 
                             if (typeof navigator !== 'undefined' && navigator.clipboard) {
                                 try {
@@ -194,15 +205,8 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                                     return;
                                 } catch (e) {
                                     // Clipboard API blocked (permissions policy) or failed — try parent copy
+                                    console.log('[Share] clipboard.writeText failed:', e);
                                 }
-                                // Debug: report resolved parent href and link to host and console
-                                try {
-                                    console.log('resolveParentUrl ->', parentHref, 'link ->', link);
-                                    if (window.parent) {
-                                        try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, HOST_ORIGIN); }
-                                        catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, '*'); } catch {} }
-                                    }
-                                } catch (e) { /* ignore */ }
                             }
 
                             // Try asking parent to copy (useful if Clipboard API blocked in iframe)

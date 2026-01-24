@@ -5,6 +5,52 @@ import { Job, FilterOptions } from './types';
 import JobCard from './components/JobCard';
 import JobDetails from './components/JobDetails';
 import Filters from './components/Filters';
+import { HOST_ORIGIN } from './constants';
+
+// Helper to get job parameter from parent URL (for iframe embedding)
+const getJobParamFromParentUrl = async (timeout = 500): Promise<string | null> => {
+    // First check our own URL
+    if (typeof window !== 'undefined') {
+        const ownParams = new URLSearchParams(window.location.search);
+        const ownJob = ownParams.get('job');
+        if (ownJob) return ownJob;
+    }
+
+    // Check document.referrer
+    if (document.referrer) {
+        try {
+            const refUrl = new URL(document.referrer);
+            const refJob = refUrl.searchParams.get('job');
+            if (refJob) return refJob;
+        } catch (e) {
+            // ignore
+        }
+    }
+
+    // Ask parent via postMessage
+    return new Promise((resolve) => {
+        const id = Math.random().toString(36).slice(2);
+        function onMsg(e: MessageEvent) {
+            if (!e.data || e.data.type !== 'opportunityboard:parent-url' || e.data.id !== id) return;
+            window.removeEventListener('message', onMsg);
+            try {
+                const parentUrl = new URL(e.data.url || '');
+                resolve(parentUrl.searchParams.get('job'));
+            } catch {
+                resolve(null);
+            }
+        }
+        window.addEventListener('message', onMsg);
+        try {
+            try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, HOST_ORIGIN); }
+            catch { try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*'); } catch {} }
+        } catch {
+            // ignore
+        }
+        setTimeout(() => { window.removeEventListener('message', onMsg); resolve(null); }, timeout);
+    });
+};
+
 const App: React.FC = () => {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
@@ -23,12 +69,14 @@ const App: React.FC = () => {
     
 
     useEffect(() => {
-        const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-        const jobParam = params?.get('job') || null;
-
         const fetchJobs = async () => {
             try {
                 setLoading(true);
+                
+                // Get job param from parent URL (works in iframe)
+                const jobParam = await getJobParamFromParentUrl(500);
+                console.log('[App] job param from parent URL:', jobParam);
+                
                 const response = await fetch('/api/jobs');
                 if (!response.ok) {
                     const text = await response.text().catch(() => '');

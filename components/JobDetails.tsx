@@ -175,13 +175,11 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                             try {
                                 const u = new URL(parentHref);
                                 console.log('[Share] parsed URL pathname:', u.pathname);
-                                // If parentHref has a path beyond '/', append query param to that URL
-                                if (u.pathname && u.pathname !== '/') {
-                                    link = `${parentHref}${parentHref.includes('?') ? '&' : '?'}job=${job.id}`;
-                                } else {
-                                    // fallback to origin root with query
-                                    link = `${u.origin}/?job=${job.id}`;
-                                }
+                                // Remove any existing 'job' parameter to avoid duplicates
+                                u.searchParams.delete('job');
+                                // Add the new job parameter
+                                u.searchParams.set('job', job.id);
+                                link = u.toString();
                             } catch (e) {
                                 // fallback to current origin
                                 link = `${window.location.origin}/?job=${job.id}`;

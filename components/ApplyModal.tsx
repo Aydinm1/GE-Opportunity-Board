@@ -340,13 +340,16 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     };
 
     const postOpen = () => {
+      console.log('[ApplyModal] postOpen called');
       try {
         if (window.parent) {
+          console.log('[ApplyModal] posting modal-open to parent, HOST_ORIGIN:', HOST_ORIGIN);
           try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, HOST_ORIGIN); }
           catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, '*'); } catch {} }
           // Send one resize message on open
           try {
             const h = computeFullHeight();
+            console.log('[ApplyModal] posting resize-iframe to parent with height:', h);
             try { window.parent.postMessage({ type: 'resize-iframe', height: h, source: 'opportunityboard-modal' }, HOST_ORIGIN); }
             catch (err) { try { window.parent.postMessage({ type: 'resize-iframe', height: h, source: 'opportunityboard-modal' }, '*'); } catch {} }
           } catch (e) {
@@ -354,19 +357,27 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
           }
         }
         // Also notify scripts running in the iframe (like resize-child.js)
+        console.log('[ApplyModal] posting modal-open to window (for resize-child.js)');
         window.postMessage({ type: 'opportunityboard:modal-open' }, '*');
-      } catch (e) {}
+      } catch (e) {
+        console.log('[ApplyModal] postOpen error:', e);
+      }
     };
 
     const postClose = () => {
+      console.log('[ApplyModal] postClose called');
       try {
         if (window.parent) {
+          console.log('[ApplyModal] posting modal-close to parent, HOST_ORIGIN:', HOST_ORIGIN);
           try { window.parent.postMessage({ type: 'opportunityboard:modal-close' }, HOST_ORIGIN); }
           catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:modal-close' }, '*'); } catch {} }
         }
         // Also notify scripts running in the iframe (like resize-child.js)
+        console.log('[ApplyModal] posting modal-close to window (for resize-child.js)');
         window.postMessage({ type: 'opportunityboard:modal-close' }, '*');
-      } catch (e) {}
+      } catch (e) {
+        console.log('[ApplyModal] postClose error:', e);
+      }
     };
 
     // Post once on mount (modal open) - no continuous observation to avoid feedback loop

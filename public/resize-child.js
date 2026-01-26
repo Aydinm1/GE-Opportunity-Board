@@ -1,3 +1,7 @@
+// Debug logging
+const DEBUG = true;
+const log = (...args) => DEBUG && console.log('[resize-child]', ...args);
+
 // Compute document height, skipping fixed/absolute elements (overlays like modals)
 function computeFullHeight() {
   const doc = document.documentElement;
@@ -34,11 +38,18 @@ let modalOpen = false;
 
 // Listen for modal open/close messages from the app
 window.addEventListener('message', (e) => {
+  if (e.data && e.data.type) {
+    log('Message received:', e.data.type, e.data);
+  }
   if (e.data && e.data.type === 'opportunityboard:modal-open') {
+    log('modalOpen changing from', modalOpen, 'to true');
     modalOpen = true;
+    log('modalOpen is now:', modalOpen);
   } else if (e.data && e.data.type === 'opportunityboard:modal-close') {
+    log('modalOpen changing from', modalOpen, 'to false');
     modalOpen = false;
-    sendHeightToParentDebounced(); // Recalculate after modal closes
+    log('modalOpen is now:', modalOpen);
+    sendHeightToParentDebounced('modal-close'); // Recalculate after modal closes
   }
 });
 
@@ -70,12 +81,25 @@ window.addEventListener('message', (e) => {
 })();
 
 let resizeTimeout = null;
-function sendHeightToParentDebounced() {
-  if (modalOpen) return; // Don't send while modal is open
-  if (resizeTimeout) clearTimeout(resizeTimeout);
+function sendHeightToParentDebounced(trigger = 'unknown') {
+  log('sendHeightToParentDebounced called, trigger:', trigger, 'modalOpen:', modalOpen);
+  if (modalOpen) {
+    log('BLOCKED - modal is open (early check)');
+    return;
+  }
+  if (resizeTimeout) {
+    log('Clearing existing timeout');
+    clearTimeout(resizeTimeout);
+  }
   resizeTimeout = setTimeout(() => {
-    if (modalOpen) return; // Double-check in case modal opened during debounce
+    log('Debounce timeout fired, trigger:', trigger, 'modalOpen:', modalOpen);
+    if (modalOpen) {
+      log('BLOCKED - modal is open (debounce check)');
+      resizeTimeout = null;
+      return;
+    }
     const height = computeFullHeight();
+    log('Computed height:', height, '- posting to parent');
     try { parent.postMessage({ type: 'resize-iframe', height }, PARENT_ORIGIN); }
     catch (err) { try { parent.postMessage({ type: 'resize-iframe', height }, '*'); } catch (e) {} }
     resizeTimeout = null;
@@ -83,18 +107,19 @@ function sendHeightToParentDebounced() {
 }
 
 // Send height once when the page is loaded
-window.addEventListener('load', sendHeightToParentDebounced);
-window.addEventListener('resize', sendHeightToParentDebounced);
+window.addEventListener('load', () => sendHeightToParentDebounced('window-load'));
+window.addEventListener('resize', () => sendHeightToParentDebounced('window-resize'));
 
 // Observe structural changes that may affect layout
-const mutationObserver = new MutationObserver(sendHeightToParentDebounced);
+const mutationObserver = new MutationObserver(() => sendHeightToParentDebounced('mutation'));
 mutationObserver.observe(document.body, { childList: true, subtree: true, attributes: true });
 
 // Observe element resizes
 if (typeof ResizeObserver !== 'undefined') {
-  const ro = new ResizeObserver(sendHeightToParentDebounced);
+  const ro = new ResizeObserver(() => sendHeightToParentDebounced('ResizeObserver'));
   ro.observe(document.body);
 }
 
 // Initial kick
-sendHeightToParentDebounced();
+log('Script initialized');
+sendHeightToParentDebounced('initial');

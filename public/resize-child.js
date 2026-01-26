@@ -1,4 +1,4 @@
-// Compute a robust document height that includes fixed-position elements (like a modal)
+// Compute document height, skipping fixed/absolute elements (overlays like modals)
 function computeFullHeight() {
   const doc = document.documentElement;
   const body = document.body;
@@ -6,13 +6,16 @@ function computeFullHeight() {
   // Base heights from normal flow
   const base = Math.max(doc.scrollHeight || 0, body.scrollHeight || 0, doc.offsetHeight || 0, body.offsetHeight || 0);
 
-  // Some UI (modals, fixed elements) are taken out of the flow. Measure the bottom-most
-  // edge of every element and use that as a candidate height.
+  // Measure the bottom-most edge of every element in normal document flow
   let maxBottom = 0;
   const nodes = document.querySelectorAll('body *');
   for (let i = 0; i < nodes.length; i++) {
     try {
-      const r = nodes[i].getBoundingClientRect();
+      const el = nodes[i];
+      const style = window.getComputedStyle(el);
+      // Skip fixed/absolute elements - they're overlays, not document content
+      if (style.position === 'fixed' || style.position === 'absolute') continue;
+      const r = el.getBoundingClientRect();
       const bottom = r.bottom + window.pageYOffset;
       if (bottom > maxBottom) maxBottom = bottom;
     } catch (e) {
@@ -27,6 +30,17 @@ function computeFullHeight() {
 }
 
 let PARENT_ORIGIN = '*';
+let modalOpen = false;
+
+// Listen for modal open/close messages from the app
+window.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'opportunityboard:modal-open') {
+    modalOpen = true;
+  } else if (e.data && e.data.type === 'opportunityboard:modal-close') {
+    modalOpen = false;
+    sendHeightToParentDebounced(); // Recalculate after modal closes
+  }
+});
 
 // Initialize parent origin with best-effort sources:
 // 1) /host-origin.json served from iframe origin
@@ -57,8 +71,10 @@ let PARENT_ORIGIN = '*';
 
 let resizeTimeout = null;
 function sendHeightToParentDebounced() {
+  if (modalOpen) return; // Don't send while modal is open
   if (resizeTimeout) clearTimeout(resizeTimeout);
   resizeTimeout = setTimeout(() => {
+    if (modalOpen) return; // Double-check in case modal opened during debounce
     const height = computeFullHeight();
     try { parent.postMessage({ type: 'resize-iframe', height }, PARENT_ORIGIN); }
     catch (err) { try { parent.postMessage({ type: 'resize-iframe', height }, '*'); } catch (e) {} }

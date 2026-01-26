@@ -314,11 +314,10 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     };
   }, []);
 
-  // Notify parent (host) about modal height so host can resize iframe to fit
+  // Notify parent (host) about modal open/close
+  // The modal is position:fixed with internal scrolling, so we DON'T continuously
+  // update height - that causes a feedback loop. We just notify once on open.
   useEffect(() => {
-    const lastPostedRef = { current: 0 } as { current: number };
-    const POST_THRESHOLD = 8; // px, only notify parent when height changes more than this
-
     const computeFullHeight = () => {
       const doc = document.documentElement;
       const body = document.body;
@@ -327,26 +326,17 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
       const nodes = document.querySelectorAll('body *');
       for (let i = 0; i < nodes.length; i++) {
         try {
-          const r = (nodes[i] as HTMLElement).getBoundingClientRect();
+          const el = nodes[i] as HTMLElement;
+          const style = window.getComputedStyle(el);
+          // Skip fixed/absolute elements - they're overlays, not document content
+          if (style.position === 'fixed' || style.position === 'absolute') continue;
+          const r = el.getBoundingClientRect();
           const bottom = r.bottom + window.pageYOffset;
           if (bottom > maxBottom) maxBottom = bottom;
         } catch (e) { /* ignore */ }
       }
       const viewportBottom = window.pageYOffset + window.innerHeight;
-      return Math.ceil(Math.max(base, maxBottom, viewportBottom) + 24);
-    };
-
-    const postHeight = () => {
-      try {
-        if (!window.parent) return;
-        const height = computeFullHeight();
-        if (Math.abs(height - (lastPostedRef.current || 0)) <= POST_THRESHOLD) return;
-        lastPostedRef.current = height;
-        try { window.parent.postMessage({ type: 'resize-iframe', height, source: 'opportunityboard-modal' }, HOST_ORIGIN); }
-        catch (err) { try { window.parent.postMessage({ type: 'resize-iframe', height, source: 'opportunityboard-modal' }, '*'); } catch {} }
-      } catch (e) {
-        // ignore
-      }
+      return Math.ceil(Math.max(base, maxBottom, viewportBottom));
     };
 
     const postOpen = () => {
@@ -354,11 +344,11 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
         if (window.parent) {
           try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, HOST_ORIGIN); }
           catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, '*'); } catch {} }
-          // force a resize immediately on open so host applies height even if within threshold
+          // Send one resize message on open
           try {
             const h = computeFullHeight();
-            try { window.parent.postMessage({ type: 'resize-iframe', height: h, source: 'opportunityboard-modal', force: true }, HOST_ORIGIN); }
-            catch (err) { try { window.parent.postMessage({ type: 'resize-iframe', height: h, source: 'opportunityboard-modal', force: true }, '*'); } catch {} }
+            try { window.parent.postMessage({ type: 'resize-iframe', height: h, source: 'opportunityboard-modal' }, HOST_ORIGIN); }
+            catch (err) { try { window.parent.postMessage({ type: 'resize-iframe', height: h, source: 'opportunityboard-modal' }, '*'); } catch {} }
           } catch (e) {
             // ignore
           }
@@ -375,34 +365,13 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
       } catch (e) {}
     };
 
-    const debounced = (() => {
-      let t: ReturnType<typeof setTimeout> | null = null;
-      return () => { if (t) clearTimeout(t); t = setTimeout(() => { postHeight(); t = null; }, 120); };
-    })();
-
-    // Post once on mount (modal open)
+    // Post once on mount (modal open) - no continuous observation to avoid feedback loop
     postOpen();
-    postHeight();
-    // Observe size changes of the modal/content
-    if (typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver(debounced);
-      if (modalRef.current) ro.observe(modalRef.current);
-      if (contentRef.current) ro.observe(contentRef.current);
-      window.addEventListener('resize', debounced);
-      const mo = new MutationObserver(debounced);
-      mo.observe(document.body, { subtree: true, childList: true, attributes: true });
 
-      return () => {
-        ro.disconnect();
-        mo.disconnect();
-        window.removeEventListener('resize', debounced);
-        // Notify host modal closed
-        postClose();
-      };
-    }
-    // Fallback
-    window.addEventListener('resize', debounced);
-    return () => { window.removeEventListener('resize', debounced); postClose(); };
+    return () => {
+      // Notify host modal closed
+      postClose();
+    };
   }, []);
 
     useEffect(() => {

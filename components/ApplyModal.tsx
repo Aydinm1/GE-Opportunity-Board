@@ -353,6 +353,8 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
             // ignore
           }
         }
+        // Also notify scripts running in the iframe (like resize-child.js)
+        window.postMessage({ type: 'opportunityboard:modal-open' }, '*');
       } catch (e) {}
     };
 
@@ -362,6 +364,8 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
           try { window.parent.postMessage({ type: 'opportunityboard:modal-close' }, HOST_ORIGIN); }
           catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:modal-close' }, '*'); } catch {} }
         }
+        // Also notify scripts running in the iframe (like resize-child.js)
+        window.postMessage({ type: 'opportunityboard:modal-close' }, '*');
       } catch (e) {}
     };
 

@@ -315,30 +315,9 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   }, []);
 
   // Notify parent (host) about modal open/close
-  // The modal is position:fixed with internal scrolling, so we DON'T continuously
-  // update height - that causes a feedback loop. We just notify once on open.
+  // The modal is position:fixed with internal scrolling within the current iframe height.
+  // We do NOT send resize messages - just notify parent to lock scroll.
   useEffect(() => {
-    const computeFullHeight = () => {
-      const doc = document.documentElement;
-      const body = document.body;
-      const base = Math.max(doc.scrollHeight || 0, body.scrollHeight || 0, doc.offsetHeight || 0, body.offsetHeight || 0);
-      let maxBottom = 0;
-      const nodes = document.querySelectorAll('body *');
-      for (let i = 0; i < nodes.length; i++) {
-        try {
-          const el = nodes[i] as HTMLElement;
-          const style = window.getComputedStyle(el);
-          // Skip fixed/absolute elements - they're overlays, not document content
-          if (style.position === 'fixed' || style.position === 'absolute') continue;
-          const r = el.getBoundingClientRect();
-          const bottom = r.bottom + window.pageYOffset;
-          if (bottom > maxBottom) maxBottom = bottom;
-        } catch (e) { /* ignore */ }
-      }
-      const viewportBottom = window.pageYOffset + window.innerHeight;
-      return Math.ceil(Math.max(base, maxBottom, viewportBottom));
-    };
-
     const postOpen = () => {
       console.log('[ApplyModal] postOpen called');
       try {
@@ -346,15 +325,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
           console.log('[ApplyModal] posting modal-open to parent, HOST_ORIGIN:', HOST_ORIGIN);
           try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, HOST_ORIGIN); }
           catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, '*'); } catch {} }
-          // Send one resize message on open
-          try {
-            const h = computeFullHeight();
-            console.log('[ApplyModal] posting resize-iframe to parent with height:', h);
-            try { window.parent.postMessage({ type: 'resize-iframe', height: h, source: 'opportunityboard-modal' }, HOST_ORIGIN); }
-            catch (err) { try { window.parent.postMessage({ type: 'resize-iframe', height: h, source: 'opportunityboard-modal' }, '*'); } catch {} }
-          } catch (e) {
-            // ignore
-          }
+          // Do NOT send resize message - modal uses internal scrolling within current iframe height
         }
         // Also notify scripts running in the iframe (like resize-child.js)
         console.log('[ApplyModal] posting modal-open to window (for resize-child.js)');

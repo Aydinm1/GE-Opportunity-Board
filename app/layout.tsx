@@ -44,7 +44,7 @@ export default function RootLayout({
           }}
         />
         <script src="https://cdn.tailwindcss.com?plugins=forms,typography" />
-        <Script src="/resize-child.js?v=2" strategy="afterInteractive" />
+        <Script src="/resize-child-v2.js" strategy="afterInteractive" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

@@ -1,0 +1,9 @@
+window.addEventListener('message', function(event) {
+    // Optionally validate event.origin here
+    if (event.data && event.data.type === 'resize-iframe') {
+      const iframeSch = document.getElementById('division-fixtures-iframe');
+      if (iframeSch) {
+        iframeSch.style.height = event.data.height + 'px';
+      }
+    }
+  });

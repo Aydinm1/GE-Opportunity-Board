@@ -210,7 +210,7 @@ const App: React.FC = () => {
 
             {/* Main Content */}
             <main className="-mt-20 relative z-20 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full flex-1">
-                <div className="bg-surface-light dark:bg-surface-dark rounded-3xl shadow-2xl overflow-hidden p-4 sm:p-6 min-h-[600px] flex flex-col md:block">
+                <div className="bg-surface-light dark:bg-surface-dark rounded-3xl shadow-2xl overflow-hidden p-4 sm:p-6 min-h-[600px] flex flex-col lg:h-[820px]">
                     <div className="flex items-center justify-between mb-3 lg:hidden">
                         <button
                             onClick={() => setShowMobileList(!showMobileList)}
@@ -219,15 +219,15 @@ const App: React.FC = () => {
                             {showMobileList ? 'Hide list' : 'Show list'}
                         </button>
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start h-full">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start lg:items-stretch h-full">
                         {/* Sidebar */}
-                        <div className={`lg:col-span-4 flex flex-col gap-4 h-full ${showMobileList ? '' : 'hidden lg:flex'}`}>
+                        <div className={`lg:col-span-4 flex flex-col gap-4 h-full min-h-0 ${showMobileList ? '' : 'hidden lg:flex'}`}>
                             <div className="pb-2 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center mb-2">
                                 <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 font-display">
                                     {filteredJobs.length} {filteredJobs.length === 1 ? 'Position Available' : 'Positions Available'}
                                 </h2>
                             </div>
-                            <div className="flex flex-col gap-4 overflow-y-auto max-h-[50vh] lg:max-h-[800px] pr-1 sm:pr-2 scrollbar-hide">
+                            <div className="flex flex-col gap-4 overflow-y-auto max-h-[50vh] lg:max-h-none lg:flex-1 min-h-0 pr-1 sm:pr-2 scrollbar-hide">
                                 {loading ? (
                                     <div className="p-8 text-center text-gray-500 font-medium">
                                         Loading jobs...
@@ -259,7 +259,7 @@ const App: React.FC = () => {
                         </div>
 
                         {/* Detailed View */}
-                        <div className="lg:col-span-8 border-t border-gray-100 dark:border-gray-800 lg:border-t-0 lg:border-l pl-0 lg:pl-6 pt-4 lg:pt-0 h-full min-h-[500px]">
+                        <div className="lg:col-span-8 border-t border-gray-100 dark:border-gray-800 lg:border-t-0 lg:border-l pl-0 lg:pl-6 pt-4 lg:pt-0 h-full min-h-[500px] lg:min-h-0 overflow-visible lg:overflow-hidden">
                             {loading ? (
                                 <div className="h-full flex items-center justify-center text-gray-400">
                                     Loading job details...

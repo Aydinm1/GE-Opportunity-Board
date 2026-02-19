@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { jsonError, jsonOk } from '../../../lib/api-response';
 
 export const runtime = 'nodejs';
 
@@ -31,10 +32,11 @@ export async function POST(req: Request) {
     const baseUrl = process.env.AIRTABLE_APPLICATIONS_TABLE || (host ? `${protocol}://${host}` : '');
     const url = `${baseUrl.replace(/\/$/, '')}/uploads/${safeName}`;
 
-    return NextResponse.json({ url, filename: safeName, mimeType }, { status: 200 });
+    return jsonOk({ url, filename: safeName, mimeType });
   } catch (error) {
-    console.error('Error handling upload:', error);
-    const message = error instanceof Error ? error.message : 'Upload failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return jsonError(error, {
+      context: '/api/upload',
+      fallbackMessage: 'Upload failed',
+    });
   }
 }

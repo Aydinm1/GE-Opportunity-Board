@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Job } from '../types';
-import { HOST_ORIGIN } from '../constants';
+import { DEFAULT_PARENT_PAGE_URL, HOST_ORIGIN } from '../constants';
 import { splitBullets, formatStartDate, statusVariant } from '../lib/utils';
 import ApplyModal from './ApplyModal';
 
@@ -17,6 +17,8 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
             if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
         };
     }, []);
+    const inIframe = typeof window !== 'undefined' && window.parent !== window;
+    const fallbackShareBaseUrl = () => (inIframe ? DEFAULT_PARENT_PAGE_URL : window.location.href);
 
     // Resolve the host/parent URL for share links.
     // Strategy: try same-origin parent access -> document.referrer (if has path) -> postMessage request to parent
@@ -24,8 +26,11 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
         // 1) same-origin access
         try {
             if (window.parent && window.parent.location && window.parent.location.href) {
-                console.log('[resolveParentUrl] same-origin access succeeded:', window.parent.location.href);
-                return window.parent.location.href;
+                const sameOriginParentHref = window.parent.location.href;
+                if (sameOriginParentHref && sameOriginParentHref !== window.location.href) {
+                    console.log('[resolveParentUrl] same-origin access succeeded:', sameOriginParentHref);
+                    return sameOriginParentHref;
+                }
             }
         } catch (e) {
             // cross-origin - continue to fallbacks
@@ -67,7 +72,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                     clearTimeout(timeoutId);
                     window.removeEventListener('message', onMsg);
                     console.log('[resolveParentUrl] received parent-url response:', e.data.url);
-                    resolve(e.data.url || window.location.href);
+                    resolve(e.data.url || '');
                 }
                 window.addEventListener('message', onMsg);
                 try {
@@ -81,13 +86,13 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                     resolved = true;
                     window.removeEventListener('message', onMsg);
                     console.log('[resolveParentUrl] postMessage timeout, using fallback');
-                    resolve(window.location.href);
+                    resolve('');
                 }, timeout);
             });
 
             try {
                 const parsed = new URL(url);
-                if (parsed.pathname && parsed.pathname !== '/') {
+                if (parsed.pathname && parsed.pathname !== '/' && parsed.href !== window.location.href) {
                     console.log('[resolveParentUrl] got valid URL with path:', url);
                     return url;
                 }
@@ -100,8 +105,9 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
         }
 
         // final fallback
-        console.log('[resolveParentUrl] all attempts failed, using window.location.href');
-        return window.location.href;
+        const fallbackUrl = fallbackShareBaseUrl();
+        console.log('[resolveParentUrl] all attempts failed, using fallback URL:', fallbackUrl);
+        return fallbackUrl;
     };
 
     // Ask parent to copy text to clipboard on our behalf (cross-origin fallback)
@@ -154,7 +160,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
 
     return (
         <>
-        <div className="h-full flex flex-col">
+        <div className="h-full min-h-0 flex flex-col">
             <div className="mb-6">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="flex-1">
@@ -192,8 +198,11 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                                 u.searchParams.set('job', job.id);
                                 link = u.toString();
                             } catch (e) {
-                                // fallback to current origin
-                                link = `${window.location.origin}/?job=${job.id}`;
+                                // fallback to parent page when embedded
+                                const fallback = new URL(fallbackShareBaseUrl());
+                                fallback.searchParams.delete('job');
+                                fallback.searchParams.set('job', job.id);
+                                link = fallback.toString();
                             }
                             console.log('[Share] final link:', link);
 
@@ -260,7 +269,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
 
             <div className="h-px bg-gray-100 dark:bg-gray-800 w-full mb-6"></div>
 
-            <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-2 scrollbar-hide">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
                         <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Location</p>

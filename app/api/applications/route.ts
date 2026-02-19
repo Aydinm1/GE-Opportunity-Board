@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
 import { submitApplication } from '../../../lib/airtable';
+import { jsonError, jsonOk } from '../../../lib/api-response';
 
 export const runtime = 'nodejs';
 
@@ -7,10 +7,11 @@ export async function POST(req: Request) {
   try {
     const payload = await req.json();
     const result = await submitApplication(payload);
-    return NextResponse.json({ ok: true, result }, { status: 200 });
+    return jsonOk({ ok: true, result });
   } catch (err) {
-    console.error('Error in /api/applications:', err);
-    const message = err instanceof Error ? err.message : 'Failed to submit application';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return jsonError(err, {
+      context: '/api/applications',
+      fallbackMessage: 'Failed to submit application',
+    });
   }
 }

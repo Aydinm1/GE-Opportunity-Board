@@ -1,9 +1,78 @@
-window.addEventListener('message', function(event) {
-    // Optionally validate event.origin here
-    if (event.data && event.data.type === 'resize-iframe') {
-      const iframeSch = document.getElementById('division-fixtures-iframe');
-      if (iframeSch) {
-        iframeSch.style.height = event.data.height + 'px';
+(function () {
+  // Optional: validate event.origin against an allowlist before handling messages.
+  const IFRAME_ID = 'division-fixtures-iframe';
+
+  function postToSource(source, origin, payload) {
+    try {
+      source && source.postMessage(payload, origin);
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  window.addEventListener('message', async function (event) {
+    const data = event.data || {};
+    if (!data || typeof data !== 'object' || !data.type) return;
+
+    if (data.type === 'resize-iframe') {
+      const iframe = document.getElementById(IFRAME_ID);
+      const nextHeight = Number(data.height) || 0;
+      if (iframe && nextHeight > 0) iframe.style.height = nextHeight + 'px';
+      return;
+    }
+
+    if (data.type === 'opportunityboard:get-parent-url') {
+      postToSource(event.source, event.origin, {
+        type: 'opportunityboard:parent-url',
+        id: data.id,
+        url: window.location.href,
+      });
+      return;
+    }
+
+    if (data.type === 'opportunityboard:copy') {
+      const text = String(data.text || '');
+      let ok = false;
+      let error = null;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          ok = true;
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+      } catch (err) {
+        error = String(err);
       }
+      postToSource(event.source, event.origin, {
+        type: 'opportunityboard:copy-result',
+        id: data.id,
+        ok,
+        error,
+      });
+      return;
+    }
+
+    if (data.type === 'opportunityboard:modal-open') {
+      document.body.dataset.obPrevOverflow = document.body.style.overflow || '';
+      document.body.dataset.obPrevTouchAction = document.body.style.touchAction || '';
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+      return;
+    }
+
+    if (data.type === 'opportunityboard:modal-close') {
+      document.body.style.overflow = document.body.dataset.obPrevOverflow || '';
+      document.body.style.touchAction = document.body.dataset.obPrevTouchAction || '';
+      delete document.body.dataset.obPrevOverflow;
+      delete document.body.dataset.obPrevTouchAction;
     }
   });
+})();

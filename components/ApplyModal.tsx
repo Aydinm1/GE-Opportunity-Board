@@ -422,7 +422,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-          <div ref={contentRef} className="flex-1 overflow-y-auto p-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div ref={contentRef} className="flex-1 overflow-y-auto p-6 scrollbar-visible" style={{ WebkitOverflowScrolling: 'touch' }}>
             <section className="mb-8">
               <h4 className="text-xs font-bold uppercase tracking-widest mb-3">Personal Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

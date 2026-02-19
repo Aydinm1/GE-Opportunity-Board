@@ -12,11 +12,44 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
     const [showApply, setShowApply] = useState(false);
     const [copied, setCopied] = useState(false);
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const detailsScrollRef = useRef<HTMLDivElement | null>(null);
+    const scrollPositionsRef = useRef<Record<string, number>>({});
+    const previousJobIdRef = useRef<string>(job.id);
     useEffect(() => {
         return () => {
             if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
         };
     }, []);
+
+    useEffect(() => {
+        const el = detailsScrollRef.current;
+        if (!el) return;
+
+        const previousJobId = previousJobIdRef.current;
+        if (previousJobId && previousJobId !== job.id) {
+            scrollPositionsRef.current[previousJobId] = el.scrollTop;
+        }
+
+        const nextTop = scrollPositionsRef.current[job.id] ?? 0;
+        requestAnimationFrame(() => {
+            const activeEl = detailsScrollRef.current;
+            if (activeEl) activeEl.scrollTop = nextTop;
+        });
+        previousJobIdRef.current = job.id;
+    }, [job.id]);
+
+    useEffect(() => {
+        const el = detailsScrollRef.current;
+        if (!el) return;
+        const onScroll = () => {
+            scrollPositionsRef.current[job.id] = el.scrollTop;
+        };
+        el.addEventListener('scroll', onScroll, { passive: true });
+        return () => {
+            el.removeEventListener('scroll', onScroll);
+        };
+    }, [job.id]);
+
     const inIframe = typeof window !== 'undefined' && window.parent !== window;
     const fallbackShareBaseUrl = () => (inIframe ? DEFAULT_PARENT_PAGE_URL : window.location.href);
 
@@ -269,7 +302,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
 
             <div className="h-px bg-gray-100 dark:bg-gray-800 w-full mb-6"></div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto pr-2 scrollbar-hide">
+            <div ref={detailsScrollRef} className="flex-1 min-h-0 overflow-y-auto pr-2 scrollbar-visible">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
                         <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Location</p>

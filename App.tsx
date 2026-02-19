@@ -227,7 +227,7 @@ const App: React.FC = () => {
                                     {filteredJobs.length} {filteredJobs.length === 1 ? 'Position Available' : 'Positions Available'}
                                 </h2>
                             </div>
-                            <div className="flex flex-col gap-4 overflow-y-auto max-h-[50vh] lg:max-h-none lg:flex-1 min-h-0 pr-1 sm:pr-2 scrollbar-hide">
+                            <div className="flex flex-col gap-4 overflow-y-auto max-h-[50vh] lg:max-h-none lg:flex-1 min-h-0 pr-1 sm:pr-2 scrollbar-visible">
                                 {loading ? (
                                     <div className="p-8 text-center text-gray-500 font-medium">
                                         Loading jobs...

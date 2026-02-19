@@ -302,7 +302,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
 
             <div className="h-px bg-gray-100 dark:bg-gray-800 w-full mb-6"></div>
 
-            <div ref={detailsScrollRef} className="flex-1 min-h-0 overflow-y-auto pr-2 scrollbar-visible">
+            <div ref={detailsScrollRef} className="flex-1 min-h-0 overflow-y-scroll pr-2">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
                         <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Location</p>

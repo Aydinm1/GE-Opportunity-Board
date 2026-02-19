@@ -17,7 +17,6 @@ const emptyPerson = (): Person => ({
   gender: '',
   countryOfOrigin: '',
   countryOfLiving: '',
-  jurisdiction: '',
   education: '',
   profession: '',
   jamatiExperience: '',
@@ -232,37 +231,6 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     "Yemen",
     "Zambia",
     "Zimbabwe"];
-  const jurisdictionOptions = [
-    "",
-    "Afghanistan",
-    "Australia / New Zealand",
-    "Bangladesh",
-    "Far East",
-    "France",
-    "Madagascar",
-    "Mozambique",
-    "Pakistan",
-    "Portugal",
-    "Russia",
-    "Syria",
-    "Tajikistan",
-    "Tanzania",
-    "UAE",
-    "Uganda",
-    "UK ",
-    "USA",
-    "Iran",
-    "Germany",
-    "Canada",
-    "United Arab Emirates",
-    "United Kingdom",
-    "DR Congo",
-    "India",
-    "Kenya",
-    "Angola",
-    "Southeast Asia"
-]
-
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -370,7 +338,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     e.preventDefault();
     setError(null);
     setSuccess(null);
-    if (!person.fullName || !person.emailAddress || !person.phoneNumber || !person.age || !person.gender || !person.countryOfOrigin || !person.countryOfLiving || !person.jurisdiction || !person.education || !person.profession || !person.jamatiExperience || !coverLetterFile || !whyText) {
+    if (!person.fullName || !person.emailAddress || !person.phoneNumber || !person.age || !person.gender || !person.countryOfOrigin || !person.countryOfLiving || !person.education || !person.profession || !person.jamatiExperience || !coverLetterFile || !whyText) {
       setError('Please fill all required fields.');
       return;
     }
@@ -422,7 +390,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-          <div ref={contentRef} className="flex-1 overflow-y-auto p-6 scrollbar-visible" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div ref={contentRef} className="flex-1 overflow-y-scroll p-6" style={{ WebkitOverflowScrolling: 'touch' }}>
             <section className="mb-8">
               <h4 className="text-xs font-bold uppercase tracking-widest mb-3">Personal Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -526,12 +494,6 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
                     {countryOptions.map((o) => (<option key={o} value={o}>{o || 'Select country'}</option>))}
                   </select>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-600 mb-2">Jurisdiction<span className="text-red-600 ml-1">*</span></label>
-                  <select required aria-required value={person.jurisdiction || ''} onChange={(e) => update('jurisdiction', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    {jurisdictionOptions.map((o) => (<option key={o} value={o}>{o || 'Select jurisdiction'}</option>))}
-                  </select>
-                </div>
               </div>
             </section>
 
@@ -543,7 +505,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
                 <div className="text-xs text-gray-500 mt-1">{countWords(person.education || '')} / {WORD_LIMIT} words</div>
               </div>
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-600 mb-2">Profession / Occupation <span className="text-gray-500 text-xs">({WORD_LIMIT} words max)</span><span className="text-red-600 ml-1">*</span></label>
+                <label className="block text-sm font-semibold text-gray-600 mb-2">Current Profession / Occupation <span className="text-gray-500 text-xs">({WORD_LIMIT} words max)</span><span className="text-red-600 ml-1">*</span></label>
                 <textarea required aria-required placeholder="Profession / Occupation" value={person.profession || ''} onChange={(e) => update('profession', enforceWordLimit(e.target.value, WORD_LIMIT))} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
                 <div className="text-xs text-gray-500 mt-1">{countWords(person.profession || '')} / {WORD_LIMIT} words</div>
               </div>

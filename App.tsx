@@ -7,6 +7,17 @@ import JobDetails from './components/JobDetails';
 import Filters from './components/Filters';
 import { HOST_ORIGIN } from './constants';
 
+const getParentTargetOrigin = (): string => {
+    try {
+        if (typeof document !== 'undefined' && document.referrer) {
+            return new URL(document.referrer).origin;
+        }
+    } catch {
+        // ignore
+    }
+    return HOST_ORIGIN || '*';
+};
+
 // Helper to get job parameter from parent URL (for iframe embedding)
 const getJobParamFromParentUrl = async (timeout = 500): Promise<string | null> => {
     // First check our own URL
@@ -27,9 +38,14 @@ const getJobParamFromParentUrl = async (timeout = 500): Promise<string | null> =
         }
     }
 
+    if (typeof window === 'undefined' || window.parent === window) {
+        return null;
+    }
+
     // Ask parent via postMessage
     return new Promise((resolve) => {
         const id = Math.random().toString(36).slice(2);
+        const parentTargetOrigin = getParentTargetOrigin();
         let resolved = false;
         let timeoutId: ReturnType<typeof setTimeout>;
         function onMsg(e: MessageEvent) {
@@ -48,7 +64,7 @@ const getJobParamFromParentUrl = async (timeout = 500): Promise<string | null> =
         }
         window.addEventListener('message', onMsg);
         try {
-            try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, HOST_ORIGIN); }
+            try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, parentTargetOrigin); }
             catch { try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*'); } catch {} }
         } catch {
             // ignore
@@ -155,7 +171,7 @@ const App: React.FC = () => {
 
 
     return (
-        <div className="min-h-screen flex flex-col">
+        <div className="flex flex-col">
             {/* Header */}
             {/* <nav className="bg-white dark:bg-surface-dark border-b border-gray-200 dark:border-gray-800 py-4 px-4 sm:px-6 lg:px-8 z-50 relative">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -284,7 +300,6 @@ const App: React.FC = () => {
                 </button>
             </nav>
             */}
-            <div className="h-20 lg:hidden"></div>
         </div>
     );
 };

@@ -56,6 +56,9 @@ window.addEventListener('message', (e) => {
 
 let resizeTimeout = null;
 function sendHeightToParentDebounced(trigger = 'unknown') {
+  if (window.parent === window) {
+    return;
+  }
   if (modalOpen) {
     return;
   }

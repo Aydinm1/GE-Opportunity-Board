@@ -32,6 +32,15 @@ const ApplyModal: React.FC<ApplyModalProps> = ({ job, onClose }) => {
   const [whyText, setWhyText] = useState('');
 
   const update = (k: keyof Person, v: string) => setPerson((p) => ({ ...p, [k]: v }));
+  const inIframe = typeof window !== 'undefined' && window.parent !== window;
+  const getParentTargetOrigin = () => {
+    try {
+      if (document.referrer) return new URL(document.referrer).origin;
+    } catch (e) {
+      // ignore
+    }
+    return HOST_ORIGIN || '*';
+  };
 
 const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Above 65+',"Prefer not to share"];
   const genderOptions = ['', 'Female', 'Male', 'Non-binary', 'Prefer not to share'];
@@ -289,9 +298,10 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     const postOpen = () => {
       console.log('[ApplyModal] postOpen called');
       try {
-        if (window.parent) {
-          console.log('[ApplyModal] posting modal-open to parent, HOST_ORIGIN:', HOST_ORIGIN);
-          try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, HOST_ORIGIN); }
+        if (inIframe && window.parent) {
+          const parentTargetOrigin = getParentTargetOrigin();
+          console.log('[ApplyModal] posting modal-open to parent, targetOrigin:', parentTargetOrigin);
+          try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, parentTargetOrigin); }
           catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, '*'); } catch {} }
           // Do NOT send resize message - modal uses internal scrolling within current iframe height
         }
@@ -306,9 +316,10 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     const postClose = () => {
       console.log('[ApplyModal] postClose called');
       try {
-        if (window.parent) {
-          console.log('[ApplyModal] posting modal-close to parent, HOST_ORIGIN:', HOST_ORIGIN);
-          try { window.parent.postMessage({ type: 'opportunityboard:modal-close' }, HOST_ORIGIN); }
+        if (inIframe && window.parent) {
+          const parentTargetOrigin = getParentTargetOrigin();
+          console.log('[ApplyModal] posting modal-close to parent, targetOrigin:', parentTargetOrigin);
+          try { window.parent.postMessage({ type: 'opportunityboard:modal-close' }, parentTargetOrigin); }
           catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:modal-close' }, '*'); } catch {} }
         }
         // Also notify scripts running in the iframe (like resize-child.js)

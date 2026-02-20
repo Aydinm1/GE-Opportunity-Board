@@ -52,6 +52,16 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
 
     const inIframe = typeof window !== 'undefined' && window.parent !== window;
     const fallbackShareBaseUrl = () => (inIframe ? DEFAULT_PARENT_PAGE_URL : window.location.href);
+    const getParentTargetOrigin = () => {
+        try {
+            if (document.referrer) {
+                return new URL(document.referrer).origin;
+            }
+        } catch (e) {
+            // ignore
+        }
+        return HOST_ORIGIN || '*';
+    };
 
     // Resolve the host/parent URL for share links.
     // Strategy: try same-origin parent access -> document.referrer (if has path) -> postMessage request to parent
@@ -88,6 +98,10 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
             }
         }
 
+        if (!inIframe) {
+            return fallbackShareBaseUrl();
+        }
+
         // 3) ask parent via postMessage, retrying if parent returns only the origin root
         console.log('[resolveParentUrl] trying postMessage to parent');
         const tries = 2;
@@ -96,6 +110,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
             console.log('[resolveParentUrl] postMessage attempt', attempt + 1);
             const url = await new Promise<string>((resolve) => {
                 const id = Math.random().toString(36).slice(2);
+                const parentTargetOrigin = getParentTargetOrigin();
                 let resolved = false;
                 let timeoutId: ReturnType<typeof setTimeout>;
                 function onMsg(e: MessageEvent) {
@@ -109,7 +124,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                 }
                 window.addEventListener('message', onMsg);
                 try {
-                    try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, HOST_ORIGIN); }
+                    try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, parentTargetOrigin); }
                     catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*'); } catch {} }
                 } catch (e) {
                     // ignore
@@ -145,8 +160,10 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
 
     // Ask parent to copy text to clipboard on our behalf (cross-origin fallback)
     const copyViaParent = async (text: string, timeout = 1500): Promise<boolean> => {
+        if (!inIframe) return false;
         return await new Promise((resolve) => {
             const id = Math.random().toString(36).slice(2);
+            const parentTargetOrigin = getParentTargetOrigin();
             function onMsg(e: MessageEvent) {
                 if (!e.data || e.data.type !== 'opportunityboard:copy-result' || e.data.id !== id) return;
                 window.removeEventListener('message', onMsg);
@@ -154,7 +171,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
             }
             window.addEventListener('message', onMsg);
             try {
-                try { window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, HOST_ORIGIN); }
+                try { window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, parentTargetOrigin); }
                 catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, '*'); } catch {} }
             } catch (err) {
                 window.removeEventListener('message', onMsg);
@@ -217,7 +234,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
                     <div className="flex items-center gap-3">
                         <button onClick={async () => {
                                 try { console.log('Share clicked', job.id); } catch (e) {}
-                                try { if (window.parent) { try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, HOST_ORIGIN); } catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, '*'); } catch {} } } } catch (e) {}
+                                try { if (inIframe && window.parent) { const parentTargetOrigin = getParentTargetOrigin(); try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, parentTargetOrigin); } catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, '*'); } catch {} } } } catch (e) {}
                             // Resolve parent URL (prefers full URL when available) then build share link
                             const parentHref = await resolveParentUrl(500);
                             console.log('[Share] resolveParentUrl returned:', parentHref);
@@ -241,8 +258,9 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
 
                             // Debug: report resolved parent href and link to host
                             try {
-                                if (window.parent) {
-                                    try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, HOST_ORIGIN); }
+                                if (inIframe && window.parent) {
+                                    const parentTargetOrigin = getParentTargetOrigin();
+                                    try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, parentTargetOrigin); }
                                     catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, '*'); } catch {} }
                                 }
                             } catch (e) { /* ignore */ }

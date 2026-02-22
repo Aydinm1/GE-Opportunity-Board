@@ -2,19 +2,27 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Job } from '../types';
 import { DEFAULT_PARENT_PAGE_URL, HOST_ORIGIN } from '../constants';
 import { splitBullets, formatStartDate, statusVariant } from '../lib/utils';
-import ApplyModal from './ApplyModal';
+import ApplyView, { ApplyDraft } from './ApplyView';
 
 interface JobDetailsProps {
     job: Job;
+    initialViewMode?: 'details' | 'apply';
 }
 
-const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
-    const [showApply, setShowApply] = useState(false);
+const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details' }) => {
+    const [viewMode, setViewMode] = useState<'details' | 'apply'>(() => {
+        if (initialViewMode === 'apply') return 'apply';
+        if (typeof window === 'undefined') return 'details';
+        const params = new URLSearchParams(window.location.search);
+        return params.get('view') === 'apply' ? 'apply' : 'details';
+    });
     const [copied, setCopied] = useState(false);
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const detailsScrollRef = useRef<HTMLDivElement | null>(null);
     const scrollPositionsRef = useRef<Record<string, number>>({});
+    const applyDraftsRef = useRef<Record<string, ApplyDraft>>({});
     const previousJobIdRef = useRef<string>(job.id);
+    const previousViewJobIdRef = useRef<string>(job.id);
     useEffect(() => {
         return () => {
             if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
@@ -37,6 +45,25 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
         });
         previousJobIdRef.current = job.id;
     }, [job.id]);
+
+    useEffect(() => {
+        if (previousViewJobIdRef.current !== job.id) {
+            setViewMode('details');
+        }
+        previousViewJobIdRef.current = job.id;
+    }, [job.id]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        url.searchParams.set('job', job.id);
+        if (viewMode === 'apply') {
+            url.searchParams.set('view', 'apply');
+        } else {
+            url.searchParams.delete('view');
+        }
+        window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    }, [job.id, viewMode]);
 
     useEffect(() => {
         const el = detailsScrollRef.current;
@@ -209,219 +236,227 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job }) => {
     const getStatusStyles = (status: string | null) => statusVariant(status).details;
 
     return (
-        <>
         <div className="h-full min-h-0 flex flex-col">
-            <div className="mb-6">
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                    <div className="flex-1">
-                        <h1 className="text-2xl font-bold text-black dark:text-white leading-tight mb-1 font-display">{job.roleTitle}</h1>
-                        <div className="flex items-center gap-2 mb-3">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{job.teamVertical}</p>
-                            <span className="h-1 w-1 rounded-full bg-gray-300"></span>
-                            <p className="text-xs font-bold text-primary uppercase tracking-widest">{job.programmeArea}</p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className={getStatusStyles(job.roleStatus || 'Actively Hiring')}>
-                                {job.roleStatus || 'Actively Hiring'}
-                            </span>
-                            {job.roleType && (
-                                <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700">
-                                    {job.roleType}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button onClick={async () => {
-                                try { console.log('Share clicked', job.id); } catch (e) {}
-                                try { if (inIframe && window.parent) { const parentTargetOrigin = getParentTargetOrigin(); try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, parentTargetOrigin); } catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, '*'); } catch {} } } } catch (e) {}
-                            // Resolve parent URL (prefers full URL when available) then build share link
-                            const parentHref = await resolveParentUrl(500);
-                            console.log('[Share] resolveParentUrl returned:', parentHref);
-                            let link = '';
-                            try {
-                                const u = new URL(parentHref);
-                                console.log('[Share] parsed URL pathname:', u.pathname);
-                                // Remove any existing 'job' parameter to avoid duplicates
-                                u.searchParams.delete('job');
-                                // Add the new job parameter
-                                u.searchParams.set('job', job.id);
-                                link = u.toString();
-                            } catch (e) {
-                                // fallback to parent page when embedded
-                                const fallback = new URL(fallbackShareBaseUrl());
-                                fallback.searchParams.delete('job');
-                                fallback.searchParams.set('job', job.id);
-                                link = fallback.toString();
-                            }
-                            console.log('[Share] final link:', link);
-
-                            // Debug: report resolved parent href and link to host
-                            try {
-                                if (inIframe && window.parent) {
-                                    const parentTargetOrigin = getParentTargetOrigin();
-                                    try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, parentTargetOrigin); }
-                                    catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, '*'); } catch {} }
-                                }
-                            } catch (e) { /* ignore */ }
-
-                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                                try {
-                                    await navigator.clipboard.writeText(link);
-                                    setCopied(true);
-                                    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-                                    copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
-                                    return;
-                                } catch (e) {
-                                    // Clipboard API blocked (permissions policy) or failed — try parent copy
-                                    console.log('[Share] clipboard.writeText failed:', e);
-                                }
-                            }
-
-                            // Try asking parent to copy (useful if Clipboard API blocked in iframe)
-                            try {
-                                const ok = await copyViaParent(link);
-                                if (ok) {
-                                    setCopied(true);
-                                    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-                                    copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
-                                    return;
-                                }
-                            } catch (e) {
-                                // ignore
-                            }
-
-                            // Last-resort fallback: textarea + execCommand
-                            if (typeof window !== 'undefined') {
-                                const el = document.createElement('textarea');
-                                el.value = link;
-                                document.body.appendChild(el);
-                                el.select();
-                                try {
-                                    document.execCommand('copy');
-                                    setCopied(true);
-                                    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-                                    copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
-                                } catch (e) {
-                                    // ignore
-                                }
-                                document.body.removeChild(el);
-                            }
-                        }} aria-label="Share job" className="inline-flex items-center justify-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-primary hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-semibold transition">
-                            {copied ? 'Copied!' : 'Share'}
-                        </button>
-
-                        <button onClick={() => setShowApply(true)} className="bg-primary hover:bg-primary-hover text-white font-bold py-2.5 px-6 rounded-lg shadow-lg shadow-blue-900/10 transition-all transform active:scale-95 text-sm uppercase tracking-wide font-body whitespace-nowrap">
-                            Apply Now
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div className="h-px bg-gray-100 dark:bg-gray-800 w-full mb-6"></div>
-
-            <div ref={detailsScrollRef} className="flex-1 min-h-0 overflow-y-scroll pr-2">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
-                        <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Location</p>
-                        <div className="flex items-center gap-1.5">
-                            <span className="material-icons-round text-sm text-primary">
-                                {job.workType === 'Virtual' ? 'laptop' : 'place'}
-                            </span>
-                            <span className="text-xs font-semibold dark:text-white">
-                                {showSpecificLocation ? job.locationBase : job.workType}
-                                {showSpecificLocation && <span className="text-[10px] text-gray-400 ml-1 font-normal">({job.workType})</span>}
-                            </span>
-                        </div>
-                    </div>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
-                        <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Start Date</p>
-                        <div className="flex items-center gap-1.5">
-                            <span className="material-icons-round text-sm text-primary">event</span>
-                            <span className="text-xs font-semibold dark:text-white">{formatStartDate(job.startDate)}</span>
-                        </div>
-                    </div>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
-                        <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Commitment</p>
-                        <div className="flex items-center gap-1.5">
-                            <span className="material-icons-round text-sm text-primary">update</span>
-                            <span className="text-xs font-semibold dark:text-white">
-                                {job.durationCategory && job.durationCategory !== 'TBD' ? `${job.durationCategory} Months` : (job.durationCategory || 'TBD')}
-                            </span>
-                        </div>
-                    </div>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
-                        <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Weekly Time</p>
-                        <div className="flex items-center gap-1.5">
-                            <span className="material-icons-round text-sm text-primary">schedule</span>
-                            <span className="text-xs font-semibold dark:text-white">{job.timeCommitment}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="prose prose-sm prose-slate dark:prose-invert max-w-none font-body">
-                    <div className="mb-8">
-                        <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Role Overview</h3>
-                        <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                            {job.purposeShort}
-                        </p>
-                    </div>
-
-                    <div className="mb-8">
-                        <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Key Responsibilities</h3>
-                        <ul className="space-y-3 list-none pl-0 text-gray-600 dark:text-gray-300">
-                            {job.keyResponsibilities.map((resp, idx) => (
-                                <li key={idx} className="flex gap-3 items-center">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></span>
-                                    <span>{resp}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-
-                    <div className="mb-8">
-                        <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Required Qualifications</h3>
-                        <ul className="space-y-3 list-none pl-0 text-gray-600 dark:text-gray-300">
-                            {requiredQualifications.map((req, idx) => (
-                                <li key={idx} className="flex gap-3 items-center">
-                                    <span className="material-icons-round text-green-600 dark:text-green-400 text-base">check_circle</span>
-                                    <span>{req}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-
-                    {preferredQualifications.length > 0 && (
-                        <div className="mb-8">
-                            <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Preferred Qualifications</h3>
-                            <ul className="space-y-3 list-none pl-0 text-gray-600 dark:text-gray-300">
-                                {preferredQualifications.map((req, idx) => (
-                                    <li key={idx} className="flex gap-3 items-start">
-                                        <span className="material-icons-round text-primary/60 text-base">star</span>
-                                        <span>{req}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-
+            {viewMode === 'apply' ? (
+                <ApplyView
+                    job={job}
+                    initialDraft={applyDraftsRef.current[job.id]}
+                    onDraftChange={(draft) => {
+                        applyDraftsRef.current[job.id] = draft;
+                    }}
+                    onBackToDetails={() => setViewMode('details')}
+                />
+            ) : (
+                <>
                     <div className="mb-6">
-                        <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Languages Required</h3>
-                        <div className="flex flex-wrap gap-2">
-                            {job.languagesRequired.map((lang, idx) => (
-                                <span key={idx} className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
-                                    {lang}
-                                </span>
-                            ))}
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                            <div className="flex-1">
+                                <h1 className="text-2xl font-bold text-black dark:text-white leading-tight mb-1 font-display">{job.roleTitle}</h1>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{job.teamVertical}</p>
+                                    <span className="h-1 w-1 rounded-full bg-gray-300"></span>
+                                    <p className="text-xs font-bold text-primary uppercase tracking-widest">{job.programmeArea}</p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className={getStatusStyles(job.roleStatus || 'Actively Hiring')}>
+                                        {job.roleStatus || 'Actively Hiring'}
+                                    </span>
+                                    {job.roleType && (
+                                        <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700">
+                                            {job.roleType}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button onClick={async () => {
+                                        try { console.log('Share clicked', job.id); } catch (e) {}
+                                        try { if (inIframe && window.parent) { const parentTargetOrigin = getParentTargetOrigin(); try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, parentTargetOrigin); } catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, '*'); } catch {} } } } catch (e) {}
+                                    // Resolve parent URL (prefers full URL when available) then build share link
+                                    const parentHref = await resolveParentUrl(500);
+                                    console.log('[Share] resolveParentUrl returned:', parentHref);
+                                    let link = '';
+                                    try {
+                                        const u = new URL(parentHref);
+                                        console.log('[Share] parsed URL pathname:', u.pathname);
+                                        // Remove any existing 'job' parameter to avoid duplicates
+                                        u.searchParams.delete('job');
+                                        // Add the new job parameter
+                                        u.searchParams.set('job', job.id);
+                                        link = u.toString();
+                                    } catch (e) {
+                                        // fallback to parent page when embedded
+                                        const fallback = new URL(fallbackShareBaseUrl());
+                                        fallback.searchParams.delete('job');
+                                        fallback.searchParams.set('job', job.id);
+                                        link = fallback.toString();
+                                    }
+                                    console.log('[Share] final link:', link);
+
+                                    // Debug: report resolved parent href and link to host
+                                    try {
+                                        if (inIframe && window.parent) {
+                                            const parentTargetOrigin = getParentTargetOrigin();
+                                            try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, parentTargetOrigin); }
+                                            catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, '*'); } catch {} }
+                                        }
+                                    } catch (e) { /* ignore */ }
+
+                                    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                                        try {
+                                            await navigator.clipboard.writeText(link);
+                                            setCopied(true);
+                                            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+                                            copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+                                            return;
+                                        } catch (e) {
+                                            // Clipboard API blocked (permissions policy) or failed — try parent copy
+                                            console.log('[Share] clipboard.writeText failed:', e);
+                                        }
+                                    }
+
+                                    // Try asking parent to copy (useful if Clipboard API blocked in iframe)
+                                    try {
+                                        const ok = await copyViaParent(link);
+                                        if (ok) {
+                                            setCopied(true);
+                                            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+                                            copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+                                            return;
+                                        }
+                                    } catch (e) {
+                                        // ignore
+                                    }
+
+                                    // Last-resort fallback: textarea + execCommand
+                                    if (typeof window !== 'undefined') {
+                                        const el = document.createElement('textarea');
+                                        el.value = link;
+                                        document.body.appendChild(el);
+                                        el.select();
+                                        try {
+                                            document.execCommand('copy');
+                                            setCopied(true);
+                                            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+                                            copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+                                        } catch (e) {
+                                            // ignore
+                                        }
+                                        document.body.removeChild(el);
+                                    }
+                                }} aria-label="Share job" className="inline-flex items-center justify-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-primary hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                                    {copied ? 'Copied!' : 'Share'}
+                                </button>
+
+                                <button onClick={() => setViewMode('apply')} className="bg-primary hover:bg-primary-hover text-white font-bold py-2.5 px-6 rounded-lg shadow-lg shadow-blue-900/10 transition-all transform active:scale-95 text-sm uppercase tracking-wide font-body whitespace-nowrap">
+                                    Apply Now
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
+
+                    <div className="h-px bg-gray-100 dark:bg-gray-800 w-full mb-6"></div>
+
+                    <div ref={detailsScrollRef} className="flex-1 min-h-0 overflow-y-scroll pr-2">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                                <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Location</p>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="material-icons-round text-sm text-primary">
+                                        {job.workType === 'Virtual' ? 'laptop' : 'place'}
+                                    </span>
+                                    <span className="text-xs font-semibold dark:text-white">
+                                        {showSpecificLocation ? job.locationBase : job.workType}
+                                        {showSpecificLocation && <span className="text-[10px] text-gray-400 ml-1 font-normal">({job.workType})</span>}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                                <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Start Date</p>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="material-icons-round text-sm text-primary">event</span>
+                                    <span className="text-xs font-semibold dark:text-white">{formatStartDate(job.startDate)}</span>
+                                </div>
+                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                                <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Commitment</p>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="material-icons-round text-sm text-primary">update</span>
+                                    <span className="text-xs font-semibold dark:text-white">
+                                        {job.durationCategory && job.durationCategory !== 'TBD' ? `${job.durationCategory} Months` : (job.durationCategory || 'TBD')}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                                <p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">Weekly Time</p>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="material-icons-round text-sm text-primary">schedule</span>
+                                    <span className="text-xs font-semibold dark:text-white">{job.timeCommitment}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="prose prose-sm prose-slate dark:prose-invert max-w-none font-body">
+                            <div className="mb-8">
+                                <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Role Overview</h3>
+                                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                                    {job.purposeShort}
+                                </p>
+                            </div>
+
+                            <div className="mb-8">
+                                <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Key Responsibilities</h3>
+                                <ul className="space-y-3 list-none pl-0 text-gray-600 dark:text-gray-300">
+                                    {job.keyResponsibilities.map((resp, idx) => (
+                                        <li key={idx} className="flex gap-3 items-center">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></span>
+                                            <span>{resp}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+
+                            <div className="mb-8">
+                                <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Required Qualifications</h3>
+                                <ul className="space-y-3 list-none pl-0 text-gray-600 dark:text-gray-300">
+                                    {requiredQualifications.map((req, idx) => (
+                                        <li key={idx} className="flex gap-3 items-center">
+                                            <span className="material-icons-round text-green-600 dark:text-green-400 text-base">check_circle</span>
+                                            <span>{req}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+
+                            {preferredQualifications.length > 0 && (
+                                <div className="mb-8">
+                                    <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Preferred Qualifications</h3>
+                                    <ul className="space-y-3 list-none pl-0 text-gray-600 dark:text-gray-300">
+                                        {preferredQualifications.map((req, idx) => (
+                                            <li key={idx} className="flex gap-3 items-start">
+                                                <span className="material-icons-round text-primary/60 text-base">star</span>
+                                                <span>{req}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            <div className="mb-6">
+                                <h3 className="text-xs font-bold uppercase text-gray-900 dark:text-white tracking-widest mb-3 font-display border-b border-gray-100 dark:border-gray-800 pb-2">Languages Required</h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {job.languagesRequired.map((lang, idx) => (
+                                        <span key={idx} className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                                            {lang}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
-        {showApply && (
-            <ApplyModal job={job} onClose={() => setShowApply(false)} />
-        )}
-        </>
     );
 };
 

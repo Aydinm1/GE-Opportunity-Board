@@ -1,10 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Person, Job } from '../types';
-import { HOST_ORIGIN } from '../constants';
 
-interface ApplyModalProps {
+export interface ApplyDraft {
+  person: Person;
+  coverLetterFile: File | null;
+  whyText: string;
+}
+
+interface ApplyViewProps {
   job: Job;
-  onClose: () => void;
+  onBackToDetails: () => void;
+  initialDraft?: ApplyDraft;
+  onDraftChange?: (draft: ApplyDraft) => void;
 }
 
 const emptyPerson = (): Person => ({
@@ -23,24 +30,15 @@ const emptyPerson = (): Person => ({
   candidateStatus: ''
 });
 
-const ApplyModal: React.FC<ApplyModalProps> = ({ job, onClose }) => {
-  const [person, setPerson] = useState<Person>(emptyPerson());
+const ApplyView: React.FC<ApplyViewProps> = ({ job, onBackToDetails, initialDraft, onDraftChange }) => {
+  const [person, setPerson] = useState<Person>(() => initialDraft?.person ? { ...emptyPerson(), ...initialDraft.person } : emptyPerson());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [coverLetterFile, setCoverLetterFile] = useState<File | null>(null);
-  const [whyText, setWhyText] = useState('');
+  const [coverLetterFile, setCoverLetterFile] = useState<File | null>(initialDraft?.coverLetterFile || null);
+  const [whyText, setWhyText] = useState(initialDraft?.whyText || '');
 
   const update = (k: keyof Person, v: string) => setPerson((p) => ({ ...p, [k]: v }));
-  const inIframe = typeof window !== 'undefined' && window.parent !== window;
-  const getParentTargetOrigin = () => {
-    try {
-      if (document.referrer) return new URL(document.referrer).origin;
-    } catch (e) {
-      // ignore
-    }
-    return HOST_ORIGIN || '*';
-  };
 
 const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Above 65+',"Prefer not to share"];
   const genderOptions = ['', 'Female', 'Male', 'Non-binary', 'Prefer not to share'];
@@ -240,11 +238,6 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     "Yemen",
     "Zambia",
     "Zimbabwe"];
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, []);
 
   const WORD_LIMIT = 100; // change this in one place to update all word limits
   const ATTACH_FEEDBACK_MS = 2200; // ms the button shows the 'attached' state
@@ -258,11 +251,29 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   };
 
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const modalRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [justAttached, setJustAttached] = useState(false);
   const attachTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const hydratedPerson = initialDraft?.person ? { ...emptyPerson(), ...initialDraft.person } : emptyPerson();
+    setPerson(hydratedPerson);
+    setCoverLetterFile(initialDraft?.coverLetterFile || null);
+    setWhyText(initialDraft?.whyText || '');
+    setError(null);
+    setSuccess(null);
+    setLoading(false);
+    setProgress(0);
+    setJustAttached(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [job.id, initialDraft]);
+
+  useEffect(() => {
+    if (!onDraftChange) return;
+    onDraftChange({ person, coverLetterFile, whyText });
+  }, [person, coverLetterFile, whyText, onDraftChange]);
+
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
@@ -288,54 +299,6 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
       el.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
       if (ro) ro.disconnect();
-    };
-  }, []);
-
-  // Notify parent (host) about modal open/close
-  // The modal is position:fixed with internal scrolling within the current iframe height.
-  // We do NOT send resize messages - just notify parent to lock scroll.
-  useEffect(() => {
-    const postOpen = () => {
-      console.log('[ApplyModal] postOpen called');
-      try {
-        if (inIframe && window.parent) {
-          const parentTargetOrigin = getParentTargetOrigin();
-          console.log('[ApplyModal] posting modal-open to parent, targetOrigin:', parentTargetOrigin);
-          try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, parentTargetOrigin); }
-          catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:modal-open' }, '*'); } catch {} }
-          // Do NOT send resize message - modal uses internal scrolling within current iframe height
-        }
-        // Also notify scripts running in the iframe (like resize-child.js)
-        console.log('[ApplyModal] posting modal-open to window (for resize-child.js)');
-        window.postMessage({ type: 'opportunityboard:modal-open' }, '*');
-      } catch (e) {
-        console.log('[ApplyModal] postOpen error:', e);
-      }
-    };
-
-    const postClose = () => {
-      console.log('[ApplyModal] postClose called');
-      try {
-        if (inIframe && window.parent) {
-          const parentTargetOrigin = getParentTargetOrigin();
-          console.log('[ApplyModal] posting modal-close to parent, targetOrigin:', parentTargetOrigin);
-          try { window.parent.postMessage({ type: 'opportunityboard:modal-close' }, parentTargetOrigin); }
-          catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:modal-close' }, '*'); } catch {} }
-        }
-        // Also notify scripts running in the iframe (like resize-child.js)
-        console.log('[ApplyModal] posting modal-close to window (for resize-child.js)');
-        window.postMessage({ type: 'opportunityboard:modal-close' }, '*');
-      } catch (e) {
-        console.log('[ApplyModal] postClose error:', e);
-      }
-    };
-
-    // Post once on mount (modal open) - no continuous observation to avoid feedback loop
-    postOpen();
-
-    return () => {
-      // Notify host modal closed
-      postClose();
     };
   }, []);
 
@@ -367,33 +330,27 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
       const res = await fetch('/api/applications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) { const txt = await res.text(); throw new Error(txt || 'Failed to submit application'); }
       setSuccess('Application submitted. Thank you!');
-      setTimeout(() => { setLoading(false); onClose(); }, 900);
+      setTimeout(() => {
+        setLoading(false);
+        onDraftChange?.({ person: emptyPerson(), coverLetterFile: null, whyText: '' });
+        onBackToDetails();
+      }, 900);
     } catch (err: any) { setError(err?.message || 'Submission failed'); setLoading(false); }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 p-4 sm:p-6">
-      <div className="h-full w-full flex items-start sm:items-center justify-center">
-        <div
-          ref={modalRef}
-          className="bg-white dark:bg-gray-900 rounded-md shadow-xl"
-          style={{
-            height: 'min(880px, calc(100vh - 2rem))',
-            maxHeight: 'min(880px, calc(100vh - 2rem))',
-            width: 'min(960px, 100%)',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column'
-          }}
-        >
+    <div className="h-full min-h-0 flex flex-col bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
         <div className="relative px-4 pt-4 pb-3 border-b">
           <div className="flex items-center justify-between">
-            <button onClick={onClose} className="text-gray-500 w-8">✕</button>
+            <button type="button" onClick={onBackToDetails} className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm font-semibold">
+              <span className="material-icons-round text-base">arrow_back</span>
+              Back
+            </button>
             <div className="text-center">
               <h2 className="text-base font-semibold">Apply</h2>
               <div className="text-sm text-primary/90 mt-0.5">{job.roleTitle}</div>
             </div>
-            <div className="w-8" />
+            <div className="w-14" />
           </div>
           <div className="mt-3 h-1 w-full bg-gray-100 rounded-full overflow-hidden">
             <div className="h-1 bg-primary transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
@@ -468,8 +425,6 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
                   </div>
                   <input
                     ref={fileInputRef}
-                    required
-                    aria-required
                     type="file"
                     accept=".pdf,.doc,.docx,.txt"
                     onChange={(e) => {
@@ -540,14 +495,11 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
           </div>
 
           <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t p-4 flex items-center justify-end">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-gray-100 text-sm text-gray-700 mr-3">Cancel</button>
             <button type="submit" disabled={loading} className="px-5 py-3 bg-primary text-white rounded-md shadow text-sm">{loading ? 'Submitting…' : 'Submit Application'}</button>
           </div>
         </form>
-        </div>
-      </div>
     </div>
   );
 };
 
-export default ApplyModal;
+export default ApplyView;

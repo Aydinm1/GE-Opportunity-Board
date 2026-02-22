@@ -18,13 +18,19 @@ const getParentTargetOrigin = (): string => {
     return HOST_ORIGIN || '*';
 };
 
-// Helper to get job parameter from parent URL (for iframe embedding)
-const getJobParamFromParentUrl = async (timeout = 500): Promise<string | null> => {
+type InitialParentParams = {
+    jobParam: string | null;
+    viewParam: string | null;
+};
+
+// Helper to get initial params from parent URL (for iframe embedding)
+const getInitialParamsFromParentUrl = async (timeout = 500): Promise<InitialParentParams> => {
     // First check our own URL
     if (typeof window !== 'undefined') {
         const ownParams = new URLSearchParams(window.location.search);
         const ownJob = ownParams.get('job');
-        if (ownJob) return ownJob;
+        const ownView = ownParams.get('view');
+        if (ownJob || ownView) return { jobParam: ownJob, viewParam: ownView };
     }
 
     // Check document.referrer
@@ -32,14 +38,15 @@ const getJobParamFromParentUrl = async (timeout = 500): Promise<string | null> =
         try {
             const refUrl = new URL(document.referrer);
             const refJob = refUrl.searchParams.get('job');
-            if (refJob) return refJob;
+            const refView = refUrl.searchParams.get('view');
+            if (refJob || refView) return { jobParam: refJob, viewParam: refView };
         } catch (e) {
             // ignore
         }
     }
 
     if (typeof window === 'undefined' || window.parent === window) {
-        return null;
+        return { jobParam: null, viewParam: null };
     }
 
     // Ask parent via postMessage
@@ -57,9 +64,12 @@ const getJobParamFromParentUrl = async (timeout = 500): Promise<string | null> =
             try {
                 const parentUrl = new URL(e.data.url || '');
                 console.log('[App] received parent URL:', e.data.url);
-                resolve(parentUrl.searchParams.get('job'));
+                resolve({
+                    jobParam: parentUrl.searchParams.get('job'),
+                    viewParam: parentUrl.searchParams.get('view'),
+                });
             } catch {
-                resolve(null);
+                resolve({ jobParam: null, viewParam: null });
             }
         }
         window.addEventListener('message', onMsg);
@@ -73,7 +83,7 @@ const getJobParamFromParentUrl = async (timeout = 500): Promise<string | null> =
             if (resolved) return;
             resolved = true;
             window.removeEventListener('message', onMsg);
-            resolve(null);
+            resolve({ jobParam: null, viewParam: null });
         }, timeout);
     });
 };
@@ -84,6 +94,7 @@ const App: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+    const [initialViewMode, setInitialViewMode] = useState<'details' | 'apply'>('details');
     const [selectedFilters, setSelectedFilters] = useState<FilterOptions>({
         programmeArea: [],
         teamVertical: [],
@@ -100,9 +111,10 @@ const App: React.FC = () => {
             try {
                 setLoading(true);
                 
-                // Get job param from parent URL (works in iframe)
-                const jobParam = await getJobParamFromParentUrl(500);
-                console.log('[App] job param from parent URL:', jobParam);
+                // Get initial params from parent URL (works in iframe)
+                const { jobParam, viewParam } = await getInitialParamsFromParentUrl(500);
+                console.log('[App] params from parent URL:', { jobParam, viewParam });
+                setInitialViewMode(viewParam === 'apply' ? 'apply' : 'details');
                 
                 const response = await fetch('/api/jobs');
                 if (!response.ok) {
@@ -281,7 +293,7 @@ const App: React.FC = () => {
                                     Loading job details...
                                 </div>
                             ) : selectedJob ? (
-                                <JobDetails job={selectedJob} />
+                                <JobDetails job={selectedJob} initialViewMode={initialViewMode} />
                             ) : (
                                 <div className="h-full flex items-center justify-center text-gray-400">
                                     Select a job to view details

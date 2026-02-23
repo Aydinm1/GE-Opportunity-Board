@@ -21,7 +21,7 @@ Global Encounters needed a lightweight, maintainable system to publish opportuni
 
 - **Candidate:** discover opportunities, evaluate role fit, submit a complete application quickly
 - **Hiring/Admin Team:** publish and maintain roles, track candidates in a single operational system
-- **Internal Recommender:** refer candidates into the same pipeline with clear context
+- **Referrals:** refer candidates into the same pipeline with clear context
 
 ## Constraints
 
@@ -92,11 +92,3 @@ If you want this case study to be resume/interview-ready, add:
 - Launch date
 - Major iteration dates (for example: modal-to-in-pane apply refactor)
 - Any available conversion or operational metrics
-
-## What I’d Do Next
-
-- Add first-class referrals table integration end-to-end
-- Add admin analytics (funnel by role, apply completion rates)
-- Add spam and abuse controls for form submissions
-- Add automated QA checks for embed contract regressions
-- Add metrics instrumentation tied to product KPIs (view -> apply -> submit)

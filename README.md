@@ -2,7 +2,7 @@
 
 End-to-end full-stack product I built to help teams publish opportunities and collect applications through a clean, embedded experience.
 
-Live context: this app is embedded as an iframe on `https://the.ismaili/globalencounters/opportunities`.
+This app is hosted on `https://the.ismaili/globalencounters/opportunities`.
 
 ## What I Built
 
@@ -24,18 +24,10 @@ I owned this project across engineering and product:
 - Frontend engineering:
   - Built responsive job list/details/apply flows in React + TypeScript
   - Implemented state persistence patterns (selected job, apply drafts, URL sync)
-  - Refactored modal-based apply UX to in-pane flow for iframe reliability
 - Backend/API engineering:
   - Built Next.js API routes for jobs and applications
   - Implemented Airtable integration with schema-tolerant writes and attachment uploads
   - Added defensive error handling and clear API response shaping
-- Platform/integration:
-  - Implemented child-to-parent iframe resizing via `postMessage`
-  - Hardened cross-origin messaging behavior and reduced origin mismatch failures
-  - Migrated styling from Tailwind CDN to local PostCSS build for production safety
-- Delivery/operations:
-  - Investigated production console warnings and separated app issues from host/GTM/vendor issues
-  - Maintained deployment-safe changes with build validation
 
 ## Skills Demonstrated
 
@@ -44,8 +36,6 @@ I owned this project across engineering and product:
 - Type-safe React architecture and state management
 - API contract design and robust error handling
 - Data modeling/mapping between Airtable schemas and app domain models
-- Cross-origin iframe communication and browser platform debugging
-- Build/tooling migration (Tailwind CDN -> PostCSS pipeline)
 
 ### Product Management
 - Translating ambiguous UX pain points into concrete implementation plans
@@ -76,11 +66,6 @@ Client (ApplyView.tsx)
           2) create application record
           3) upload CV/resume attachment via Airtable content API
 
-Iframe Integration
-  public/resize-child-v2.js
-  -> postMessage({ type: 'resize-iframe', height }) to parent
-```
-
 ## Key API Endpoints
 
 - `GET /api/jobs`: fetch and normalize published job records
@@ -92,13 +77,12 @@ Iframe Integration
 Create `.env`:
 
 ```bash
-AIRTABLE_TOKEN=pat_xxx
-AIRTABLE_BASE_ID=app_xxx
-AIRTABLE_GEROLES_TABLE=GE Roles
-AIRTABLE_JOBS_VIEW=Public
-AIRTABLE_PEOPLE_TABLE=People
-AIRTABLE_APPLICATIONS_TABLE=Applications
-AIRTABLE_APPLICATIONS_PERSON_FIELD=Person
+AIRTABLE_TOKEN="pat_xxx"
+AIRTABLE_GEROLES_TABLE=""
+AIRTABLE_JOBS_VIEW=""
+AIRTABLE_PEOPLE_TABLE=""
+AIRTABLE_APPLICATIONS_TABLE=""
+AIRTABLE_BASE_ID=""
 ```
 
 ## Run Locally
@@ -126,7 +110,6 @@ public/
 App.tsx
 tailwind.config.js
 postcss.config.js
-parent-script-original.txt
 ```
 
 ## Case Study and Engineering Docs

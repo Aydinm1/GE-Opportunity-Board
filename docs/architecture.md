@@ -47,21 +47,6 @@ Airtable acts as operational datastore:
 - Applications
 - (Recommended extension) Referrals
 
-## Iframe Integration
-
-Child script:
-- `public/resize-child-v2.js` sends `resize-iframe` to parent
-
-Parent script contract (reference):
-- `parent-script-original.txt`
-- Handles:
-  - iframe resizing
-  - parent URL lookup
-  - clipboard proxy copy
-
-Important:
-- Parent responses should target `event.origin` (or validated allowlist) to avoid postMessage origin mismatch errors.
-
 ## Upload Flow
 
 ## Primary (current)

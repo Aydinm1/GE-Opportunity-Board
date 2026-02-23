@@ -37,6 +37,8 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, onBackToDetails, initialDraf
   const [success, setSuccess] = useState<string | null>(null);
   const [coverLetterFile, setCoverLetterFile] = useState<File | null>(initialDraft?.coverLetterFile || null);
   const [whyText, setWhyText] = useState(initialDraft?.whyText || '');
+  const [website, setWebsite] = useState('');
+  const formStartedAtRef = useRef<number>(Date.now());
 
   const update = (k: keyof Person, v: string) => setPerson((p) => ({ ...p, [k]: v }));
 
@@ -266,6 +268,8 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     setLoading(false);
     setProgress(0);
     setJustAttached(false);
+    setWebsite('');
+    formStartedAtRef.current = Date.now();
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [job.id, initialDraft]);
 
@@ -326,7 +330,17 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
       if (!m) throw new Error('Could not read CV / Resume file');
       const [, contentType, base64] = m;
       const attachments = { cvResume: { filename: coverLetterFile.name, contentType, base64 } };
-      const payload = { person: { ...person, normalizedEmail: normalized, candidateStatus: '1a - Applicant' }, jobId: job.id, extras: { Status: '1a - Applicant', Source: 'Opportunity Board', 'Why are you interested in or qualified for this job?': whyText || '' }, attachments };
+      const payload = {
+        person: { ...person, normalizedEmail: normalized, candidateStatus: '1a - Applicant' },
+        jobId: job.id,
+        extras: { Status: '1a - Applicant', Source: 'Opportunity Board', 'Why are you interested in or qualified for this job?': whyText || '' },
+        attachments,
+        meta: {
+          website,
+          formStartedAt: formStartedAtRef.current,
+          submittedAt: Date.now(),
+        },
+      };
       const res = await fetch('/api/applications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) { const txt = await res.text(); throw new Error(txt || 'Failed to submit application'); }
       setSuccess('Application submitted. Thank you!');
@@ -359,6 +373,17 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
           <div ref={contentRef} className="flex-1 overflow-y-scroll p-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="hidden" aria-hidden="true">
+              <label htmlFor="website-field">Website</label>
+              <input
+                id="website-field"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+              />
+            </div>
             <section className="mb-8">
               <h4 className="text-xs font-bold uppercase tracking-widest mb-3">Personal Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

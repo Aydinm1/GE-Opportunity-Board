@@ -43,39 +43,7 @@ export default function RootLayout({
             `,
           }}
         />
-        <script src="https://cdn.tailwindcss.com?plugins=forms,typography" />
         <Script src="/resize-child-v2.js" strategy="afterInteractive" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              tailwind.config = {
-                darkMode: "class",
-                theme: {
-                  extend: {
-                    colors: {
-                      primary: "#00558C",
-                      "primary-hover": "#00406A",
-                      "background-light": "#F3F4F6",
-                      "background-dark": "#000000",
-                      "surface-light": "#ffffff",
-                      "surface-dark": "#111111",
-                    },
-                    fontFamily: {
-                      display: ["Questrial", "sans-serif"],
-                      body: ["Montserrat", "sans-serif"],
-                    },
-                    borderRadius: {
-                      DEFAULT: "0.5rem",
-                      xl: "1rem",
-                      "2xl": "1.5rem",
-                      "3xl": "2rem",
-                    },
-                  },
-                },
-              };
-            `,
-          }}
-        />
       </head>
       <body className="bg-background-light dark:bg-background-dark text-black dark:text-white font-body antialiased transition-colors duration-200">
         {children}

@@ -63,19 +63,5 @@
       return;
     }
 
-    if (data.type === 'opportunityboard:modal-open') {
-      document.body.dataset.obPrevOverflow = document.body.style.overflow || '';
-      document.body.dataset.obPrevTouchAction = document.body.style.touchAction || '';
-      document.body.style.overflow = 'hidden';
-      document.body.style.touchAction = 'none';
-      return;
-    }
-
-    if (data.type === 'opportunityboard:modal-close') {
-      document.body.style.overflow = document.body.dataset.obPrevOverflow || '';
-      document.body.style.touchAction = document.body.dataset.obPrevTouchAction || '';
-      delete document.body.dataset.obPrevOverflow;
-      delete document.body.dataset.obPrevTouchAction;
-    }
   });
 })();

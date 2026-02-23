@@ -23,56 +23,17 @@ function computeFullHeight() {
   return Math.ceil(Math.max(base, maxBottom, viewportBottom));
 }
 
-let PARENT_ORIGIN = '*';
-let modalOpen = false;
-
-window.addEventListener('message', (e) => {
-  if (e.data && e.data.type === 'opportunityboard:modal-open') {
-    modalOpen = true;
-  } else if (e.data && e.data.type === 'opportunityboard:modal-close') {
-    modalOpen = false;
-    sendHeightToParentDebounced('modal-close');
-  }
-});
-
-(async function initParentOrigin() {
-  try {
-    const res = await fetch('/host-origin.json');
-    if (res.ok) {
-      const j = await res.json();
-      if (j && j.HOST_ORIGIN) { PARENT_ORIGIN = j.HOST_ORIGIN; return; }
-    }
-  } catch (e) {
-  }
-
-  try {
-    if (document.referrer) {
-      const u = new URL(document.referrer);
-      if (u && u.origin) { PARENT_ORIGIN = u.origin; return; }
-    }
-  } catch (e) {
-  }
-})();
-
 let resizeTimeout = null;
 function sendHeightToParentDebounced(trigger = 'unknown') {
   if (window.parent === window) {
-    return;
-  }
-  if (modalOpen) {
     return;
   }
   if (resizeTimeout) {
     clearTimeout(resizeTimeout);
   }
   resizeTimeout = setTimeout(() => {
-    if (modalOpen) {
-      resizeTimeout = null;
-      return;
-    }
     const height = computeFullHeight();
-    try { parent.postMessage({ type: 'resize-iframe', height }, PARENT_ORIGIN); }
-    catch (err) { try { parent.postMessage({ type: 'resize-iframe', height }, '*'); } catch (e) {} }
+    try { parent.postMessage({ type: 'resize-iframe', height }, '*'); } catch (e) {}
     resizeTimeout = null;
   }, 100);
 }

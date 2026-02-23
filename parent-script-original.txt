@@ -3,24 +3,15 @@
   const IFRAME_ID = 'division-fixtures-iframe';
   const MIN_IFRAME_HEIGHT = 600;
   const MAX_IFRAME_HEIGHT = 1400;
-  const log = (...args) => {
-    try {
-      console.log('[opportunityboard-parent]', ...args);
-    } catch (_) {}
-  };
 
   function postToSource(source, origin, payload) {
     try {
       source && source.postMessage(payload, origin);
-      log('postToSource ok', { origin, type: payload?.type, id: payload?.id });
-    } catch (_) {
-      log('postToSource failed');
-    }
+    } catch (_) {}
   }
 
   window.addEventListener('message', async function (event) {
     const data = event.data || {};
-    log('message received', { origin: event.origin, type: data?.type, data });
     if (!data || typeof data !== 'object' || !data.type) return;
 
     if (data.type === 'resize-iframe') {
@@ -29,15 +20,11 @@
       const clampedHeight = Math.min(MAX_IFRAME_HEIGHT, Math.max(MIN_IFRAME_HEIGHT, requestedHeight));
       if (iframe && requestedHeight > 0) {
         iframe.style.height = clampedHeight + 'px';
-        log('resize-iframe applied', { iframeId: IFRAME_ID, requestedHeight, clampedHeight, min: MIN_IFRAME_HEIGHT, max: MAX_IFRAME_HEIGHT });
-      } else {
-        log('resize-iframe skipped', { iframeFound: !!iframe, requestedHeight, iframeId: IFRAME_ID });
       }
       return;
     }
 
     if (data.type === 'opportunityboard:get-parent-url') {
-      log('replying with parent url', window.location.href);
       postToSource(event.source, event.origin, {
         type: 'opportunityboard:parent-url',
         id: data.id,
@@ -50,7 +37,6 @@
       const text = String(data.text || '');
       let ok = false;
       let error = null;
-      log('copy request received', { textLength: text.length, id: data.id });
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(text);
@@ -67,9 +53,7 @@
         }
       } catch (err) {
         error = String(err);
-        log('copy failed', { id: data.id, error });
       }
-      log('copy result', { id: data.id, ok, error });
       postToSource(event.source, event.origin, {
         type: 'opportunityboard:copy-result',
         id: data.id,
@@ -84,7 +68,6 @@
       document.body.dataset.obPrevTouchAction = document.body.style.touchAction || '';
       document.body.style.overflow = 'hidden';
       document.body.style.touchAction = 'none';
-      log('modal-open applied');
       return;
     }
 
@@ -93,9 +76,6 @@
       document.body.style.touchAction = document.body.dataset.obPrevTouchAction || '';
       delete document.body.dataset.obPrevOverflow;
       delete document.body.dataset.obPrevTouchAction;
-      log('modal-close applied');
     }
   });
-
-  log('parent script initialized', { iframeId: IFRAME_ID, href: window.location.href });
 })();

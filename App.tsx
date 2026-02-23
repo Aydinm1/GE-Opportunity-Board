@@ -5,18 +5,6 @@ import { Job, FilterOptions } from './types';
 import JobCard from './components/JobCard';
 import JobDetails from './components/JobDetails';
 import Filters from './components/Filters';
-import { HOST_ORIGIN } from './constants';
-
-const getParentTargetOrigin = (): string => {
-    try {
-        if (typeof document !== 'undefined' && document.referrer) {
-            return new URL(document.referrer).origin;
-        }
-    } catch {
-        // ignore
-    }
-    return HOST_ORIGIN || '*';
-};
 
 type InitialParentParams = {
     jobParam: string | null;
@@ -52,7 +40,6 @@ const getInitialParamsFromParentUrl = async (timeout = 500): Promise<InitialPare
     // Ask parent via postMessage
     return new Promise((resolve) => {
         const id = Math.random().toString(36).slice(2);
-        const parentTargetOrigin = getParentTargetOrigin();
         let resolved = false;
         let timeoutId: ReturnType<typeof setTimeout>;
         function onMsg(e: MessageEvent) {
@@ -63,7 +50,6 @@ const getInitialParamsFromParentUrl = async (timeout = 500): Promise<InitialPare
             window.removeEventListener('message', onMsg);
             try {
                 const parentUrl = new URL(e.data.url || '');
-                console.log('[App] received parent URL:', e.data.url);
                 resolve({
                     jobParam: parentUrl.searchParams.get('job'),
                     viewParam: parentUrl.searchParams.get('view'),
@@ -74,8 +60,7 @@ const getInitialParamsFromParentUrl = async (timeout = 500): Promise<InitialPare
         }
         window.addEventListener('message', onMsg);
         try {
-            try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, parentTargetOrigin); }
-            catch { try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*'); } catch {} }
+            window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*');
         } catch {
             // ignore
         }
@@ -113,7 +98,6 @@ const App: React.FC = () => {
                 
                 // Get initial params from parent URL (works in iframe)
                 const { jobParam, viewParam } = await getInitialParamsFromParentUrl(500);
-                console.log('[App] params from parent URL:', { jobParam, viewParam });
                 setInitialViewMode(viewParam === 'apply' ? 'apply' : 'details');
                 
                 const response = await fetch('/api/jobs');

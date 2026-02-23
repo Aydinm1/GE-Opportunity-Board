@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Job } from '../types';
-import { DEFAULT_PARENT_PAGE_URL, HOST_ORIGIN } from '../constants';
+import { DEFAULT_PARENT_PAGE_URL } from '../constants';
 import { splitBullets, formatStartDate, statusVariant } from '../lib/utils';
 import ApplyView, { ApplyDraft } from './ApplyView';
 
@@ -79,16 +79,6 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
 
     const inIframe = typeof window !== 'undefined' && window.parent !== window;
     const fallbackShareBaseUrl = () => (inIframe ? DEFAULT_PARENT_PAGE_URL : window.location.href);
-    const getParentTargetOrigin = () => {
-        try {
-            if (document.referrer) {
-                return new URL(document.referrer).origin;
-            }
-        } catch (e) {
-            // ignore
-        }
-        return HOST_ORIGIN || '*';
-    };
 
     // Resolve the host/parent URL for share links.
     // Strategy: try same-origin parent access -> document.referrer (if has path) -> postMessage request to parent
@@ -98,30 +88,23 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
             if (window.parent && window.parent.location && window.parent.location.href) {
                 const sameOriginParentHref = window.parent.location.href;
                 if (sameOriginParentHref && sameOriginParentHref !== window.location.href) {
-                    console.log('[resolveParentUrl] same-origin access succeeded:', sameOriginParentHref);
                     return sameOriginParentHref;
                 }
             }
         } catch (e) {
             // cross-origin - continue to fallbacks
-            console.log('[resolveParentUrl] same-origin access failed (cross-origin)');
         }
 
         // 2) referrer - only use if it has a meaningful path (some sites strip path via Referrer-Policy)
-        console.log('[resolveParentUrl] document.referrer:', document.referrer);
         if (document.referrer) {
             try {
                 const refUrl = new URL(document.referrer);
-                console.log('[resolveParentUrl] referrer pathname:', refUrl.pathname);
                 // Only return referrer if it has a path beyond '/' (not stripped by Referrer-Policy: origin)
                 if (refUrl.pathname && refUrl.pathname !== '/') {
-                    console.log('[resolveParentUrl] using referrer (has path):', document.referrer);
                     return document.referrer;
                 }
-                console.log('[resolveParentUrl] referrer has no path, falling through to postMessage');
             } catch (e) {
                 // Invalid URL, continue to postMessage fallback
-                console.log('[resolveParentUrl] referrer URL parse failed:', e);
             }
         }
 
@@ -130,14 +113,11 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
         }
 
         // 3) ask parent via postMessage, retrying if parent returns only the origin root
-        console.log('[resolveParentUrl] trying postMessage to parent');
         const tries = 2;
         const retryDelay = 150; // ms
         for (let attempt = 0; attempt < tries; attempt++) {
-            console.log('[resolveParentUrl] postMessage attempt', attempt + 1);
             const url = await new Promise<string>((resolve) => {
                 const id = Math.random().toString(36).slice(2);
-                const parentTargetOrigin = getParentTargetOrigin();
                 let resolved = false;
                 let timeoutId: ReturnType<typeof setTimeout>;
                 function onMsg(e: MessageEvent) {
@@ -146,13 +126,11 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
                     resolved = true;
                     clearTimeout(timeoutId);
                     window.removeEventListener('message', onMsg);
-                    console.log('[resolveParentUrl] received parent-url response:', e.data.url);
                     resolve(e.data.url || '');
                 }
                 window.addEventListener('message', onMsg);
                 try {
-                    try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, parentTargetOrigin); }
-                    catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*'); } catch {} }
+                    window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*');
                 } catch (e) {
                     // ignore
                 }
@@ -160,7 +138,6 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
                     if (resolved) return;
                     resolved = true;
                     window.removeEventListener('message', onMsg);
-                    console.log('[resolveParentUrl] postMessage timeout, using fallback');
                     resolve('');
                 }, timeout);
             });
@@ -168,7 +145,6 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
             try {
                 const parsed = new URL(url);
                 if (parsed.pathname && parsed.pathname !== '/' && parsed.href !== window.location.href) {
-                    console.log('[resolveParentUrl] got valid URL with path:', url);
                     return url;
                 }
             } catch (e) {
@@ -181,7 +157,6 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
 
         // final fallback
         const fallbackUrl = fallbackShareBaseUrl();
-        console.log('[resolveParentUrl] all attempts failed, using fallback URL:', fallbackUrl);
         return fallbackUrl;
     };
 
@@ -190,7 +165,6 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
         if (!inIframe) return false;
         return await new Promise((resolve) => {
             const id = Math.random().toString(36).slice(2);
-            const parentTargetOrigin = getParentTargetOrigin();
             function onMsg(e: MessageEvent) {
                 if (!e.data || e.data.type !== 'opportunityboard:copy-result' || e.data.id !== id) return;
                 window.removeEventListener('message', onMsg);
@@ -198,8 +172,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
             }
             window.addEventListener('message', onMsg);
             try {
-                try { window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, parentTargetOrigin); }
-                catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, '*'); } catch {} }
+                window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, '*');
             } catch (err) {
                 window.removeEventListener('message', onMsg);
                 resolve(false);
@@ -270,15 +243,11 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
                             </div>
                             <div className="flex items-center gap-3">
                                 <button onClick={async () => {
-                                        try { console.log('Share clicked', job.id); } catch (e) {}
-                                        try { if (inIframe && window.parent) { const parentTargetOrigin = getParentTargetOrigin(); try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, parentTargetOrigin); } catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-click-share', id: job.id }, '*'); } catch {} } } } catch (e) {}
                                     // Resolve parent URL (prefers full URL when available) then build share link
                                     const parentHref = await resolveParentUrl(500);
-                                    console.log('[Share] resolveParentUrl returned:', parentHref);
                                     let link = '';
                                     try {
                                         const u = new URL(parentHref);
-                                        console.log('[Share] parsed URL pathname:', u.pathname);
                                         // Remove any existing 'job' parameter to avoid duplicates
                                         u.searchParams.delete('job');
                                         // Add the new job parameter
@@ -291,16 +260,6 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
                                         fallback.searchParams.set('job', job.id);
                                         link = fallback.toString();
                                     }
-                                    console.log('[Share] final link:', link);
-
-                                    // Debug: report resolved parent href and link to host
-                                    try {
-                                        if (inIframe && window.parent) {
-                                            const parentTargetOrigin = getParentTargetOrigin();
-                                            try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, parentTargetOrigin); }
-                                            catch (err) { try { window.parent.postMessage({ type: 'opportunityboard:child-resolved-parent', id: job.id, parentHref, link }, '*'); } catch {} }
-                                        }
-                                    } catch (e) { /* ignore */ }
 
                                     if (typeof navigator !== 'undefined' && navigator.clipboard) {
                                         try {
@@ -311,7 +270,6 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
                                             return;
                                         } catch (e) {
                                             // Clipboard API blocked (permissions policy) or failed — try parent copy
-                                            console.log('[Share] clipboard.writeText failed:', e);
                                         }
                                     }
 

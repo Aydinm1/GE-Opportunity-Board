@@ -19,7 +19,7 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link
           href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Questrial&display=swap"
@@ -45,7 +45,7 @@ export default function RootLayout({
         />
         <Script src="/resize-child-v2.js" strategy="afterInteractive" />
       </head>
-      <body className="bg-background-light dark:bg-background-dark text-black dark:text-white font-body antialiased transition-colors duration-200">
+      <body suppressHydrationWarning className="bg-background-light dark:bg-background-dark text-black dark:text-white font-body antialiased transition-colors duration-200">
         {children}
       </body>
     </html>

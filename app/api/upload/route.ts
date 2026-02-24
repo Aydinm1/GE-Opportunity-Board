@@ -41,7 +41,11 @@ export async function POST(req: Request) {
 
     const host = req.headers.get('host');
     const protocol = req.headers.get('x-forwarded-proto') || 'http';
-    const baseUrl = process.env.AIRTABLE_APPLICATIONS_TABLE || (host ? `${protocol}://${host}` : '');
+    const configuredBaseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      process.env.SITE_URL ||
+      '';
+    const baseUrl = configuredBaseUrl || (host ? `${protocol}://${host}` : '');
     const url = `${baseUrl.replace(/\/$/, '')}/uploads/${safeName}`;
 
     return jsonOk({ url, filename: safeName, mimeType }, 200, limit.headers);

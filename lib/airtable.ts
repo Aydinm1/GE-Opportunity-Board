@@ -169,11 +169,11 @@ async function createPerson(person: Person) {
   if (person.linkedIn && person.linkedIn.trim() !== '') fields['LinkedIn Profile Link (if available)'] = person.linkedIn.trim();
   if (person.age && person.age.trim() !== '') fields['Age'] = person.age.trim();
   if (person.gender && person.gender.trim() !== '') fields['Gender'] = person.gender.trim();
-  if (person.countryOfOrigin && person.countryOfOrigin.trim() !== '') fields['Country of Origin'] = person.countryOfOrigin.trim();
+  if (person.countryOfOrigin && person.countryOfOrigin.trim() !== '') fields['Country of Birth'] = person.countryOfOrigin.trim();
   if (person.countryOfLiving && person.countryOfLiving.trim() !== '') fields['Country of Living (Current Location)'] = person.countryOfLiving.trim();
   if (person.jurisdiction && person.jurisdiction.trim() !== '') fields['Jurisdiction'] = person.jurisdiction.trim();
   if (person.education && person.education.trim() !== '') fields['Academic / Professional Education'] = person.education.trim();
-  if (person.profession && person.profession.trim() !== '') fields['Profession / Occupation'] = person.profession.trim();
+  if (person.profession && person.profession.trim() !== '') fields['Current Profession / Occupation'] = person.profession.trim();
   if (person.jamatiExperience && person.jamatiExperience.trim() !== '') fields['Jamati Experience'] = person.jamatiExperience.trim();
 
   const url = airtableBaseUrl(baseId, peopleTable);
@@ -311,6 +311,22 @@ async function uploadAttachmentToAirtable(recordId: string, fieldName: string, a
   return chosen;
 }
 
+function asAttachmentPatchItem(value: unknown): Record<string, string> | null {
+  if (!value || typeof value !== 'object') return null;
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.id === 'string' && obj.id.trim() !== '') {
+    return { id: obj.id };
+  }
+  if (typeof obj.url === 'string' && obj.url.trim() !== '') {
+    const item: Record<string, string> = { url: obj.url };
+    if (typeof obj.filename === 'string' && obj.filename.trim() !== '') {
+      item.filename = obj.filename;
+    }
+    return item;
+  }
+  return null;
+}
+
 export async function submitApplication(payload: { person: Person; jobId?: string | null; jobTitle?: string | null; extras?: Record<string, unknown>; attachments?: { cvResume?: AttachmentInput } }) {
   const { person, jobId, jobTitle, extras, attachments } = payload;
   if (!person || !person.emailAddress) throw new Error('Person email is required');
@@ -340,16 +356,24 @@ export async function submitApplication(payload: { person: Person; jobId?: strin
   const app = await createApplicationRecord(personRecordId, jobId, jobTitle, mergedExtras);
   // Attach CV / Resume via Airtable content API (requires existing record id)
   if (attachments?.cvResume && app?.id) {
-    const attachmentObj = await uploadAttachmentToAirtable(app.id, 'CV / Resume', attachments.cvResume);
+    const attachmentField = process.env.AIRTABLE_APPLICATIONS_ATTACHMENT_FIELD || 'CV / Resume';
+    const attachmentObj = await uploadAttachmentToAirtable(app.id, attachmentField, attachments.cvResume);
     try {
       const token = process.env.AIRTABLE_TOKEN;
       const baseId = process.env.AIRTABLE_BASE_ID;
       const appsTable = process.env.AIRTABLE_APPLICATIONS_TABLE;
       if (!token || !baseId || !appsTable) throw new Error('Missing Airtable env vars for applications');
       const updateUrl = airtableBaseUrl(baseId, appsTable);
-      // Preserve existing attachments if any were returned
-      const existing = (app as any)?.fields?.['CV / Resume'] ?? [];
-      const newArray = Array.isArray(existing) ? [...existing, attachmentObj] : [attachmentObj];
+      // Keep this patch best-effort. The content API upload already writes the attachment.
+      const existing = (app as any)?.fields?.[attachmentField] ?? [];
+      const existingItems = Array.isArray(existing)
+        ? existing.map(asAttachmentPatchItem).filter(Boolean) as Record<string, string>[]
+        : [];
+      const uploadedItem = asAttachmentPatchItem(attachmentObj);
+      const newArray = uploadedItem ? [...existingItems, uploadedItem] : existingItems;
+      if (newArray.length === 0) {
+        return { personRecordId, applicationRecord: app };
+      }
       const res = await fetch(updateUrl, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -357,18 +381,17 @@ export async function submitApplication(payload: { person: Person; jobId?: strin
           records: [
             {
               id: app.id,
-              fields: { 'CV / Resume': newArray },
+              fields: { [attachmentField]: newArray },
             },
           ],
         }),
       });
       if (!res.ok) {
         const d = await res.text();
-        throw new Error(`Airtable apply attachment to record failed: ${d}`);
+        console.warn(`Airtable attachment patch warning: ${d}`);
       }
     } catch (err) {
-      // Surface a combined error so caller can show a useful message
-      throw new Error(err instanceof Error ? err.message : String(err));
+      console.warn('Airtable attachment patch warning:', err);
     }
   }
 

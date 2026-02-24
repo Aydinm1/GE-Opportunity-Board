@@ -209,7 +209,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
     const getStatusStyles = (status: string | null) => statusVariant(status).details;
 
     return (
-        <div className="h-full min-h-0 flex flex-col">
+        <div className="h-full min-h-0 flex flex-col overflow-hidden">
             {viewMode === 'apply' ? (
                 <ApplyView
                     job={job}

@@ -271,7 +271,7 @@ const App: React.FC = () => {
                         </div>
 
                         {/* Detailed View */}
-                        <div className="lg:col-span-8 border-t border-gray-100 dark:border-gray-800 lg:border-t-0 lg:border-l pl-0 lg:pl-6 pt-4 lg:pt-0 h-full min-h-[500px] lg:min-h-0 overflow-visible lg:overflow-hidden">
+                        <div className="lg:col-span-8 border-t border-gray-100 dark:border-gray-800 lg:border-t-0 lg:border-l pl-0 lg:pl-6 pt-4 lg:pt-0 h-[72svh] min-h-[420px] lg:h-full lg:min-h-0 overflow-hidden">
                             {loading ? (
                                 <div className="h-full flex items-center justify-center text-gray-400">
                                     Loading job details...

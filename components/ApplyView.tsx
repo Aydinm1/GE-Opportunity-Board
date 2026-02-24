@@ -257,6 +257,8 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   const [justAttached, setJustAttached] = useState(false);
   const attachTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [progress, setProgress] = useState(0);
+  const progressRafRef = useRef<number | null>(null);
+  const lastProgressRef = useRef(0);
 
   useEffect(() => {
     const hydratedPerson = initialDraft?.person ? { ...emptyPerson(), ...initialDraft.person } : emptyPerson();
@@ -267,6 +269,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     setSuccess(null);
     setLoading(false);
     setProgress(0);
+    lastProgressRef.current = 0;
     setJustAttached(false);
     setWebsite('');
     formStartedAtRef.current = Date.now();
@@ -281,28 +284,41 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
-    const onScroll = () => {
+    const updateProgress = () => {
       const { scrollTop, scrollHeight, clientHeight } = el;
       const denom = scrollHeight - clientHeight;
       const pct = denom <= 0 ? 1 : Math.max(0, Math.min(1, scrollTop / denom));
+      if (Math.abs(pct - lastProgressRef.current) < 0.005 && pct !== 0 && pct !== 1) return;
+      lastProgressRef.current = pct;
       setProgress(pct);
     };
+    const scheduleProgressUpdate = () => {
+      if (progressRafRef.current !== null) return;
+      progressRafRef.current = window.requestAnimationFrame(() => {
+        progressRafRef.current = null;
+        updateProgress();
+      });
+    };
 
-    el.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
+    el.addEventListener('scroll', scheduleProgressUpdate, { passive: true });
+    window.addEventListener('resize', scheduleProgressUpdate);
 
     // Keep progress updated if content size changes
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(onScroll);
+      ro = new ResizeObserver(scheduleProgressUpdate);
       try { ro.observe(el); } catch (e) { /* ignore */ }
     }
 
-    onScroll();
+    scheduleProgressUpdate();
     return () => {
-      el.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      el.removeEventListener('scroll', scheduleProgressUpdate);
+      window.removeEventListener('resize', scheduleProgressUpdate);
       if (ro) ro.disconnect();
+      if (progressRafRef.current !== null) {
+        window.cancelAnimationFrame(progressRafRef.current);
+        progressRafRef.current = null;
+      }
     };
   }, []);
 
@@ -366,9 +382,9 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
             </div>
             <div className="w-14" />
           </div>
-          <div className="mt-3 h-1 w-full bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-1 bg-primary transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
-          </div>
+            <div className="mt-3 h-1 w-full bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-1 bg-primary transition-[width] duration-150 ease-out" style={{ width: `${Math.round(progress * 100)}%` }} />
+            </div>
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">

@@ -4,8 +4,6 @@ End-to-end full-stack product I built to help teams publish opportunities and co
 
 This app is hosted on `https://the.ismaili/globalencounters/opportunities`.
 
-## What I Built
-
 I designed and shipped a production-ready opportunity platform that:
 - Fetches and normalizes role data from Airtable
 - Supports search/filtering and deep-linking to specific jobs

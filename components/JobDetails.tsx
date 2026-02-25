@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Job } from '../types';
 import { DEFAULT_PARENT_PAGE_URL } from '../constants';
 import { splitBullets, formatStartDate, statusVariant } from '../lib/utils';
+import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
 import ApplyView, { ApplyDraft } from './ApplyView';
 
 interface JobDetailsProps {
@@ -23,6 +24,8 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
     const applyDraftsRef = useRef<Record<string, ApplyDraft>>({});
     const previousJobIdRef = useRef<string>(job.id);
     const previousViewJobIdRef = useRef<string>(job.id);
+    useScrollBoundaryTransfer(detailsScrollRef);
+
     useEffect(() => {
         return () => {
             if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);

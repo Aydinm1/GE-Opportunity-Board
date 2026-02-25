@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Job, FilterOptions } from './types';
 import JobCard from './components/JobCard';
 import JobDetails from './components/JobDetails';
 import Filters from './components/Filters';
+import { useScrollBoundaryTransfer } from './lib/useScrollBoundaryTransfer';
 
 type InitialParentParams = {
     jobParam: string | null;
@@ -89,6 +90,9 @@ const App: React.FC = () => {
         timeCommitment: [],
     });
     const [showMobileList, setShowMobileList] = useState(true);
+    const mobileListScrollRef = useRef<HTMLDivElement | null>(null);
+
+    useScrollBoundaryTransfer(mobileListScrollRef);
     
 
     useEffect(() => {
@@ -239,7 +243,7 @@ const App: React.FC = () => {
                                     {filteredJobs.length} {filteredJobs.length === 1 ? 'Position Available' : 'Positions Available'}
                                 </h2>
                             </div>
-                            <div className="flex flex-col gap-4 overflow-y-scroll max-h-[50vh] lg:max-h-none lg:flex-1 min-h-0 pr-1 sm:pr-2">
+                            <div ref={mobileListScrollRef} className="flex flex-col gap-4 overflow-y-scroll max-h-[50vh] lg:max-h-none lg:flex-1 min-h-0 pr-1 sm:pr-2">
                                 {loading ? (
                                     <div className="p-8 text-center text-gray-500 font-medium">
                                         Loading jobs...

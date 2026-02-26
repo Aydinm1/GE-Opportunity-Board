@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Job } from '../types';
-import { DEFAULT_PARENT_PAGE_URL } from '../constants';
+import { DEFAULT_PARENT_PAGE_URL, HOST_ORIGIN } from '../constants';
+import { isTrustedParentMessage, parseTrustedRedirectUrl } from '../lib/message-security';
 import { splitBullets, formatStartDate, statusVariant } from '../lib/utils';
 import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
 import ApplyView, { ApplyDraft } from './ApplyView';
@@ -83,31 +84,14 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
     const inIframe = typeof window !== 'undefined' && window.parent !== window;
     const fallbackShareBaseUrl = () => (inIframe ? DEFAULT_PARENT_PAGE_URL : window.location.href);
 
-    // Resolve the host/parent URL for share links.
-    // Strategy: try same-origin parent access -> document.referrer (if has path) -> postMessage request to parent
+    // Resolve the host URL for share links.
+    // Strategy: trusted referrer -> trusted postMessage response from parent.
     const resolveParentUrl = async (timeout = 1000): Promise<string> => {
-        // 1) same-origin access
-        try {
-            if (window.parent && window.parent.location && window.parent.location.href) {
-                const sameOriginParentHref = window.parent.location.href;
-                if (sameOriginParentHref && sameOriginParentHref !== window.location.href) {
-                    return sameOriginParentHref;
-                }
-            }
-        } catch (e) {
-            // cross-origin - continue to fallbacks
-        }
-
-        // 2) referrer - only use if it has a meaningful path (some sites strip path via Referrer-Policy)
+        // 1) referrer - only trust configured host origin
         if (document.referrer) {
-            try {
-                const refUrl = new URL(document.referrer);
-                // Only return referrer if it has a path beyond '/' (not stripped by Referrer-Policy: origin)
-                if (refUrl.pathname && refUrl.pathname !== '/') {
-                    return document.referrer;
-                }
-            } catch (e) {
-                // Invalid URL, continue to postMessage fallback
+            const refUrl = parseTrustedRedirectUrl(document.referrer, HOST_ORIGIN);
+            if (refUrl && refUrl.pathname && refUrl.pathname !== '/') {
+                return refUrl.toString();
             }
         }
 
@@ -115,25 +99,31 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
             return fallbackShareBaseUrl();
         }
 
-        // 3) ask parent via postMessage, retrying if parent returns only the origin root
+        // 2) ask parent via postMessage, retrying if parent returns only the origin root
         const tries = 2;
         const retryDelay = 150; // ms
         for (let attempt = 0; attempt < tries; attempt++) {
-            const url = await new Promise<string>((resolve) => {
+            const url = await new Promise<URL | null>((resolve) => {
                 const id = Math.random().toString(36).slice(2);
                 let resolved = false;
                 let timeoutId: ReturnType<typeof setTimeout>;
                 function onMsg(e: MessageEvent) {
-                    if (!e.data || e.data.type !== 'opportunityboard:parent-url' || e.data.id !== id) return;
+                    if (!isTrustedParentMessage(e, HOST_ORIGIN)) return;
+                    const data = e.data && typeof e.data === 'object'
+                        ? e.data as { type?: unknown; id?: unknown; url?: unknown }
+                        : null;
+                    if (!data || data.type !== 'opportunityboard:parent-url' || data.id !== id) return;
+                    const parsed = parseTrustedRedirectUrl(data.url, HOST_ORIGIN);
+                    if (!parsed) return;
                     if (resolved) return;
                     resolved = true;
                     clearTimeout(timeoutId);
                     window.removeEventListener('message', onMsg);
-                    resolve(e.data.url || '');
+                    resolve(parsed);
                 }
                 window.addEventListener('message', onMsg);
                 try {
-                    window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*');
+                    window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, HOST_ORIGIN);
                 } catch (e) {
                     // ignore
                 }
@@ -141,17 +131,12 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
                     if (resolved) return;
                     resolved = true;
                     window.removeEventListener('message', onMsg);
-                    resolve('');
+                    resolve(null);
                 }, timeout);
             });
 
-            try {
-                const parsed = new URL(url);
-                if (parsed.pathname && parsed.pathname !== '/' && parsed.href !== window.location.href) {
-                    return url;
-                }
-            } catch (e) {
-                return url;
+            if (url && url.pathname && url.pathname !== '/' && url.href !== window.location.href) {
+                return url.toString();
             }
 
             // if we only got the origin, wait and retry
@@ -169,13 +154,17 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
         return await new Promise((resolve) => {
             const id = Math.random().toString(36).slice(2);
             function onMsg(e: MessageEvent) {
-                if (!e.data || e.data.type !== 'opportunityboard:copy-result' || e.data.id !== id) return;
+                if (!isTrustedParentMessage(e, HOST_ORIGIN)) return;
+                const data = e.data && typeof e.data === 'object'
+                    ? e.data as { type?: unknown; id?: unknown; ok?: unknown }
+                    : null;
+                if (!data || data.type !== 'opportunityboard:copy-result' || data.id !== id) return;
                 window.removeEventListener('message', onMsg);
-                resolve(Boolean(e.data.ok));
+                resolve(Boolean(data.ok));
             }
             window.addEventListener('message', onMsg);
             try {
-                window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, '*');
+                window.parent.postMessage({ type: 'opportunityboard:copy', id, text }, HOST_ORIGIN);
             } catch (err) {
                 window.removeEventListener('message', onMsg);
                 resolve(false);
@@ -250,7 +239,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
                                     const parentHref = await resolveParentUrl(500);
                                     let link = '';
                                     try {
-                                        const u = new URL(parentHref);
+                                        const u = parseTrustedRedirectUrl(parentHref, HOST_ORIGIN) ?? new URL(fallbackShareBaseUrl());
                                         // Remove any existing 'job' parameter to avoid duplicates
                                         u.searchParams.delete('job');
                                         // Add the new job parameter

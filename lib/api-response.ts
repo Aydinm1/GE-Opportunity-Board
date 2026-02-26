@@ -19,11 +19,29 @@ export function jsonError(
     headers?: HeadersInit;
   }
 ) {
-  console.error(`Error in ${context}:`, err);
   const isAppError = err instanceof AppError;
   const resolvedStatus = isAppError ? err.status : status;
-  const message = isAppError
-    ? (err.expose ? err.message : fallbackMessage)
-    : (process.env.NODE_ENV !== 'production' && err instanceof Error ? err.message : fallbackMessage);
-  return NextResponse.json({ error: message }, { status: resolvedStatus, headers });
+  const errorDetails =
+    err instanceof Error
+      ? {
+          name: err.name,
+          message: err.message,
+          stack: err.stack,
+          cause: err.cause,
+        }
+      : { value: err };
+
+  const logPayload = {
+    context,
+    status: resolvedStatus,
+    details: errorDetails,
+  };
+
+  if (resolvedStatus >= 500) {
+    console.error('API request failed', logPayload);
+  } else {
+    console.warn('API request rejected', logPayload);
+  }
+
+  return NextResponse.json({ error: fallbackMessage }, { status: resolvedStatus, headers });
 }

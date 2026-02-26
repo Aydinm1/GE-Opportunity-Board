@@ -2,9 +2,11 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Job, FilterOptions } from './types';
+import { HOST_ORIGIN } from './constants';
 import JobCard from './components/JobCard';
 import JobDetails from './components/JobDetails';
 import Filters from './components/Filters';
+import { isTrustedParentMessage, parseTrustedRedirectUrl } from './lib/message-security';
 import { useScrollBoundaryTransfer } from './lib/useScrollBoundaryTransfer';
 
 type InitialParentParams = {
@@ -22,15 +24,13 @@ const getInitialParamsFromParentUrl = async (timeout = 500): Promise<InitialPare
         if (ownJob || ownView) return { jobParam: ownJob, viewParam: ownView };
     }
 
-    // Check document.referrer
+    // Check document.referrer from our trusted host origin only
     if (document.referrer) {
-        try {
-            const refUrl = new URL(document.referrer);
+        const refUrl = parseTrustedRedirectUrl(document.referrer, HOST_ORIGIN);
+        if (refUrl) {
             const refJob = refUrl.searchParams.get('job');
             const refView = refUrl.searchParams.get('view');
             if (refJob || refView) return { jobParam: refJob, viewParam: refView };
-        } catch (e) {
-            // ignore
         }
     }
 
@@ -44,24 +44,25 @@ const getInitialParamsFromParentUrl = async (timeout = 500): Promise<InitialPare
         let resolved = false;
         let timeoutId: ReturnType<typeof setTimeout>;
         function onMsg(e: MessageEvent) {
-            if (!e.data || e.data.type !== 'opportunityboard:parent-url' || e.data.id !== id) return;
+            if (!isTrustedParentMessage(e, HOST_ORIGIN)) return;
+            const data = e.data && typeof e.data === 'object'
+                ? e.data as { type?: unknown; id?: unknown; url?: unknown }
+                : null;
+            if (!data || data.type !== 'opportunityboard:parent-url' || data.id !== id) return;
+            const parentUrl = parseTrustedRedirectUrl(data.url, HOST_ORIGIN);
+            if (!parentUrl) return;
             if (resolved) return;
             resolved = true;
             clearTimeout(timeoutId);
             window.removeEventListener('message', onMsg);
-            try {
-                const parentUrl = new URL(e.data.url || '');
-                resolve({
-                    jobParam: parentUrl.searchParams.get('job'),
-                    viewParam: parentUrl.searchParams.get('view'),
-                });
-            } catch {
-                resolve({ jobParam: null, viewParam: null });
-            }
+            resolve({
+                jobParam: parentUrl.searchParams.get('job'),
+                viewParam: parentUrl.searchParams.get('view'),
+            });
         }
         window.addEventListener('message', onMsg);
         try {
-            window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, '*');
+            window.parent.postMessage({ type: 'opportunityboard:get-parent-url', id }, HOST_ORIGIN);
         } catch {
             // ignore
         }

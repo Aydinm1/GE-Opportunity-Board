@@ -9,6 +9,7 @@ I designed and shipped a production-ready opportunity platform that:
 - Supports search/filtering and deep-linking to specific jobs
 - Handles full application submission, including CV/resume attachments
 - Works reliably inside a cross-origin iframe environment
+- Validates parent/redirect URLs against a trusted host origin to block spoofed redirects
 - Balances UX quality with integration constraints from a host site
 
 ## My Ownership

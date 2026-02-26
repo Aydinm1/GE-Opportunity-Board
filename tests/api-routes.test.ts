@@ -116,7 +116,8 @@ describe('GET /api/jobs', () => {
     const res = await getJobs();
     expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body.error).toContain('Missing Airtable env vars');
+    expect(body).toEqual({ error: 'Failed to fetch jobs' });
+    expect(console.error).toHaveBeenCalled();
   });
 });
 
@@ -282,7 +283,8 @@ describe('POST /api/applications', () => {
     const res = await postApplication(req);
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body).toEqual({ error: 'Invalid JSON payload.' });
+    expect(body).toEqual({ error: 'Failed to submit application' });
+    expect(console.warn).toHaveBeenCalled();
   });
 
   it('returns 400 for invalid idempotency key format', async () => {
@@ -301,7 +303,8 @@ describe('POST /api/applications', () => {
     const res = await postApplication(req);
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body).toEqual({ error: 'Idempotency key format is invalid.' });
+    expect(body).toEqual({ error: 'Failed to submit application' });
+    expect(console.warn).toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -323,6 +326,7 @@ describe('POST /api/applications', () => {
     expect(res!.status).toBe(429);
     expect(res!.headers.get('retry-after')).not.toBeNull();
     const body = await res!.json();
-    expect(body).toEqual({ error: 'Too many requests. Please try again shortly.' });
+    expect(body).toEqual({ error: 'Rate limit exceeded' });
+    expect(console.warn).toHaveBeenCalled();
   });
 });

@@ -75,3 +75,4 @@ Application submission includes base64 attachment payload:
 - Idempotency keys are format-validated before dedupe logic
 - Airtable formula inputs are escaped before query construction
 - API route includes per-IP rate limiting for abuse resistance
+- Iframe parent URL/copy messaging is origin- and source-validated against configured `HOST_ORIGIN` before using redirect/share targets

@@ -24,6 +24,14 @@ function computeFullHeight() {
 }
 
 let resizeTimeout = null;
+const TARGET_PARENT_ORIGIN = (() => {
+  try {
+    return document.referrer ? new URL(document.referrer).origin : '*';
+  } catch (e) {
+    return '*';
+  }
+})();
+
 function sendHeightToParentDebounced(trigger = 'unknown') {
   if (window.parent === window) {
     return;
@@ -33,7 +41,7 @@ function sendHeightToParentDebounced(trigger = 'unknown') {
   }
   resizeTimeout = setTimeout(() => {
     const height = computeFullHeight();
-    try { parent.postMessage({ type: 'resize-iframe', height }, '*'); } catch (e) {}
+    try { parent.postMessage({ type: 'resize-iframe', height }, TARGET_PARENT_ORIGIN); } catch (e) {}
     resizeTimeout = null;
   }, 100);
 }

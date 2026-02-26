@@ -1,0 +1,141 @@
+(function () {
+  // Parent-side hardening for Opportunity Board iframe messaging.
+  // 1) Only accept messages from trusted iframe origins.
+  // 2) Only accept messages from the expected iframe window.
+  // 3) Strictly validate message shape/types before acting.
+
+  const IFRAME_ID = 'division-fixtures-iframe';
+  const MIN_IFRAME_HEIGHT = 600;
+  const MAX_IFRAME_HEIGHT = 1400;
+
+  // Update this to match your deployed child app origin(s).
+  const ALLOWED_CHILD_ORIGINS = [
+    'https://ge-opp-board.the.ismaili',
+  ];
+
+  const ALLOWED_TYPES = new Set([
+    'resize-iframe',
+    'opportunityboard:get-parent-url',
+    'opportunityboard:copy',
+  ]);
+
+  function getIframeElement() {
+    return document.getElementById(IFRAME_ID);
+  }
+
+  function getIframeWindow() {
+    const iframe = getIframeElement();
+    if (!iframe || !iframe.contentWindow) return null;
+    return iframe.contentWindow;
+  }
+
+  function isAllowedOrigin(origin) {
+    return ALLOWED_CHILD_ORIGINS.indexOf(origin) !== -1;
+  }
+
+  function isValidMessageShape(data) {
+    return !!data && typeof data === 'object' && typeof data.type === 'string';
+  }
+
+  function isTrustedMessage(event) {
+    if (!isAllowedOrigin(event.origin)) return false;
+    const iframeWindow = getIframeWindow();
+    if (!iframeWindow) return false;
+    if (event.source !== iframeWindow) return false;
+    return true;
+  }
+
+  function safePostToSource(source, origin, payload) {
+    try {
+      if (source && typeof source.postMessage === 'function') {
+        source.postMessage(payload, origin);
+      }
+    } catch (_) {}
+  }
+
+  function toSafeRequestId(value) {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (trimmed.length > 128) return null;
+    if (!/^[A-Za-z0-9._:-]+$/.test(trimmed)) return null;
+    return trimmed;
+  }
+
+  window.addEventListener('message', async function (event) {
+    const data = event.data;
+
+    if (!isValidMessageShape(data)) return;
+    if (!ALLOWED_TYPES.has(data.type)) return;
+    if (!isTrustedMessage(event)) return;
+
+    if (data.type === 'resize-iframe') {
+      const requestedHeight = Number(data.height);
+      if (!Number.isFinite(requestedHeight) || requestedHeight <= 0) return;
+
+      const iframe = getIframeElement();
+      if (!iframe) return;
+
+      const clampedHeight = Math.min(MAX_IFRAME_HEIGHT, Math.max(MIN_IFRAME_HEIGHT, requestedHeight));
+      iframe.style.height = clampedHeight + 'px';
+      return;
+    }
+
+    if (data.type === 'opportunityboard:get-parent-url') {
+      const id = toSafeRequestId(data.id);
+      if (!id) return;
+
+      safePostToSource(event.source, event.origin, {
+        type: 'opportunityboard:parent-url',
+        id,
+        url: window.location.href,
+      });
+      return;
+    }
+
+    if (data.type === 'opportunityboard:copy') {
+      const id = toSafeRequestId(data.id);
+      if (!id) return;
+
+      const text = typeof data.text === 'string' ? data.text : '';
+      // Avoid abuse from very large payloads.
+      if (!text || text.length > 4000) {
+        safePostToSource(event.source, event.origin, {
+          type: 'opportunityboard:copy-result',
+          id,
+          ok: false,
+          error: 'Invalid copy payload',
+        });
+        return;
+      }
+
+      let ok = false;
+      let error = null;
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          ok = true;
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+      } catch (err) {
+        error = String(err);
+      }
+
+      safePostToSource(event.source, event.origin, {
+        type: 'opportunityboard:copy-result',
+        id,
+        ok,
+        error,
+      });
+    }
+  });
+})();

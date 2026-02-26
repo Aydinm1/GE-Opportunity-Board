@@ -1,8 +1,5 @@
 (function () {
-  // Parent-side hardening for Opportunity Board iframe messaging.
-  // 1) Only accept messages from trusted iframe origins.
-  // 2) Only accept messages from the expected iframe window.
-  // 3) Strictly validate message shape/types before acting.
+  
 
   const IFRAME_ID = 'division-fixtures-iframe';
   const MIN_IFRAME_HEIGHT = 600;

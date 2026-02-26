@@ -28,15 +28,14 @@ Key fields used by app:
 - `Start Date`
 - `Duration (Months)`
 - `Duration Categories`
-- `Purpose of the Role copy`
+- `Displayed Purpose of the Role`
 - `Key Responsibilities`
 - `10. Required Qualifications`
-- `Other`
+- `Other Required Qualifications`
 - `Preferred Qualifications`
 - `Additional Skill Notes`
-- `Estimated Time Commitment copy`
+- `Displayed Estimated Time Commitment`
 - `Languages Required`
-- `OTHER LANGUAGES`
 
 Suggested status enum:
 - `Draft`

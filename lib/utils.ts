@@ -17,9 +17,10 @@ export const TIME_COMMITMENT_BUCKETS = [
 
 export function splitBullets(text?: string | null): string[] {
   if (!text) return [];
+  const bulletPrefix = /^\s*(?:[-*•]\s+|\d+[.)]\s+)/;
   return text
     .split(/\r?\n/)
-    .map((s) => s.replace(/^[-•\d.)\s]+/, '').trim())
+    .map((s) => s.replace(bulletPrefix, '').trim())
     .filter(Boolean);
 }
 

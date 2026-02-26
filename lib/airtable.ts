@@ -28,19 +28,18 @@ type AirtableJobFields = {
   "Duration (Months)"?: number | string; // Number field preferred; but tolerate string
   "Duration Categories"?: string; // your formula field ("0–3", "3–6", ... "TBD")
 
-  "Purpose of the Role copy"?: string;
+  "Displayed Purpose of the Role"?: string;
   "Key Responsibilities"?: string;
 
   "10. Required Qualifications"?: string[] | string;
-  "Other"?: string;
+  "Other Required Qualifications"?: string;
 
   "Preferred Qualifications"?: string[] | string;
   "Additional Skill Notes"?: string;
 
-  "Estimated Time Commitment copy"?: string;
+  "Displayed Estimated Time Commitment"?: string;
 
   "Languages Required"?: string[] | string;
-  "OTHER LANGUAGES"?: string;
 };
 
 // Shared helpers moved to lib/utils.ts
@@ -144,19 +143,18 @@ export async function getJobs() {
       durationMonths, // number | null
       durationCategory, // string like "0–3", "3–6", ... "TBD"
 
-      purposeShort: r.fields["Purpose of the Role copy"] ?? null,
+      purposeShort: r.fields["Displayed Purpose of the Role"] ?? null,
       keyResponsibilities: splitBullets(r.fields["Key Responsibilities"]),
 
       requiredQualifications: asStringArray(r.fields["10. Required Qualifications"]),
-      otherQualifications: asOptionalTrimmedString(r.fields["Other"]),
+      otherQualifications: asOptionalTrimmedString(r.fields["Other Required Qualifications"]),
 
       preferredQualifications: asStringArray(r.fields["Preferred Qualifications"]),
       additionalQualifications: asOptionalTrimmedString(r.fields["Additional Skill Notes"]),
 
-      timeCommitment: r.fields["Estimated Time Commitment copy"] ?? null,
+      timeCommitment: r.fields["Displayed Estimated Time Commitment"] ?? null,
 
       languagesRequired: asStringArray(r.fields["Languages Required"]),
-      otherLanguages: r.fields["OTHER LANGUAGES"] ?? null,
     };
   });
 

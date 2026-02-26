@@ -180,35 +180,3 @@ export function validateApplicationPayload(payload: unknown) {
     attachments: { cvResume },
   };
 }
-
-export function validateLegacyUploadPayload(payload: unknown) {
-  requireObject(payload, 'Invalid upload payload.');
-  const body = payload as Record<string, unknown>;
-  const filename = requireString(body.filename, 'Filename', 255);
-  const dataUrl = requireString(body.dataUrl, 'File data', 20_000_000);
-
-  const match = /^data:(.+);base64,(.+)$/.exec(dataUrl);
-  if (!match) throw new AppError('Invalid data URL.');
-  const [, mimeTypeRaw, base64] = match;
-
-  const extension = getExtension(filename);
-  if (!ALLOWED_EXTENSIONS.has(extension)) {
-    throw new AppError('File type is not allowed.');
-  }
-
-  const mimeType = normalizeContentType(mimeTypeRaw);
-  if (!ALLOWED_CONTENT_TYPES.has(mimeType)) {
-    throw new AppError('File content type is not allowed.');
-  }
-
-  let sizeBytes = 0;
-  try {
-    sizeBytes = Buffer.byteLength(base64, 'base64');
-  } catch {
-    throw new AppError('Invalid file payload.');
-  }
-  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) throw new AppError('Invalid file payload.');
-  if (sizeBytes > MAX_ATTACHMENT_BYTES) throw new AppError('File must be 5MB or smaller.');
-
-  return { filename, dataUrl, mimeType, base64 };
-}

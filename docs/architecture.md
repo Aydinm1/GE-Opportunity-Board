@@ -11,8 +11,6 @@ flowchart LR
 
   B -.postMessage resize-iframe.-> P[Parent Host Page<br/>the.ismaili]
   P -.postMessage parent-url/copy-result.-> B
-
-  B --> L[Legacy Local Upload Path<br/>/api/upload -> /uploads/*]
 ```
 
 ## Architecture Notes
@@ -32,8 +30,6 @@ flowchart LR
 Route handlers:
 - `GET /api/jobs`
 - `POST /api/applications`
-- `POST /api/upload` (legacy)
-- `GET /uploads/[...path]` (legacy)
 
 Shared integration logic:
 - `lib/airtable.ts` (Airtable read/write + attachment upload)
@@ -57,13 +53,6 @@ Application submission includes base64 attachment payload:
 - backend uploads attachment via Airtable content API
 - backend patches attachment onto application record
 
-## Legacy (still available)
-
-- frontend -> `POST /api/upload` (local file write)
-- file served via `GET /uploads/[...path]`
-
-This exists for compatibility; the preferred production flow is Airtable-native attachment upload.
-
 ## Hosting / Deployment
 
 - App is built and served as Next.js application
@@ -79,4 +68,3 @@ This exists for compatibility; the preferred production flow is Airtable-native 
 - Env vars gate Airtable access (`AIRTABLE_*`)
 - API routes run server-side (`runtime = nodejs`)
 - Attachment upload requires existing application record and valid base64 payload
-- Path traversal checks are enforced for legacy local file serving

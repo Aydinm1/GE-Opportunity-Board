@@ -1,11 +1,11 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `app/`: Next.js App Router entrypoints and API routes (`app/api/*`, `app/uploads/[...path]`).
+- `app/`: Next.js App Router entrypoints and API routes (`app/api/*`).
 - `components/`: Client UI components (`JobCard`, `JobDetails`, `ApplyModal`, `Filters`).
 - `lib/`: Shared logic and integrations (`airtable.ts`, `utils.ts`, `api-response.ts`).
 - Root files: `App.tsx` (main client shell), `types.ts` (shared types), `constants.ts` (config constants).
-- Static assets: `public/` (served files), `img/` (source images). Build output appears in `.next/` and `dist/`.
+- Static assets: `public/` (served files). Build output appears in `.next/`.
 
 ## Build, Test, and Development Commands
 - `npm run dev`: Start local development server (Next.js).
@@ -32,7 +32,7 @@ npm run dev
 - No formal test framework is configured yet (`npm test` is not available).
 - Minimum validation before PR:
   - `npm run build` passes
-  - Manual smoke test of key flows: jobs fetch, filtering, job details, application submission, upload route.
+  - Manual smoke test of key flows: jobs fetch, filtering, job details, application submission.
 - When adding tests, colocate as `*.test.ts(x)` near source or under `__tests__/`.
 
 ## Commit & Pull Request Guidelines

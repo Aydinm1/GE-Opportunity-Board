@@ -143,44 +143,10 @@ Other possible error messages:
 - Attachment upload failures
 - Missing Airtable env vars
 
-## 3) `POST /api/upload` (legacy helper)
+## Removed Endpoints
 
-Stores a base64 file to local `uploads/` folder and returns URL metadata.
+As of the latest update, these legacy local-file endpoints have been removed:
+- `POST /api/upload`
+- `GET /uploads/[...path]`
 
-### Request
-
-```json
-{
-  "filename": "resume.pdf",
-  "dataUrl": "data:application/pdf;base64,JVBERi0xLjc..."
-}
-```
-
-### Success response: 200
-
-```json
-{
-  "url": "http://localhost:3000/uploads/1700000000000-resume.pdf",
-  "filename": "1700000000000-resume.pdf",
-  "mimeType": "application/pdf"
-}
-```
-
-### Validation and errors
-
-- `400` if `filename` or `dataUrl` missing
-- `400` if data URL is malformed
-- `500` on write failures
-
-## 4) `GET /uploads/[...path]` (legacy helper)
-
-Serves files from local `uploads/` directory.
-
-### Behavior
-
-- Validates path traversal (`fullPath` must stay inside uploads dir)
-- Infers content-type by extension
-- Returns:
-  - `200` file bytes
-  - `400` invalid path
-  - `404` file not found
+All upload behavior now goes through `POST /api/applications` and Airtable attachment handling.

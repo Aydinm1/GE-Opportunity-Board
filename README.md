@@ -68,7 +68,6 @@ Client (ApplyView.tsx)
 
 - `GET /api/jobs`: fetch and normalize published job records
 - `POST /api/applications`: submit person + application + optional attachments
-- `POST /api/upload`, `GET /uploads/[...path]`: legacy local upload/serve support
 
 ## Environment Setup
 
@@ -101,7 +100,6 @@ npm run build
 ```text
 app/
   api/
-  uploads/[...path]/
 components/
 lib/
 public/

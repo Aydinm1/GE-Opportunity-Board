@@ -25,6 +25,7 @@ I owned this project across engineering and product:
 - Backend/API engineering:
   - Built Next.js API routes for jobs and applications
   - Implemented Airtable integration with schema-tolerant writes and attachment uploads
+  - Added idempotent application submission handling to prevent duplicate records on retries
   - Added defensive error handling and clear API response shaping
 
 ## Skills Demonstrated
@@ -49,6 +50,8 @@ I owned this project across engineering and product:
 - TypeScript
 - Tailwind CSS (local PostCSS build)
 - Airtable REST + Airtable content API
+- Vitest
+- GitHub Actions (CI)
 
 ## Architecture Overview
 
@@ -63,11 +66,14 @@ Client (ApplyView.tsx)
           1) upsert person by normalized email
           2) create application record
           3) upload CV/resume attachment via Airtable content API
+          4) dedupe duplicate submissions via idempotency key
+```
 
 ## Key API Endpoints
 
 - `GET /api/jobs`: fetch and normalize published job records
 - `POST /api/applications`: submit person + application + optional attachments
+  - Supports `X-Idempotency-Key` to safely retry without creating duplicates
 
 ## Environment Setup
 
@@ -80,6 +86,7 @@ AIRTABLE_JOBS_VIEW=""
 AIRTABLE_PEOPLE_TABLE=""
 AIRTABLE_APPLICATIONS_TABLE=""
 AIRTABLE_BASE_ID=""
+AIRTABLE_APPLICATIONS_IDEMPOTENCY_FIELD="" # optional, e.g. "Idempotency Key"
 ```
 
 ## Run Locally
@@ -87,6 +94,7 @@ AIRTABLE_BASE_ID=""
 ```bash
 npm install
 npm run dev
+npm test
 ```
 
 Build:
@@ -103,6 +111,8 @@ app/
 components/
 lib/
 public/
+tests/
+.github/workflows/
 App.tsx
 tailwind.config.js
 postcss.config.js

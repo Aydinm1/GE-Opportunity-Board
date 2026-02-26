@@ -83,6 +83,7 @@ Key fields used by app:
 - `Status` (set to `1a - Applicant` on submission)
 - `Source` (set to `Opportunity Board` on submission)
 - `Why are you interested in or qualified for this job?` (via extras payload)
+- Optional idempotency field (recommended): `Idempotency Key`
 
 Suggested pipeline enum:
 - `1a - Applicant`
@@ -143,11 +144,12 @@ File constraints:
 
 ## API-side validation (current behavior)
 
-- `/api/applications` requires `person.emailAddress` at minimum
+- `/api/applications` validates full payload shape (person details, extras answer, CV attachment)
+- Email format, word limits, file type/content-type, and file size are validated server-side
+- Anti-bot metadata checks are applied when meta fields are provided
 - Airtable write path enforces schema compatibility by retrying on unknown fields
 - Attachment upload requires valid base64 payload and existing application record
+- Optional idempotency keys prevent duplicate application creation on retries/double submits
 
 Recommended server hardening:
-- Explicit schema validation for full payload
-- File size/type verification on server
-- Rate limiting and anti-abuse controls
+- Durable idempotency storage (for cross-instance replay safety)

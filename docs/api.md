@@ -114,10 +114,18 @@ Submits candidate application, creating/updating People and Applications records
 
 ### Validation behavior
 
-Current server-side required check:
-- `person.emailAddress` must exist
-
-Client-side form enforces additional required fields before submit, including attachment and application answers.
+Server-side validation is strict and enforced in `lib/validation.ts`:
+- Required objects/fields:
+  - `person` with full identity/profile fields
+  - `extras["Why are you interested in or qualified for this job?"]`
+  - `attachments.cvResume`
+- Email format is validated and normalized.
+- Word limits are enforced on long-text fields (100 words max).
+- Attachment validation enforces:
+  - allowed extensions/content-types (`.pdf`, `.doc`, `.docx`, `.txt`)
+  - valid base64 payload
+  - max size 5MB
+- Anti-bot checks validate honeypot/timing metadata when provided.
 
 ### Write behavior
 
@@ -127,18 +135,30 @@ Client-side form enforces additional required fields before submit, including at
   - `Source = Opportunity Board`
 - Attach CV/Resume using Airtable content API
 - Retry logic for unknown Airtable field name errors in create application path
+- Idempotency support:
+  - optional request header: `X-Idempotency-Key: <unique-key>`
+  - optional payload field: `meta.idempotencyKey`
+  - header takes precedence when both are present
+  - repeated submissions with the same key return the same application result (prevents duplicate records from double-click/retry)
 
 ### Errors
 
-`500`
+Common error status codes:
+- `400` validation/payload errors
+- `429` rate limit exceeded
+- `500` unexpected server/integration errors
+
+Example `400`:
 
 ```json
 {
-  "error": "Person email is required"
+  "error": "Invalid JSON payload."
 }
 ```
 
 Other possible error messages:
+- Validation failures (`400`)
+- Rate limiting (`429`)
 - Airtable create/update failures
 - Attachment upload failures
 - Missing Airtable env vars

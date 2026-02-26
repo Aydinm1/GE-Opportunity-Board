@@ -34,6 +34,7 @@ Route handlers:
 Shared integration logic:
 - `lib/airtable.ts` (Airtable read/write + attachment upload)
 - `lib/api-response.ts` (consistent JSON responses)
+- `lib/rate-limit.ts` (request throttling)
 
 ## Data Layer
 
@@ -52,6 +53,7 @@ Application submission includes base64 attachment payload:
 - backend creates application record
 - backend uploads attachment via Airtable content API
 - backend patches attachment onto application record
+- backend applies idempotency key checks to avoid duplicate submissions
 
 ## Hosting / Deployment
 
@@ -68,3 +70,5 @@ Application submission includes base64 attachment payload:
 - Env vars gate Airtable access (`AIRTABLE_*`)
 - API routes run server-side (`runtime = nodejs`)
 - Attachment upload requires existing application record and valid base64 payload
+- Application submission supports idempotency key retry safety (`X-Idempotency-Key`)
+- API route includes per-IP rate limiting for abuse resistance

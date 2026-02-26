@@ -29,7 +29,19 @@ export async function POST(req: Request) {
       throw new AppError('Invalid JSON payload.', { status: 400 });
     }
     const payload = validateApplicationPayload(rawPayload);
-    const result = await submitApplication(payload);
+    const bodyIdempotencyKey =
+      rawPayload &&
+      typeof rawPayload === 'object' &&
+      !Array.isArray(rawPayload) &&
+      (rawPayload as { meta?: { idempotencyKey?: unknown } }).meta &&
+      typeof (rawPayload as { meta?: { idempotencyKey?: unknown } }).meta?.idempotencyKey === 'string'
+        ? (rawPayload as { meta?: { idempotencyKey?: string } }).meta?.idempotencyKey
+        : null;
+    const headerIdempotencyKey = req.headers.get('x-idempotency-key');
+    const result = await submitApplication({
+      ...payload,
+      idempotencyKey: (headerIdempotencyKey || bodyIdempotencyKey || '').trim() || null,
+    });
     return jsonOk({ ok: true, result }, 200, limit.headers);
   } catch (err) {
     return jsonError(err, {

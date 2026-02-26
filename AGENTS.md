@@ -29,8 +29,9 @@ npm run dev
 - No ESLint/Prettier config is currently committed; keep formatting consistent with surrounding code.
 
 ## Testing Guidelines
-- No formal test framework is configured yet (`npm test` is not available).
+- Automated tests run with Vitest (`npm test`).
 - Minimum validation before PR:
+  - `npm test` passes
   - `npm run build` passes
   - Manual smoke test of key flows: jobs fetch, filtering, job details, application submission.
 - When adding tests, colocate as `*.test.ts(x)` near source or under `__tests__/`.
@@ -46,7 +47,7 @@ npm run dev
 
 ## Security & Configuration Tips
 - Required secrets live in `.env` (Airtable tokens/base/table IDs); never commit secrets.
-- Sanitize and validate request data in API routes, especially upload and application endpoints.
+- Sanitize and validate request data in API routes, especially application submission endpoints.
 
 ## Iframe Integration Notes
 - This app is embedded as an iframe at `https://the.ismaili/globalencounters/opportunities`.

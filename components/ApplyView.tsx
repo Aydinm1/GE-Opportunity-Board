@@ -6,6 +6,7 @@ export interface ApplyDraft {
   person: Person;
   coverLetterFile: File | null;
   whyText: string;
+  submissionKey?: string;
 }
 
 interface ApplyViewProps {
@@ -31,6 +32,13 @@ const emptyPerson = (): Person => ({
   candidateStatus: ''
 });
 
+const createSubmissionKey = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
 const ApplyView: React.FC<ApplyViewProps> = ({ job, onBackToDetails, initialDraft, onDraftChange }) => {
   const [person, setPerson] = useState<Person>(() => initialDraft?.person ? { ...emptyPerson(), ...initialDraft.person } : emptyPerson());
   const [loading, setLoading] = useState(false);
@@ -38,7 +46,9 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, onBackToDetails, initialDraf
   const [success, setSuccess] = useState<string | null>(null);
   const [coverLetterFile, setCoverLetterFile] = useState<File | null>(initialDraft?.coverLetterFile || null);
   const [whyText, setWhyText] = useState(initialDraft?.whyText || '');
+  const [submissionKey, setSubmissionKey] = useState<string>(() => initialDraft?.submissionKey || createSubmissionKey());
   const [website, setWebsite] = useState('');
+  const inFlightSubmitRef = useRef(false);
   const formStartedAtRef = useRef<number>(Date.now());
 
   const update = (k: keyof Person, v: string) => setPerson((p) => ({ ...p, [k]: v }));
@@ -270,9 +280,11 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     setError(null);
     setSuccess(null);
     setLoading(false);
+    inFlightSubmitRef.current = false;
     setProgress(0);
     lastProgressRef.current = 0;
     setJustAttached(false);
+    setSubmissionKey(initialDraft?.submissionKey || createSubmissionKey());
     setWebsite('');
     formStartedAtRef.current = Date.now();
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -280,8 +292,8 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
 
   useEffect(() => {
     if (!onDraftChange) return;
-    onDraftChange({ person, coverLetterFile, whyText });
-  }, [person, coverLetterFile, whyText, onDraftChange]);
+    onDraftChange({ person, coverLetterFile, whyText, submissionKey });
+  }, [person, coverLetterFile, whyText, submissionKey, onDraftChange]);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -332,12 +344,14 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (inFlightSubmitRef.current || loading) return;
     setError(null);
     setSuccess(null);
     if (!person.fullName || !person.emailAddress || !person.phoneNumber || !person.age || !person.gender || !person.countryOfOrigin || !person.countryOfLiving || !person.education || !person.profession || !person.jamatiExperience || !coverLetterFile || !whyText) {
       setError('Please fill all required fields.');
       return;
     }
+    inFlightSubmitRef.current = true;
     setLoading(true);
     try {
       const normalized = person.emailAddress.trim().toLowerCase();
@@ -355,19 +369,31 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
         attachments,
         meta: {
           website,
+          idempotencyKey: submissionKey,
           formStartedAt: formStartedAtRef.current,
           submittedAt: Date.now(),
         },
       };
-      const res = await fetch('/api/applications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-idempotency-key': submissionKey },
+        body: JSON.stringify(payload),
+      });
       if (!res.ok) { const txt = await res.text(); throw new Error(txt || 'Failed to submit application'); }
       setSuccess('Application submitted. Thank you!');
+      const nextSubmissionKey = createSubmissionKey();
+      setSubmissionKey(nextSubmissionKey);
       setTimeout(() => {
         setLoading(false);
-        onDraftChange?.({ person: emptyPerson(), coverLetterFile: null, whyText: '' });
+        inFlightSubmitRef.current = false;
+        onDraftChange?.({ person: emptyPerson(), coverLetterFile: null, whyText: '', submissionKey: nextSubmissionKey });
         onBackToDetails();
       }, 900);
-    } catch (err: any) { setError(err?.message || 'Submission failed'); setLoading(false); }
+    } catch (err: any) {
+      setError(err?.message || 'Submission failed');
+      setLoading(false);
+      inFlightSubmitRef.current = false;
+    }
   };
 
   return (

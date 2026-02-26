@@ -76,13 +76,13 @@ Lookup behavior in code:
 Primary purpose: track submissions linked to People and Jobs.
 
 Key fields used by app:
-- Link to People (`Person` by default, fallback `People`)
+- Link to People (`People`)
 - Link to Jobs (`GE Roles`, when `jobId` provided)
 - `CV / Resume` attachment field
 - `Status` (set to `1a - Applicant` on submission)
 - `Source` (set to `Opportunity Board` on submission)
 - `Why are you interested in or qualified for this job?` (via extras payload)
-- Optional idempotency field (recommended): `Idempotency Key`
+- `Idempotency Key`
 
 Suggested pipeline enum:
 - `1a - Applicant`

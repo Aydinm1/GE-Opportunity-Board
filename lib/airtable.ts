@@ -4,11 +4,15 @@ import { splitBullets, parseDurationMonths, bucketFromMonths, asStringArray, asO
 type AirtableRecord<T> = { id: string; fields: T; createdTime: string };
 type AirtableListResponse<T> = { records: AirtableRecord<T>[]; offset?: string };
 type AttachmentInput = { filename: string; contentType: string; base64: string };
-type SubmitApplicationResult = { personRecordId: string; applicationRecord: AirtableRecord<Record<string, unknown>> | null };
+type SubmitApplicationResult = { personRecordId: string; applicationRecord: AirtableRecord<AirtableApplicationFields> | null };
 
 const IDEMPOTENCY_CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_IDEMPOTENCY_CACHE_KEYS = 5000;
 const SAFE_IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,128}$/;
+const APPLICATION_PERSON_LINK_FIELD = 'People';
+const APPLICATION_JOB_LINK_FIELD = 'GE Roles';
+const APPLICATION_ATTACHMENT_FIELD = 'CV / Resume';
+const APPLICATION_IDEMPOTENCY_FIELD = 'Idempotency Key';
 const inFlightIdempotency = new Map<string, Promise<SubmitApplicationResult>>();
 const completedIdempotency = new Map<string, { result: SubmitApplicationResult; expiresAt: number }>();
 
@@ -42,6 +46,42 @@ type AirtableJobFields = {
   "Languages Required"?: string[] | string;
 };
 
+type AirtablePeopleFields = {
+  "Full Name"?: string;
+  "Candidate Status"?: string;
+  "Email Address"?: string;
+  "Phone Number (incl. Country Code)"?: string;
+  "LinkedIn Profile Link (if available)"?: string;
+  "Age"?: string;
+  "Gender"?: string;
+  "Country of Birth"?: string;
+  "Country of Living (Current Location)"?: string;
+  "Jurisdiction"?: string;
+  "Academic / Professional Education"?: string;
+  "Current Profession / Occupation"?: string;
+  "Jamati Experience"?: string;
+  "normalized email"?: string;
+  [key: string]: unknown;
+};
+
+type AirtableAttachment = {
+  id?: string;
+  url?: string;
+  filename?: string;
+  [key: string]: unknown;
+};
+
+type AirtableApplicationFields = {
+  "People"?: string[];
+  "GE Roles"?: string[];
+  "Status"?: string;
+  "Source"?: string;
+  "Why are you interested in or qualified for this job?"?: string;
+  "CV / Resume"?: AirtableAttachment[];
+  "Idempotency Key"?: string;
+  [key: string]: unknown;
+};
+
 // Shared helpers moved to lib/utils.ts
 
 function normalizeIdempotencyKey(value: unknown): string | null {
@@ -54,13 +94,6 @@ function normalizeIdempotencyKey(value: unknown): string | null {
 
 function escapeFormulaValue(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
-function getIdempotencyFieldCandidates() {
-  const configured = process.env.AIRTABLE_APPLICATIONS_IDEMPOTENCY_FIELD?.trim() || '';
-  const defaults = ['Idempotency Key', 'Submission Idempotency Key', 'Submission Key'];
-  const fields = configured ? [configured, ...defaults] : defaults;
-  return Array.from(new Set(fields.filter(Boolean)));
 }
 
 function pruneCompletedIdempotency(now = Date.now()) {
@@ -120,7 +153,9 @@ export async function getJobs() {
 
   const data = (await res.json()) as AirtableListResponse<AirtableJobFields>;
 
-  const jobs = data.records.map((r) => {
+  const jobs = data.records
+    .filter((r) => r.fields["Published?"] === true)
+    .map((r) => {
     const durationMonths = parseDurationMonths(r.fields["Duration (Months)"]);
     const durationCategory =
       r.fields["Duration Categories"] ?? bucketFromMonths(durationMonths);
@@ -167,7 +202,7 @@ function airtableBaseUrl(baseId: string, tableName: string) {
   return `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}`;
 }
 
-async function findPersonByNormalizedEmail(normalizedEmail: string) {
+async function findPersonByNormalizedEmail(normalizedEmail: string): Promise<AirtableRecord<AirtablePeopleFields> | null> {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const peopleTable = process.env.AIRTABLE_PEOPLE_TABLE;
@@ -179,7 +214,7 @@ async function findPersonByNormalizedEmail(normalizedEmail: string) {
     const url = `${airtableBaseUrl(baseId, peopleTable)}?maxRecords=1&filterByFormula=${encodeURIComponent(formula)}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (res.ok) {
-      const json = await res.json() as AirtableListResponse<Record<string, unknown>>;
+      const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;
       if (json.records && json.records.length > 0) return json.records[0];
     }
     // if not ok or no records, fallthrough to email search
@@ -196,7 +231,7 @@ async function findPersonByNormalizedEmail(normalizedEmail: string) {
       const d = await r2.text();
       throw new Error(`Airtable people email query failed: ${d}`);
     }
-    const json2 = await r2.json() as AirtableListResponse<Record<string, unknown>>;
+    const json2 = await r2.json() as AirtableListResponse<AirtablePeopleFields>;
     return json2.records && json2.records.length > 0 ? json2.records[0] : null;
   } catch (err) {
     // surface the original error
@@ -204,7 +239,7 @@ async function findPersonByNormalizedEmail(normalizedEmail: string) {
   }
 }
 
-async function createPerson(person: Person) {
+async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeopleFields> | null> {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const peopleTable = process.env.AIRTABLE_PEOPLE_TABLE;
@@ -240,38 +275,28 @@ async function createPerson(person: Person) {
     const d = await res.text();
     throw new Error(`Airtable create person failed: ${d}`);
   }
-  const json = await res.json() as AirtableListResponse<Record<string, unknown>>;
+  const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;
   return json.records && json.records.length > 0 ? json.records[0] : null;
 }
 
-async function findApplicationByIdempotencyKey(idempotencyKey: string) {
+async function findApplicationByIdempotencyKey(idempotencyKey: string): Promise<AirtableRecord<AirtableApplicationFields> | null> {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const appsTable = process.env.AIRTABLE_APPLICATIONS_TABLE;
   if (!token || !baseId || !appsTable) throw new Error('Missing Airtable env vars for applications');
 
   const escapedKey = escapeFormulaValue(idempotencyKey);
-  const fields = getIdempotencyFieldCandidates();
+  const formula = `({${APPLICATION_IDEMPOTENCY_FIELD}} = '${escapedKey}')`;
+  const url = `${airtableBaseUrl(baseId, appsTable)}?maxRecords=1&filterByFormula=${encodeURIComponent(formula)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
-  for (const field of fields) {
-    const formula = `({${field}} = '${escapedKey}')`;
-    const url = `${airtableBaseUrl(baseId, appsTable)}?maxRecords=1&filterByFormula=${encodeURIComponent(formula)}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-
-    if (res.ok) {
-      const json = await res.json() as AirtableListResponse<Record<string, unknown>>;
-      if (json.records && json.records.length > 0) return json.records[0];
-      continue;
-    }
-
+  if (!res.ok) {
     const details = await res.text();
-    if (/UNKNOWN_FIELD_NAME|Unknown field name/i.test(details)) {
-      continue;
-    }
-    console.warn(`Airtable idempotency lookup warning for field "${field}": ${details}`);
+    throw new Error(`Airtable idempotency lookup failed: ${details}`);
   }
 
-  return null;
+  const json = await res.json() as AirtableListResponse<AirtableApplicationFields>;
+  return json.records && json.records.length > 0 ? json.records[0] : null;
 }
 
 async function createApplicationRecord(
@@ -280,19 +305,11 @@ async function createApplicationRecord(
   jobTitle?: string | null,
   extras?: Record<string, unknown>,
   idempotencyKey?: string | null
-) {
+): Promise<AirtableRecord<AirtableApplicationFields> | null> {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const appsTable = process.env.AIRTABLE_APPLICATIONS_TABLE;
-  const personLinkField = process.env.AIRTABLE_APPLICATIONS_PERSON_FIELD || 'Person';
   if (!token || !baseId || !appsTable) throw new Error('Missing Airtable env vars for applications');
-
-  // Try multiple candidate link field names to accommodate different table schemas.
-  const personCandidates = [personLinkField, 'People'].filter(Boolean) as string[];
-  const jobLinkCandidates = ['GE Roles'].filter(Boolean) as string[];
-  const idempotencyCandidates = idempotencyKey
-    ? [...getIdempotencyFieldCandidates(), null]
-    : [null];
   const baseUrl = airtableBaseUrl(baseId, appsTable);
 
   // Build common payload fields (only include non-empty values) — do NOT include job title (avoid unknown field errors)
@@ -302,56 +319,51 @@ async function createApplicationRecord(
       if (v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '')) baseFields[k] = v;
     }
   }
+  baseFields[APPLICATION_PERSON_LINK_FIELD] = [personRecordId];
+  if (jobId && jobId.trim() !== '') baseFields[APPLICATION_JOB_LINK_FIELD] = [jobId];
+  if (idempotencyKey) baseFields[APPLICATION_IDEMPOTENCY_FIELD] = idempotencyKey;
 
   const removedFields = new Set<string>();
   let lastError: any = null;
 
-  // Try combinations of person link field and job link field (if jobId present)
-  for (const personCandidate of personCandidates) {
-    const jobCandidates = jobId && jobId.trim() !== '' ? jobLinkCandidates.concat([null]) : [null];
-    for (const jobCandidate of jobCandidates) {
-      for (const idempotencyField of idempotencyCandidates) {
-        const fields: Record<string, unknown> = { ...baseFields };
-        for (const f of removedFields) delete fields[f];
-        // add person link
-        fields[personCandidate] = [personRecordId];
-        // add job link if available
-        if (jobCandidate) fields[jobCandidate] = [jobId];
-        if (idempotencyField && idempotencyKey) fields[idempotencyField] = idempotencyKey;
+  while (true) {
+    const fields: Record<string, unknown> = { ...baseFields };
+    for (const f of removedFields) delete fields[f];
 
-        try {
-          const res = await fetch(baseUrl, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ records: [{ fields }] }),
-          });
-          if (!res.ok) {
-            const d = await res.text();
-            // If Airtable reports unknown field name, extract it and retry without that field
-            const m = d && d.match(/Unknown field name:\s*"([^"]+)"/i);
-            if (m && m[1]) {
-              const unknown = m[1];
-              removedFields.add(unknown);
-              lastError = d;
-              continue;
-            }
-            if (d && d.includes('UNKNOWN_FIELD_NAME')) {
-              lastError = d;
-              continue;
-            }
-            throw new Error(`Airtable create application failed: ${d}`);
+    try {
+      const res = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records: [{ fields }] }),
+      });
+      if (!res.ok) {
+        const d = await res.text();
+        // If Airtable reports unknown field name, extract it and retry without that non-critical field
+        const m = d && d.match(/Unknown field name:\s*"([^"]+)"/i);
+        if (m && m[1]) {
+          const unknown = m[1];
+          if (
+            unknown === APPLICATION_PERSON_LINK_FIELD ||
+            unknown === APPLICATION_JOB_LINK_FIELD ||
+            unknown === APPLICATION_IDEMPOTENCY_FIELD
+          ) {
+            throw new Error(`Airtable create application failed: required field "${unknown}" is missing.`);
           }
-          const json = await res.json() as AirtableListResponse<Record<string, unknown>>;
-          return json.records && json.records.length > 0 ? json.records[0] : null;
-        } catch (err) {
-          lastError = err;
-          // try next candidate combination
+          removedFields.add(unknown);
+          lastError = d;
+          continue;
         }
+        throw new Error(`Airtable create application failed: ${d}`);
       }
+      const json = await res.json() as AirtableListResponse<AirtableApplicationFields>;
+      return json.records && json.records.length > 0 ? json.records[0] : null;
+    } catch (err) {
+      lastError = err;
+      break;
     }
   }
 
-  throw new Error(`Airtable create application failed (all link field candidates tried): ${lastError}`);
+  throw new Error(`Airtable create application failed: ${lastError}`);
 }
 
 async function uploadAttachmentToAirtable(recordId: string, fieldName: string, attachment: AttachmentInput) {
@@ -373,7 +385,11 @@ async function uploadAttachmentToAirtable(recordId: string, fieldName: string, a
     const d = await res.text();
     throw new Error(`Airtable upload attachment failed: ${d}`);
   }
-  const data = await res.json() as any;
+  const data = await res.json() as {
+    attachment?: AirtableAttachment;
+    fields?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
   // The API can return { attachment: {...} } or a record with fields
   const attachmentObj =
     (data && (data.attachment || data)) as Record<string, unknown>;
@@ -471,7 +487,7 @@ export async function submitApplication(payload: {
     const app = await createApplicationRecord(personRecordId, jobId, jobTitle, mergedExtras, idempotencyKey);
     // Attach CV / Resume via Airtable content API (requires existing record id)
     if (attachments?.cvResume && app?.id) {
-      const attachmentField = process.env.AIRTABLE_APPLICATIONS_ATTACHMENT_FIELD || 'CV / Resume';
+      const attachmentField = APPLICATION_ATTACHMENT_FIELD;
       const attachmentObj = await uploadAttachmentToAirtable(app.id, attachmentField, attachments.cvResume);
       try {
         const token = process.env.AIRTABLE_TOKEN;
@@ -480,7 +496,7 @@ export async function submitApplication(payload: {
         if (!token || !baseId || !appsTable) throw new Error('Missing Airtable env vars for applications');
         const updateUrl = airtableBaseUrl(baseId, appsTable);
         // Keep this patch best-effort. The content API upload already writes the attachment.
-        const existing = (app as any)?.fields?.[attachmentField] ?? [];
+        const existing = app.fields?.[attachmentField] ?? [];
         const existingItems = Array.isArray(existing)
           ? existing.map(asAttachmentPatchItem).filter(Boolean) as Record<string, string>[]
           : [];

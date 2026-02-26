@@ -81,6 +81,7 @@ describe('GET /api/jobs', () => {
           {
             id: 'recJob123',
             fields: {
+              'Published?': true,
               'Role Title': 'Programme Lead',
               'Key Responsibilities': '- Lead planning\n- Coordinate teams',
               'Duration (Months)': '6',
@@ -106,6 +107,47 @@ describe('GET /api/jobs', () => {
       languagesRequired: ['English', 'French'],
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns only jobs where Published? is true', async () => {
+    process.env.AIRTABLE_TOKEN = 'test-token';
+    process.env.AIRTABLE_BASE_ID = 'appTestBase';
+    process.env.AIRTABLE_GEROLES_TABLE = 'GE Roles';
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        records: [
+          {
+            id: 'recPublished',
+            fields: {
+              'Published?': true,
+              'Role Title': 'Published Role',
+            },
+          },
+          {
+            id: 'recDraft',
+            fields: {
+              'Published?': false,
+              'Role Title': 'Draft Role',
+            },
+          },
+          {
+            id: 'recMissingFlag',
+            fields: {
+              'Role Title': 'Missing Publish Flag',
+            },
+          },
+        ],
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await getJobs();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.jobs).toHaveLength(1);
+    expect(body.jobs[0].id).toBe('recPublished');
+    expect(body.jobs[0].roleTitle).toBe('Published Role');
   });
 
   it('returns 500 when Airtable env is missing', async () => {

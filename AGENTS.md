@@ -11,11 +11,13 @@
 - `npm run dev`: Start local development server (Next.js).
 - `npm run build`: Create production build and run type checks.
 - `npm run start`: Serve the production build locally.
+- `npm test`: Run API/unit tests (Vitest).
 
 Example:
 ```bash
 npm install
 npm run dev
+npm test
 ```
 
 ## Coding Style & Naming Conventions

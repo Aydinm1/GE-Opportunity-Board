@@ -8,6 +8,7 @@ type SubmitApplicationResult = { personRecordId: string; applicationRecord: Airt
 
 const IDEMPOTENCY_CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_IDEMPOTENCY_CACHE_KEYS = 5000;
+const SAFE_IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,128}$/;
 const inFlightIdempotency = new Map<string, Promise<SubmitApplicationResult>>();
 const completedIdempotency = new Map<string, { result: SubmitApplicationResult; expiresAt: number }>();
 
@@ -48,7 +49,8 @@ function normalizeIdempotencyKey(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const key = value.trim();
   if (!key) return null;
-  return key.slice(0, 128);
+  if (!SAFE_IDEMPOTENCY_KEY.test(key)) return null;
+  return key;
 }
 
 function escapeFormulaValue(value: string): string {
@@ -175,7 +177,7 @@ async function findPersonByNormalizedEmail(normalizedEmail: string) {
 
   // Try normalized email lookup first (if the field exists and is queryable).
   try {
-    const formula = `({normalized email} = '${normalizedEmail.replace(/'/g, "\\'")}')`;
+    const formula = `({normalized email} = '${escapeFormulaValue(normalizedEmail)}')`;
     const url = `${airtableBaseUrl(baseId, peopleTable)}?maxRecords=1&filterByFormula=${encodeURIComponent(formula)}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (res.ok) {
@@ -189,7 +191,7 @@ async function findPersonByNormalizedEmail(normalizedEmail: string) {
 
   // Fallback: search by Email Address using lowercased comparison
   try {
-    const emailFormula = `(LOWER({Email Address}) = '${normalizedEmail.replace(/'/g, "\\'")}')`;
+    const emailFormula = `(LOWER({Email Address}) = '${escapeFormulaValue(normalizedEmail)}')`;
     const emailUrl = `${airtableBaseUrl(baseId, peopleTable)}?maxRecords=1&filterByFormula=${encodeURIComponent(emailFormula)}`;
     const r2 = await fetch(emailUrl, { headers: { Authorization: `Bearer ${token}` } });
     if (!r2.ok) {

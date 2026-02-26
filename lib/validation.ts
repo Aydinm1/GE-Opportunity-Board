@@ -4,6 +4,8 @@ import type { Person } from '../types';
 const WORD_LIMIT = 100;
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const WHY_FIELD = 'Why are you interested in or qualified for this job?';
+const SAFE_IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,128}$/;
+const CONTROL_CHARS = /[\u0000-\u001F\u007F]/g;
 
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.doc', '.docx', '.txt']);
 const ALLOWED_CONTENT_TYPES = new Set([
@@ -15,6 +17,14 @@ const ALLOWED_CONTENT_TYPES = new Set([
 
 type AttachmentInput = { filename: string; contentType: string; base64: string };
 
+function sanitizeText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .replace(CONTROL_CHARS, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function requireObject(value: unknown, message: string) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new AppError(message);
@@ -23,7 +33,7 @@ function requireObject(value: unknown, message: string) {
 
 function requireString(value: unknown, fieldName: string, maxLength = 512): string {
   if (typeof value !== 'string') throw new AppError(`${fieldName} is required.`);
-  const trimmed = value.trim();
+  const trimmed = sanitizeText(value);
   if (!trimmed) throw new AppError(`${fieldName} is required.`);
   if (trimmed.length > maxLength) throw new AppError(`${fieldName} is too long.`);
   return trimmed;
@@ -31,7 +41,7 @@ function requireString(value: unknown, fieldName: string, maxLength = 512): stri
 
 function optionalString(value: unknown, maxLength = 512): string | undefined {
   if (typeof value !== 'string') return undefined;
-  const trimmed = value.trim();
+  const trimmed = sanitizeText(value);
   if (!trimmed) return undefined;
   return trimmed.length > maxLength ? trimmed.slice(0, maxLength) : trimmed;
 }
@@ -47,7 +57,7 @@ function enforceWordLimit(value: string, fieldName: string) {
 }
 
 function validateEmail(email: string): string {
-  const normalized = email.trim().toLowerCase();
+  const normalized = sanitizeText(email).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
     throw new AppError('Email format is invalid.');
   }
@@ -70,6 +80,9 @@ function validateAttachment(attachment: unknown): AttachmentInput {
   const filename = requireString(record.filename, 'CV / Resume filename', 255);
   const contentTypeRaw = requireString(record.contentType, 'CV / Resume content type', 255);
   const base64 = requireString(record.base64, 'CV / Resume payload', 20_000_000);
+  if (filename.includes('/') || filename.includes('\\')) {
+    throw new AppError('CV / Resume filename is invalid.');
+  }
 
   const extension = getExtension(filename);
   if (!ALLOWED_EXTENSIONS.has(extension)) {
@@ -179,4 +192,17 @@ export function validateApplicationPayload(payload: unknown) {
     extras,
     attachments: { cvResume },
   };
+}
+
+export function validateIdempotencyKey(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') {
+    throw new AppError('Idempotency key must be a string.', { status: 400 });
+  }
+  const key = sanitizeText(value);
+  if (!key) return null;
+  if (!SAFE_IDEMPOTENCY_KEY.test(key)) {
+    throw new AppError('Idempotency key format is invalid.', { status: 400 });
+  }
+  return key;
 }

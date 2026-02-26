@@ -69,6 +69,9 @@ Application submission includes base64 attachment payload:
 
 - Env vars gate Airtable access (`AIRTABLE_*`)
 - API routes run server-side (`runtime = nodejs`)
+- Application payloads are sanitized/validated before integration calls
 - Attachment upload requires existing application record and valid base64 payload
 - Application submission supports idempotency key retry safety (`X-Idempotency-Key`)
+- Idempotency keys are format-validated before dedupe logic
+- Airtable formula inputs are escaped before query construction
 - API route includes per-IP rate limiting for abuse resistance

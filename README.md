@@ -73,6 +73,7 @@ Client (ApplyView.tsx)
 
 - `GET /api/jobs`: fetch and normalize published job records
 - `POST /api/applications`: submit person + application + optional attachments
+  - Server-side sanitization/validation runs before Airtable writes
   - Supports `X-Idempotency-Key` to safely retry without creating duplicates
 
 ## Environment Setup

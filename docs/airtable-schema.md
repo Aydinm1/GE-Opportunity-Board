@@ -145,10 +145,12 @@ File constraints:
 ## API-side validation (current behavior)
 
 - `/api/applications` validates full payload shape (person details, extras answer, CV attachment)
+- String inputs are sanitized (normalization + control-character stripping) before write operations
 - Email format, word limits, file type/content-type, and file size are validated server-side
 - Anti-bot metadata checks are applied when meta fields are provided
 - Airtable write path enforces schema compatibility by retrying on unknown fields
 - Attachment upload requires valid base64 payload and existing application record
+- Idempotency keys are strictly format-validated (`A-Z a-z 0-9 . _ : -`, max 128) when supplied
 - Optional idempotency keys prevent duplicate application creation on retries/double submits
 
 Recommended server hardening:

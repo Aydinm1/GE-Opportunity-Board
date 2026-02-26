@@ -285,6 +285,26 @@ describe('POST /api/applications', () => {
     expect(body).toEqual({ error: 'Invalid JSON payload.' });
   });
 
+  it('returns 400 for invalid idempotency key format', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const req = new Request('http://localhost/api/applications', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': nextIp('198.51.108'),
+        'x-idempotency-key': 'bad key with spaces',
+      },
+      body: JSON.stringify(validApplicationPayload()),
+    });
+
+    const res = await postApplication(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'Idempotency key format is invalid.' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('enforces rate limiting after 8 requests per minute', async () => {
     const ip = nextIp('198.51.103');
     let res: Response | null = null;

@@ -119,12 +119,14 @@ Server-side validation is strict and enforced in `lib/validation.ts`:
   - `person` with full identity/profile fields
   - `extras["Why are you interested in or qualified for this job?"]`
   - `attachments.cvResume`
+- String sanitization is applied (`NFKC` normalization, control-char stripping, whitespace collapsing).
 - Email format is validated and normalized.
 - Word limits are enforced on long-text fields (100 words max).
 - Attachment validation enforces:
   - allowed extensions/content-types (`.pdf`, `.doc`, `.docx`, `.txt`)
   - valid base64 payload
   - max size 5MB
+  - filename safety checks (path separators are rejected)
 - Anti-bot checks validate honeypot/timing metadata when provided.
 
 ### Write behavior
@@ -139,6 +141,8 @@ Server-side validation is strict and enforced in `lib/validation.ts`:
   - optional request header: `X-Idempotency-Key: <unique-key>`
   - optional payload field: `meta.idempotencyKey`
   - header takes precedence when both are present
+  - accepted key format: `A-Z a-z 0-9 . _ : -` (max 128 chars)
+  - invalid key formats are rejected with `400`
   - repeated submissions with the same key return the same application result (prevents duplicate records from double-click/retry)
 
 ### Errors

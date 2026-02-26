@@ -2,7 +2,7 @@ import { submitApplication } from '../../../lib/airtable';
 import { jsonError, jsonOk } from '../../../lib/api-response';
 import { applyRateLimit } from '../../../lib/rate-limit';
 import { AppError } from '../../../lib/errors';
-import { validateApplicationPayload } from '../../../lib/validation';
+import { validateApplicationPayload, validateIdempotencyKey } from '../../../lib/validation';
 
 export const runtime = 'nodejs';
 
@@ -38,9 +38,10 @@ export async function POST(req: Request) {
         ? (rawPayload as { meta?: { idempotencyKey?: string } }).meta?.idempotencyKey
         : null;
     const headerIdempotencyKey = req.headers.get('x-idempotency-key');
+    const idempotencyKey = validateIdempotencyKey(headerIdempotencyKey || bodyIdempotencyKey || null);
     const result = await submitApplication({
       ...payload,
-      idempotencyKey: (headerIdempotencyKey || bodyIdempotencyKey || '').trim() || null,
+      idempotencyKey,
     });
     return jsonOk({ ok: true, result }, 200, limit.headers);
   } catch (err) {

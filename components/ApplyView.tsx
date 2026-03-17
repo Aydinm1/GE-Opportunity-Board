@@ -13,6 +13,7 @@ export interface ApplyDraft {
 
 interface ApplyViewProps {
   job: Job;
+  isMobile?: boolean;
   onBackToDetails: () => void;
   initialDraft?: ApplyDraft;
   onDraftChange?: (draft: ApplyDraft) => void;
@@ -48,7 +49,7 @@ type SubmitRequestError = Error & {
   status?: number;
 };
 
-const ApplyView: React.FC<ApplyViewProps> = ({ job, onBackToDetails, initialDraft, onDraftChange }) => {
+const ApplyView: React.FC<ApplyViewProps> = ({ job, isMobile = false, onBackToDetails, initialDraft, onDraftChange }) => {
   const [person, setPerson] = useState<Person>(() => initialDraft?.person ? { ...emptyPerson(), ...initialDraft.person } : emptyPerson());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -424,26 +425,39 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-        <div className="relative px-4 pt-4 pb-3 border-b">
-          <div className="flex items-center justify-between">
-            <button type="button" onClick={onBackToDetails} className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm font-semibold">
+    <div className={`h-full min-h-0 flex flex-col overflow-hidden bg-white dark:bg-gray-900 ${isMobile ? '' : 'rounded-xl border border-gray-100 shadow-sm dark:border-gray-800'}`}>
+        <div className={`relative border-b px-4 pt-4 pb-3 ${isMobile ? '' : 'sm:px-6'}`}>
+          <div className="sm:hidden">
+            <button
+              type="button"
+              onClick={onBackToDetails}
+              className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm font-semibold"
+            >
               <span className="material-icons-round text-base">arrow_back</span>
               Back
             </button>
-            <div className="text-center">
-              <h2 className="text-base font-semibold">Apply</h2>
-              <div className="text-sm text-primary/90 mt-0.5">{job.roleTitle}</div>
-            </div>
-            <div className="w-14" />
           </div>
-            <div className="mt-3 h-1 w-full bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-1 bg-primary transition-[width] duration-150 ease-out" style={{ width: `${Math.round(progress * 100)}%` }} />
+          <div className="mt-3 sm:mt-0 sm:relative sm:flex sm:items-center sm:justify-center sm:min-h-10">
+            <button
+              type="button"
+              onClick={onBackToDetails}
+              className="hidden sm:inline-flex absolute left-0 items-center gap-1 text-gray-500 hover:text-gray-700 text-sm font-semibold"
+            >
+              <span className="material-icons-round text-base">arrow_back</span>
+              Back
+            </button>
+            <div className="sm:text-center sm:px-12">
+              <h2 className="text-base font-semibold">Apply</h2>
+              <div className="mt-0.5 text-sm leading-snug text-primary/90 sm:line-clamp-2">{job.roleTitle}</div>
             </div>
+          </div>
+          <div className="mt-3 h-1 w-full bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-1 bg-primary transition-[width] duration-150 ease-out" style={{ width: `${Math.round(progress * 100)}%` }} />
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-          <div ref={contentRef} className="flex-1 overflow-y-scroll p-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div ref={contentRef} className="flex-1 overflow-y-scroll px-4 pb-24 pt-5 sm:p-6" style={{ WebkitOverflowScrolling: 'touch' }}>
             <div className="hidden" aria-hidden="true">
               <label htmlFor="website-field">Website</label>
               <input
@@ -488,7 +502,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-gray-600 mb-2">CV / Resume (attachment)<span className="text-red-600 ml-1">*</span></label>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
@@ -498,8 +512,8 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
                       {justAttached ? 'File attached' : 'Choose File'}
                     </button>
 
-                    <div className="flex items-center gap-2">
-                      <div className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-xs">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <div className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-full sm:max-w-xs">
                         {coverLetterFile ? coverLetterFile.name : 'No file chosen'}
                       </div>
                       {coverLetterFile && (
@@ -600,8 +614,8 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
             {success && <p className="text-sm text-primary mt-3">{success}</p>}
           </div>
 
-          <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t p-4 flex items-center justify-end">
-            <button type="submit" disabled={loading} className="px-5 py-3 bg-primary text-white rounded-md shadow text-sm">{loading ? 'Submitting…' : 'Submit Application'}</button>
+          <div className="sticky bottom-0 border-t bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] dark:bg-gray-900 flex items-center justify-stretch sm:justify-end">
+            <button type="submit" disabled={loading} className="w-full sm:w-auto px-5 py-3 bg-primary text-white rounded-md shadow text-sm">{loading ? 'Submitting…' : 'Submit Application'}</button>
           </div>
         </form>
     </div>

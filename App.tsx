@@ -85,7 +85,8 @@ const App: React.FC = () => {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchInput, setSearchInput] = useState('');
+    const [appliedSearchQuery, setAppliedSearchQuery] = useState('');
     const [showSentryTestButton, setShowSentryTestButton] = useState(false);
     const [sentryTestSent, setSentryTestSent] = useState(false);
     const [sentryServerTestResult, setSentryServerTestResult] = useState<string | null>(null);
@@ -99,7 +100,8 @@ const App: React.FC = () => {
         durationCategory: [],
         timeCommitment: [],
     });
-    const [showMobileList, setShowMobileList] = useState(true);
+    const [isMobileViewport, setIsMobileViewport] = useState(false);
+    const [mobileScreen, setMobileScreen] = useState<'list' | 'details'>('list');
     const mobileListScrollRef = useRef<HTMLDivElement | null>(null);
 
     useScrollBoundaryTransfer(mobileListScrollRef);
@@ -110,6 +112,18 @@ const App: React.FC = () => {
             const smokeTestsEnabled = process.env.NEXT_PUBLIC_ENABLE_SENTRY_SMOKE_TESTS === 'true';
             setShowSentryTestButton(smokeTestsEnabled && params.get('sentry-test') === '1');
         }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const mediaQuery = window.matchMedia('(max-width: 1023px)');
+        const syncViewport = (event?: MediaQueryListEvent) => {
+            setIsMobileViewport(event ? event.matches : mediaQuery.matches);
+        };
+
+        syncViewport();
+        mediaQuery.addEventListener('change', syncViewport);
+        return () => mediaQuery.removeEventListener('change', syncViewport);
     }, []);
 
     useEffect(() => {
@@ -135,8 +149,12 @@ const App: React.FC = () => {
                 if (data.jobs && data.jobs.length > 0) {
                     if (jobParam && data.jobs.find((j: Job) => j.id === jobParam)) {
                         setSelectedJobId(jobParam);
+                        setMobileScreen('details');
                     } else {
                         setSelectedJobId(data.jobs[0].id);
+                        if (viewParam === 'apply') {
+                            setMobileScreen('details');
+                        }
                     }
                 }
             } catch (err) {
@@ -161,8 +179,29 @@ const App: React.FC = () => {
         fetchJobs();
     }, []);
 
+    useEffect(() => {
+        const trimmedQuery = searchInput.trim();
+        if (trimmedQuery === '') {
+            setAppliedSearchQuery('');
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            setAppliedSearchQuery(trimmedQuery);
+        }, 250);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [searchInput]);
+
+    const handleSearchSubmit = () => {
+        setAppliedSearchQuery(searchInput.trim());
+        if (isMobileViewport) {
+            setMobileScreen('list');
+        }
+    };
+
     const filteredJobs = useMemo(() => {
-        const q = searchQuery.toLowerCase();
+        const q = appliedSearchQuery.toLowerCase();
         let res = jobs.filter(job =>
             job.roleTitle.toLowerCase().includes(q) ||
             (job.teamVertical || '').toLowerCase().includes(q) ||
@@ -191,12 +230,26 @@ const App: React.FC = () => {
         res = res.slice().sort((a, b) => toTime(a.startDate) - toTime(b.startDate));
 
         return res;
-    }, [jobs, searchQuery, selectedFilters]);
+    }, [appliedSearchQuery, jobs, selectedFilters]);
+
+    useEffect(() => {
+        if (loading) return;
+        if (filteredJobs.length === 0) {
+            if (selectedJobId !== null) setSelectedJobId(null);
+            if (isMobileViewport) setMobileScreen('list');
+            return;
+        }
+
+        if (!selectedJobId || !filteredJobs.some((job) => job.id === selectedJobId)) {
+            setSelectedJobId(filteredJobs[0].id);
+        }
+    }, [filteredJobs, isMobileViewport, loading, selectedJobId]);
 
     const selectedJob = useMemo(() => {
         if (!selectedJobId) return null;
         return jobs.find(j => j.id === selectedJobId) || jobs[0] || null;
     }, [jobs, selectedJobId]);
+    const isMobileDetailsView = isMobileViewport && mobileScreen === 'details';
 
     // Filter UI and helper logic moved to `components/Filters.tsx`.
 
@@ -219,7 +272,11 @@ const App: React.FC = () => {
             {/* Hero / Search Section */}
             {/*. Use pattern again: <div className="relative pattern-bg pt-12 pb-32 px-4 sm:px-6 lg:px-8 shadow-lg">*/}
             <div
-                className="relative pt-10 pb-24 sm:pt-12 sm:pb-32 px-4 sm:px-6 lg:px-8 shadow-lg bg-[#00558C]"
+                className={`relative px-4 shadow-lg sm:px-6 lg:px-8 bg-[#00558C] ${
+                    isMobileDetailsView
+                        ? 'hidden sm:block pb-3 pt-[calc(env(safe-area-inset-top)+0.35rem)]'
+                        : 'pt-10 pb-24 sm:pt-12 sm:pb-32'
+                }`}
                 style={{
                     backgroundImage: "url('/img/pattern.png')",
                     backgroundRepeat: 'repeat',
@@ -227,8 +284,8 @@ const App: React.FC = () => {
                 }}
             >
                 <div className="max-w-6xl mx-auto flex flex-col items-center relative z-10">
-                    <div className="w-full max-w-3xl text-center text-white mb-6">
-                         <h1 className="text-3xl sm:text-4xl font-bold font-display leading-tight">Opportunity Board</h1>
+                    <div className={`w-full max-w-3xl text-center text-white ${isMobileDetailsView ? 'hidden sm:block mb-2' : 'mb-6'}`}>
+                        <h1 className="text-3xl sm:text-4xl font-bold font-display leading-tight">Opportunity Board</h1>
                         <p className="text-base sm:text-lg font-semibold mt-2 text-white/85">Find your next role today</p>
                         {showSentryTestButton && (
                             <div className="mt-4">
@@ -275,50 +332,62 @@ const App: React.FC = () => {
                             </div>
                         )}
                     </div>
-                    <div className="w-full max-w-3xl group mb-6">
+                    <div className={`w-full max-w-3xl group mb-6 ${isMobileDetailsView ? 'hidden sm:block' : ''}`}>
                         <div className="relative">
                             <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
                                 <span className="material-icons-round text-gray-400 group-focus-within:text-primary text-xl">search</span>
                             </div>
-                            <input 
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="block w-full pl-12 pr-4 sm:pr-28 py-3 sm:py-4 rounded-xl border-none shadow-xl bg-white text-sm sm:text-base font-body placeholder-gray-500 text-black focus:ring-4 focus:ring-blue-500/30 transition-all" 
-                                placeholder="Job title, keywords, location" 
+                            <input
+                                value={searchInput}
+                                onChange={(e) => {
+                                    setSearchInput(e.target.value);
+                                    if (isMobileViewport && mobileScreen !== 'list') {
+                                        setMobileScreen('list');
+                                    }
+                                }}
+                                className="block w-full pl-12 pr-4 sm:pr-28 py-3 sm:py-4 rounded-xl border-none shadow-xl bg-white text-base font-body placeholder-gray-500 text-black focus:ring-4 focus:ring-blue-500/30 transition-all"
+                                placeholder="Job title, keywords, location"
                                 type="text"
                             />
-                            <button className="hidden sm:flex absolute right-2 top-2 bottom-2 bg-primary hover:bg-primary-hover text-white px-6 rounded-lg text-sm font-semibold font-body uppercase tracking-wider transition-colors shadow-sm items-center justify-center">
+                            <button onClick={handleSearchSubmit} className="hidden sm:flex absolute right-2 top-2 bottom-2 bg-primary hover:bg-primary-hover text-white px-6 rounded-lg text-sm font-semibold font-body uppercase tracking-wider transition-colors shadow-sm items-center justify-center">
                                 Search
                             </button>
                         </div>
-                        <button className="mt-3 w-full sm:hidden bg-primary hover:bg-primary-hover text-white px-4 py-3 rounded-lg text-sm font-semibold font-body uppercase tracking-wider transition-colors shadow-sm">
-                            Search
-                        </button>
                     </div>
-                    <Filters jobs={jobs} selectedFilters={selectedFilters} setSelectedFilters={setSelectedFilters} />
+                    <div className="hidden lg:block w-full">
+                        <Filters jobs={jobs} selectedFilters={selectedFilters} setSelectedFilters={setSelectedFilters} />
+                    </div>
                 </div>
             </div>
 
             {/* Main Content */}
-            <main className="-mt-20 relative z-20 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full flex-1">
-                <div className="bg-surface-light dark:bg-surface-dark rounded-3xl shadow-2xl overflow-hidden p-4 sm:p-6 min-h-[600px] flex flex-col lg:h-[820px]">
-                    <div className="flex items-center justify-between mb-3 lg:hidden">
-                        <button
-                            onClick={() => setShowMobileList(!showMobileList)}
-                            className="text-sm font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                            {showMobileList ? 'Hide list' : 'Show list'}
-                        </button>
-                    </div>
+            <main className={`relative z-20 mx-auto flex w-full max-w-7xl flex-1 px-0 pb-12 sm:px-6 lg:px-8 ${isMobileDetailsView ? 'mt-0' : '-mt-20'}`}>
+                <div className={`flex min-h-[520px] w-full flex-col overflow-hidden bg-surface-light px-5 pb-10 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] dark:bg-surface-dark sm:rounded-3xl sm:p-6 lg:h-[820px] lg:shadow-2xl ${
+                    isMobileDetailsView
+                        ? 'rounded-none pt-[calc(env(safe-area-inset-top)+1rem)]'
+                        : 'rounded-t-[2rem] pt-5'
+                }`}>
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start lg:items-stretch h-full">
                         {/* Sidebar */}
-                        <div className={`lg:col-span-4 flex flex-col gap-4 h-full min-h-0 ${showMobileList ? '' : 'hidden lg:flex'}`}>
-                            <div className="pb-2 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center mb-2">
-                                <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 font-display">
-                                    {filteredJobs.length} {filteredJobs.length === 1 ? 'Position Available' : 'Positions Available'}
-                                </h2>
+                        <div className={`lg:col-span-4 flex flex-col gap-4 h-full min-h-0 ${isMobileViewport && mobileScreen !== 'list' ? 'hidden' : ''}`}>
+                            <div className="mb-1 border-b border-gray-100 pb-3 dark:border-gray-800">
+                                <div className="flex justify-between items-center gap-3">
+                                    <h2 className="text-[13px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400 font-display sm:text-sm sm:tracking-[0.18em]">
+                                        {filteredJobs.length} {filteredJobs.length === 1 ? 'Position Available' : 'Positions Available'}
+                                    </h2>
+                                </div>
+                                {isMobileViewport && (
+                                    <div className="mt-3">
+                                        <Filters
+                                            jobs={jobs}
+                                            selectedFilters={selectedFilters}
+                                            setSelectedFilters={setSelectedFilters}
+                                            mobileMode="compact"
+                                        />
+                                    </div>
+                                )}
                             </div>
-                            <div ref={mobileListScrollRef} className="flex flex-col gap-4 overflow-y-scroll max-h-[50vh] lg:max-h-none lg:flex-1 min-h-0 pr-1 sm:pr-2">
+                            <div ref={mobileListScrollRef} className="flex flex-col gap-3.5 min-h-0 pr-0 sm:pr-2 lg:pr-2 lg:flex-1 lg:max-h-none lg:overflow-y-scroll">
                                 {loading ? (
                                     <div className="p-8 text-center text-gray-500 font-medium">
                                         Loading jobs...
@@ -332,10 +401,13 @@ const App: React.FC = () => {
                                                 <JobCard 
                                                     key={job.id} 
                                                     job={job} 
+                                                    isMobile={isMobileViewport}
                                                     isSelected={selectedJobId === job.id}
                                                     onClick={() => {
                                                         setSelectedJobId(job.id);
-                                                        if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+                                                        if (isMobileViewport) {
+                                                            setMobileScreen('details');
+                                                        } else if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
                                                             window.scrollTo({ top: 400, behavior: 'smooth' });
                                                         }
                                                     }}
@@ -350,13 +422,20 @@ const App: React.FC = () => {
                         </div>
 
                         {/* Detailed View */}
-                        <div className="lg:col-span-8 border-t border-gray-100 dark:border-gray-800 lg:border-t-0 lg:border-l pl-0 lg:pl-6 pt-4 lg:pt-0 h-[72svh] min-h-[420px] lg:h-full lg:min-h-0 overflow-hidden">
+                        <div className={`lg:col-span-8 border-gray-100 dark:border-gray-800 lg:border-l pl-0 lg:pl-6 ${isMobileViewport ? 'pt-0 min-h-[360px]' : 'border-t pt-4 h-[72svh] min-h-[420px] overflow-hidden'} lg:border-t-0 lg:pt-0 lg:h-full lg:min-h-0 lg:overflow-hidden ${isMobileViewport && mobileScreen !== 'details' ? 'hidden' : ''}`}>
                             {loading ? (
                                 <div className="h-full flex items-center justify-center text-gray-400">
                                     Loading job details...
                                 </div>
                             ) : selectedJob ? (
-                                <JobDetails job={selectedJob} initialViewMode={initialViewMode} />
+                                <JobDetails
+                                    job={selectedJob}
+                                    initialViewMode={initialViewMode}
+                                    isMobile={isMobileViewport}
+                                    onBackToList={isMobileViewport ? () => {
+                                        setMobileScreen('list');
+                                    } : undefined}
+                                />
                             ) : (
                                 <div className="h-full flex items-center justify-center text-gray-400">
                                     Select a job to view details

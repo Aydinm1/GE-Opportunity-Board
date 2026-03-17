@@ -4,12 +4,17 @@ import { statusVariant } from '../lib/utils';
 
 interface JobCardProps {
     job: Job;
+    isMobile?: boolean;
     isSelected: boolean;
     onClick: () => void;
 }
 
-const JobCard: React.FC<JobCardProps> = ({ job, isSelected, onClick }) => {
+const JobCard: React.FC<JobCardProps> = ({ job, isMobile = false, isSelected, onClick }) => {
     const getStatusStyles = (status: string | null) => statusVariant(status).card;
+    const selectedCardClasses = isMobile
+        ? 'border-gray-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]'
+        : 'border-primary bg-white shadow-md';
+    const defaultCardClasses = 'border-gray-100 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)] hover:border-gray-200 hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)]';
 
     const getLocationStyles = (loc: string | null) => {
         switch (loc) {
@@ -24,39 +29,46 @@ const JobCard: React.FC<JobCardProps> = ({ job, isSelected, onClick }) => {
     };
 
     return (
-        <div 
+        <button
+            type="button"
             onClick={onClick}
-            className={`relative p-5 rounded-xl transition-all cursor-pointer group border-2 ${
+            className={`relative w-full rounded-[1.35rem] border p-4 text-left transition-all cursor-pointer group sm:rounded-xl sm:p-5 ${
                 isSelected 
-                ? 'bg-white dark:bg-gray-800 border-primary shadow-md' 
-                : 'bg-gray-50 dark:bg-gray-900 border-transparent hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-sm'
+                ? selectedCardClasses
+                : defaultCardClasses
             }`}
         >
-            <div className="mb-8">
-                <h3 className={`font-bold text-base font-display leading-tight mb-2 transition-colors ${isSelected ? 'text-primary' : 'text-black dark:text-white group-hover:text-primary'}`}>
+            <div className="mb-[1.125rem] sm:mb-6">
+                <h3 className={`mb-2 font-display text-[1.04rem] font-bold leading-[1.08] transition-colors sm:text-base ${isSelected && !isMobile ? 'text-primary' : 'text-black dark:text-white group-hover:text-primary'}`}>
                     {job.roleTitle}
                 </h3>
-                <div className="flex flex-col gap-1">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
+                <div className="flex flex-col gap-1.5">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400 leading-none">
                         {job.teamVertical}
                     </p>
-                    <p className="text-[11px] font-bold text-primary/80 dark:text-primary leading-none">
+                    <p className="text-[12px] font-semibold text-primary/80 dark:text-primary leading-none">
                         {job.programmeArea}
                     </p>
                 </div>
             </div>
-            <div className="flex justify-between items-end mt-4">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${getStatusStyles(job.roleStatus || 'Actively Hiring')}`}>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide border ${getStatusStyles(job.roleStatus || 'Actively Hiring')}`}>
                         {job.roleStatus || 'Actively Hiring'}
                     </span>
-                    <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${getLocationStyles(job.workType)}`}>
-                        {job.workType}
-                    </span>
+                    {job.workType && (
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide border ${getLocationStyles(job.workType)}`}>
+                            {job.workType}
+                        </span>
+                    )}
                 </div>
-                <span className="text-[10px] text-gray-400 font-bold whitespace-nowrap uppercase tracking-tighter">{job.timeCommitment}</span>
+                {job.timeCommitment && (
+                    <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 sm:text-right">
+                        {job.timeCommitment}
+                    </span>
+                )}
             </div>
-        </div>
+        </button>
     );
 };
 

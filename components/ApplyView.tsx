@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Person, Job } from '../types';
 import { MAX_APPLICATION_ATTACHMENT_BYTES, MAX_APPLICATION_ATTACHMENT_LABEL } from '../lib/application-constraints';
+import { captureClientException } from '../lib/monitoring';
 import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
 
 export interface ApplyDraft {
@@ -41,6 +42,11 @@ const createSubmissionKey = () => {
 };
 
 const ATTACHMENT_SIZE_ERROR = `CV / Resume must be ${MAX_APPLICATION_ATTACHMENT_LABEL} or smaller.`;
+
+type SubmitRequestError = Error & {
+  endpoint?: string;
+  status?: number;
+};
 
 const ApplyView: React.FC<ApplyViewProps> = ({ job, onBackToDetails, initialDraft, onDraftChange }) => {
   const [person, setPerson] = useState<Person>(() => initialDraft?.person ? { ...emptyPerson(), ...initialDraft.person } : emptyPerson());
@@ -382,7 +388,13 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
         headers: { 'Content-Type': 'application/json', 'x-idempotency-key': submissionKey },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) { const txt = await res.text(); throw new Error(txt || 'Failed to submit application'); }
+      if (!res.ok) {
+        const txt = await res.text();
+        const requestError = new Error(txt || 'Failed to submit application') as SubmitRequestError;
+        requestError.endpoint = '/api/applications';
+        requestError.status = res.status;
+        throw requestError;
+      }
       setSuccess('Application submitted. Thank you!');
       const nextSubmissionKey = createSubmissionKey();
       setSubmissionKey(nextSubmissionKey);
@@ -393,6 +405,18 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
         onBackToDetails();
       }, 900);
     } catch (err: any) {
+      const requestError = err as SubmitRequestError;
+      if (
+        err instanceof TypeError ||
+        (typeof requestError?.status === 'number' && requestError.status >= 500)
+      ) {
+        captureClientException(err, {
+          endpoint: requestError.endpoint || '/api/applications',
+          jobId: job.id,
+          operation: 'submit_application',
+          status: requestError.status,
+        });
+      }
       setError(err?.message || 'Submission failed');
       setLoading(false);
       inFlightSubmitRef.current = false;

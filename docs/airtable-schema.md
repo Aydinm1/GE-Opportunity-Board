@@ -154,3 +154,20 @@ File constraints:
 
 Recommended server hardening:
 - Durable idempotency storage (for cross-instance replay safety)
+
+## Live Schema Verification
+
+Run the live Airtable schema contract check with:
+
+```bash
+npm run test:airtable
+```
+
+Required env vars:
+- `AIRTABLE_TOKEN`
+- `AIRTABLE_BASE_ID`
+- `AIRTABLE_GEROLES_TABLE`
+- `AIRTABLE_PEOPLE_TABLE`
+- `AIRTABLE_APPLICATIONS_TABLE`
+
+The Airtable token must be able to read base schema metadata. The command compares the live base against the field names and Airtable field types the app expects and fails with an explicit mismatch message when a field has been renamed or changed to the wrong type.

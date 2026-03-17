@@ -96,12 +96,21 @@ AIRTABLE_BASE_ID=""
 npm install
 npm run dev
 npm test
+npm run test:airtable
 ```
 
 Build:
 
 ```bash
 npm run build
+```
+
+Optional monitoring:
+
+```bash
+NEXT_PUBLIC_SENTRY_DSN="https://<public-key>@o0.ingest.sentry.io/<project-id>"
+SENTRY_ENVIRONMENT="production"
+NEXT_PUBLIC_ENABLE_SENTRY_SMOKE_TESTS="false"
 ```
 
 ## Repo Structure
@@ -125,3 +134,4 @@ postcss.config.js
 - Airtable schema: `docs/airtable-schema.md`
 - API reference: `docs/api.md`
 - Architecture overview: `docs/architecture.md`
+- Monitoring and smoke tests: `docs/monitoring.md`

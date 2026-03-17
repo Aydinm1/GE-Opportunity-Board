@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { AppError } from './errors';
+import { captureServerException } from './monitoring';
 
 export function jsonOk<T>(body: T, status = 200, headers?: HeadersInit) {
   return NextResponse.json(body, { status, headers });
@@ -38,6 +39,11 @@ export function jsonError(
   };
 
   if (resolvedStatus >= 500) {
+    captureServerException(err, {
+      context,
+      status: resolvedStatus,
+      errorCode: isAppError ? err.code : undefined,
+    });
     console.error('API request failed', logPayload);
   } else {
     console.warn('API request rejected', logPayload);

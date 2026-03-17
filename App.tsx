@@ -6,12 +6,18 @@ import { HOST_ORIGIN } from './constants';
 import JobCard from './components/JobCard';
 import JobDetails from './components/JobDetails';
 import Filters from './components/Filters';
+import { captureClientException } from './lib/monitoring';
 import { isTrustedParentMessage, parseTrustedRedirectUrl } from './lib/message-security';
 import { useScrollBoundaryTransfer } from './lib/useScrollBoundaryTransfer';
 
 type InitialParentParams = {
     jobParam: string | null;
     viewParam: string | null;
+};
+
+type RequestError = Error & {
+    endpoint?: string;
+    status?: number;
 };
 
 // Helper to get initial params from parent URL (for iframe embedding)
@@ -80,6 +86,9 @@ const App: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [showSentryTestButton, setShowSentryTestButton] = useState(false);
+    const [sentryTestSent, setSentryTestSent] = useState(false);
+    const [sentryServerTestResult, setSentryServerTestResult] = useState<string | null>(null);
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
     const [initialViewMode, setInitialViewMode] = useState<'details' | 'apply'>('details');
     const [selectedFilters, setSelectedFilters] = useState<FilterOptions>({
@@ -94,7 +103,14 @@ const App: React.FC = () => {
     const mobileListScrollRef = useRef<HTMLDivElement | null>(null);
 
     useScrollBoundaryTransfer(mobileListScrollRef);
-    
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const smokeTestsEnabled = process.env.NEXT_PUBLIC_ENABLE_SENTRY_SMOKE_TESTS === 'true';
+            setShowSentryTestButton(smokeTestsEnabled && params.get('sentry-test') === '1');
+        }
+    }, []);
 
     useEffect(() => {
         const fetchJobs = async () => {
@@ -109,7 +125,10 @@ const App: React.FC = () => {
                 if (!response.ok) {
                     const text = await response.text().catch(() => '');
                     const msg = text || `Failed to fetch jobs (status ${response.status})`;
-                    throw new Error(msg);
+                    const requestError = new Error(msg) as RequestError;
+                    requestError.endpoint = '/api/jobs';
+                    requestError.status = response.status;
+                    throw requestError;
                 }
                 const data = await response.json();
                 setJobs(data.jobs || []);
@@ -121,6 +140,17 @@ const App: React.FC = () => {
                     }
                 }
             } catch (err) {
+                const requestError = err as RequestError;
+                if (
+                    err instanceof TypeError ||
+                    (typeof requestError?.status === 'number' && requestError.status >= 500)
+                ) {
+                    captureClientException(err, {
+                        endpoint: requestError.endpoint || '/api/jobs',
+                        operation: 'jobs_fetch',
+                        status: requestError.status,
+                    });
+                }
                 setError(err instanceof Error ? err.message : 'An error occurred');
                 console.error('Error fetching jobs:', err);
             } finally {
@@ -200,6 +230,50 @@ const App: React.FC = () => {
                     <div className="w-full max-w-3xl text-center text-white mb-6">
                          <h1 className="text-3xl sm:text-4xl font-bold font-display leading-tight">Opportunity Board</h1>
                         <p className="text-base sm:text-lg font-semibold mt-2 text-white/85">Find your next role today</p>
+                        {showSentryTestButton && (
+                            <div className="mt-4">
+                                <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            captureClientException(new Error('Sentry client smoke test'), {
+                                                operation: 'manual_smoke_test',
+                                                endpoint: window.location.pathname,
+                                            });
+                                            setSentryTestSent(true);
+                                        }}
+                                        className="inline-flex items-center justify-center rounded-lg border border-white/40 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white transition-colors hover:bg-white/20"
+                                    >
+                                        Send Browser Test Event
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            setSentryServerTestResult(null);
+                                            try {
+                                                const response = await fetch('/api/sentry-test', { method: 'POST' });
+                                                setSentryServerTestResult(`Server smoke test returned ${response.status}. Check Sentry Issues for the event.`);
+                                            } catch {
+                                                setSentryServerTestResult('Server smoke test request failed before reaching the app.');
+                                            }
+                                        }}
+                                        className="inline-flex items-center justify-center rounded-lg border border-white/40 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white transition-colors hover:bg-white/20"
+                                    >
+                                        Trigger Server Test
+                                    </button>
+                                </div>
+                                {sentryTestSent && (
+                                    <p className="mt-2 text-xs font-medium text-white/85">
+                                        Browser test event sent. Check Sentry Issues for the result.
+                                    </p>
+                                )}
+                                {sentryServerTestResult && (
+                                    <p className="mt-2 text-xs font-medium text-white/85">
+                                        {sentryServerTestResult}
+                                    </p>
+                                )}
+                            </div>
+                        )}
                     </div>
                     <div className="w-full max-w-3xl group mb-6">
                         <div className="relative">

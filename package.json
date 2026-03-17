@@ -7,9 +7,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:airtable": "vitest run --config vitest.airtable.config.ts"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.43.0",
     "next": "^16.1.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"

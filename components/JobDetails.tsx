@@ -27,7 +27,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
     const applyDraftsRef = useRef<Record<string, ApplyDraft>>({});
     const previousJobIdRef = useRef<string>(job.id);
     const previousViewJobIdRef = useRef<string>(job.id);
-    useScrollBoundaryTransfer(detailsScrollRef);
+    useScrollBoundaryTransfer(detailsScrollRef, !isMobile);
 
     useEffect(() => {
         return () => {

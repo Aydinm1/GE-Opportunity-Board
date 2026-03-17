@@ -104,7 +104,7 @@ const App: React.FC = () => {
     const [mobileScreen, setMobileScreen] = useState<'list' | 'details'>('list');
     const mobileListScrollRef = useRef<HTMLDivElement | null>(null);
 
-    useScrollBoundaryTransfer(mobileListScrollRef);
+    useScrollBoundaryTransfer(mobileListScrollRef, !isMobileViewport);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {

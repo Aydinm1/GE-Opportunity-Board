@@ -280,7 +280,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   const [progress, setProgress] = useState(0);
   const progressRafRef = useRef<number | null>(null);
   const lastProgressRef = useRef(0);
-  useScrollBoundaryTransfer(contentRef);
+  useScrollBoundaryTransfer(contentRef, !isMobile);
 
   useEffect(() => {
     const hydratedPerson = initialDraft?.person ? { ...emptyPerson(), ...initialDraft.person } : emptyPerson();

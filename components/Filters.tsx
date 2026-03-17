@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { Job, FilterOptions } from '../types';
 import { DURATION_BUCKETS, TIME_COMMITMENT_BUCKETS } from '../lib/utils';
 
@@ -133,12 +132,17 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters, m
   const activeFilterMeta = filters.find((filter) => filter.id === activeFilter) || null;
   const isMobileSheet = typeof window !== 'undefined' && window.innerWidth < 1024;
   const isCompactMobile = mobileMode === 'compact' && isMobileSheet;
+  const requestIframeResize = () => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new Event('opportunityboard:request-resize'));
+  };
   const closeMobileSheet = () => {
     setActiveFilter(null);
     setMobileSheetOpen(false);
   };
 
   useEffect(() => {
+    if (isMobileSheet) return;
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
       if (activeFilter === null) return;
@@ -148,17 +152,22 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters, m
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [activeFilter]);
+  }, [activeFilter, isMobileSheet]);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || window.innerWidth >= 1024) return;
-    if (activeFilter === null && !mobileSheetOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (!isMobileSheet || typeof window === 'undefined') return;
+    const frameId = window.requestAnimationFrame(requestIframeResize);
+    const timeoutId = window.setTimeout(requestIframeResize, 180);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
     };
-  }, [activeFilter, mobileSheetOpen]);
+  }, [activeFilter, isMobileSheet, mobileSheetOpen]);
+
+  useEffect(() => {
+    if (isMobileSheet) return;
+    setMobileSheetOpen(false);
+  }, [isMobileSheet]);
 
   return (
     <>
@@ -167,9 +176,14 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters, m
           <button
             type="button"
             onClick={() => {
+              if (mobileSheetOpen) {
+                closeMobileSheet();
+                return;
+              }
               setActiveFilter(null);
               setMobileSheetOpen(true);
             }}
+            aria-expanded={mobileSheetOpen}
             className="inline-flex min-w-0 flex-1 items-center justify-between gap-3 rounded-[1.25rem] border border-gray-200 bg-white px-4 py-2.5 text-[15px] font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
           >
             <span className="inline-flex items-center gap-2">
@@ -182,7 +196,7 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters, m
                   {selectedFilterCount} active
                 </span>
               ) : null}
-              <span className="material-icons-round text-[18px] text-gray-400">expand_more</span>
+              <span className={`material-icons-round text-[18px] text-gray-400 transition-transform ${mobileSheetOpen ? 'rotate-180' : ''}`}>expand_more</span>
             </span>
           </button>
           {anyFilterSelected && (
@@ -238,7 +252,7 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters, m
         </div>
       )}
 
-      {activeFilter && fieldOptions[activeFilter as string] && (
+      {activeFilter && fieldOptions[activeFilter as string] && !isCompactMobile && (
         <>
           <div className="w-full flex justify-center mt-3">
             <div ref={optionsPanelRef} className="bg-white dark:bg-gray-900 rounded-lg shadow p-3 inline-flex gap-2 flex-wrap justify-center w-fit mx-auto">
@@ -269,165 +283,107 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters, m
               })}
             </div>
           </div>
-
-          {!isCompactMobile && isMobileSheet && typeof document !== 'undefined' && createPortal(
-        <div className="lg:hidden fixed inset-0 z-[80] bg-slate-900/30" onClick={closeMobileSheet}>
-          <div
-            ref={optionsPanelRef}
-            className="absolute inset-x-0 bottom-0 max-h-[calc(100svh-6rem)] overflow-y-auto rounded-t-[1.75rem] bg-white px-5 pb-[calc(env(safe-area-inset-bottom)+4rem)] pt-3 shadow-[0_-20px_48px_rgba(15,23,42,0.18)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-gray-200" />
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Filter</p>
-              </div>
-              <h3 className="flex-1 text-center text-[15px] font-semibold text-gray-900">{activeFilterMeta?.label || 'Options'}</h3>
-              <button
-                type="button"
-                onClick={closeMobileSheet}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-600"
-                aria-label="Close filter options"
-              >
-                <span className="material-icons-round text-base">close</span>
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2 pb-2">
-                  <button
-                    onClick={() => { updateFilter(activeFilter as keyof FilterOptions, []); }}
-                    className="px-3 py-2 rounded-full text-sm bg-gray-100 text-gray-700 whitespace-nowrap"
-                  >
-                    All
-                  </button>
-                  {fieldOptions[activeFilter as string].map((opt: FilterOption) => {
-                    const value = typeof opt === 'string' ? opt : opt.value;
-                    const label = typeof opt === 'string' ? opt : opt.label;
-                    const curr = selectedFilters[activeFilter as keyof FilterOptions] || [];
-                    const isPicked = Array.isArray(curr) && curr.includes(value);
-                    return (
-                      <button
-                        key={value}
-                        onClick={() => {
-                          const currVals = selectedFilters[activeFilter as keyof FilterOptions] || [];
-                          const next = currVals.includes(value) ? currVals.filter((v) => v !== value) : [...currVals, value];
-                          updateFilter(activeFilter as keyof FilterOptions, next);
-                        }}
-                        className={`px-3 py-2 rounded-full text-sm border whitespace-nowrap ${isPicked ? 'bg-primary text-white border-transparent' : 'bg-white text-gray-700 border-gray-200'}`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>,
-            document.body
-          )}
         </>
       )}
 
-      {isCompactMobile && mobileSheetOpen && typeof document !== 'undefined' && createPortal(
-        <div className="lg:hidden fixed inset-0 z-[80] bg-slate-900/30" onClick={closeMobileSheet}>
-          <div
-            ref={optionsPanelRef}
-            className="absolute inset-x-0 bottom-0 max-h-[calc(100svh-6rem)] overflow-y-auto rounded-t-[1.75rem] bg-white px-5 pb-[calc(env(safe-area-inset-bottom)+4rem)] pt-3 shadow-[0_-20px_48px_rgba(15,23,42,0.18)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200" />
-            <div className="mb-4 grid grid-cols-[36px_1fr_36px] items-start gap-3">
-              {activeFilter ? (
-                <button
-                  type="button"
-                  onClick={() => setActiveFilter(null)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-600"
-                  aria-label="Back to filter groups"
-                >
-                  <span className="material-icons-round text-base">arrow_back</span>
-                </button>
-              ) : (
-                <div className="h-9 w-9" aria-hidden="true" />
-              )}
-              <div className="pt-0.5 text-center">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Filter</p>
-                <h3 className="mt-1 text-[15px] font-semibold leading-tight text-gray-900">
-                  {activeFilterMeta?.label || 'Filter roles'}
-                </h3>
-              </div>
+      {isCompactMobile && mobileSheetOpen && (
+        <div
+          ref={optionsPanelRef}
+          className="mt-3 rounded-[1.75rem] border border-gray-200 bg-white px-4 pb-4 pt-3 shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
+        >
+          <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200" />
+          <div className="mb-4 grid grid-cols-[36px_1fr_36px] items-start gap-3">
+            {activeFilter ? (
               <button
                 type="button"
-                onClick={closeMobileSheet}
+                onClick={() => setActiveFilter(null)}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-600"
-                aria-label="Close filter options"
+                aria-label="Back to filter groups"
               >
-                <span className="material-icons-round text-base">close</span>
+                <span className="material-icons-round text-base">arrow_back</span>
               </button>
-            </div>
-            {activeFilter === null ? (
-              <div className="space-y-2 pb-1">
-                {filters.map((filter) => {
-                  const currentValues = selectedFilters[filter.id] || [];
-                  const summary = currentValues.length === 0
-                    ? 'All'
-                    : currentValues.length <= 2
-                      ? currentValues.map((value) => getOptionLabel(filter.id, value)).join(', ')
-                      : `${currentValues.length} selected`;
-                  return (
-                    <button
-                      key={filter.id}
-                      type="button"
-                      onClick={() => setActiveFilter(filter.id)}
-                      className="flex w-full items-center justify-between rounded-[1.25rem] border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:bg-gray-50"
-                    >
-                      <div>
-                        <div className="text-[15px] font-semibold leading-tight text-gray-900">{filter.label}</div>
-                        <div className="mt-0.5 text-[14px] text-gray-500">{summary}</div>
-                      </div>
-                      <span className="material-icons-round text-base text-gray-400">chevron_right</span>
-                    </button>
-                  );
-                })}
-                {anyFilterSelected && (
-                  <button
-                    type="button"
-                    onClick={clearAllFilters}
-                    className="mt-2 w-full rounded-[1.25rem] border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
-                  >
-                    Clear all filters
-                  </button>
-                )}
-              </div>
             ) : (
-              <div className="flex flex-wrap gap-2 pb-1">
-                <button
-                  onClick={() => { updateFilter(activeFilter as keyof FilterOptions, []); }}
-                  className="rounded-full bg-gray-100 px-3 py-2 text-[14px] text-gray-700 whitespace-nowrap"
-                >
-                  All
-                </button>
-                {fieldOptions[activeFilter as string].map((opt: FilterOption) => {
-                  const value = typeof opt === 'string' ? opt : opt.value;
-                  const label = typeof opt === 'string' ? opt : opt.label;
-                  const curr = selectedFilters[activeFilter as keyof FilterOptions] || [];
-                  const isPicked = Array.isArray(curr) && curr.includes(value);
-                  return (
-                      <button
-                        key={value}
-                        onClick={() => {
-                          const currVals = selectedFilters[activeFilter as keyof FilterOptions] || [];
-                          const next = currVals.includes(value) ? currVals.filter((v) => v !== value) : [...currVals, value];
-                          updateFilter(activeFilter as keyof FilterOptions, next);
-                        }}
-                      className={`rounded-full border px-3 py-2 text-[14px] whitespace-nowrap ${isPicked ? 'bg-primary text-white border-transparent' : 'bg-white text-gray-700 border-gray-200'}`}
-                      >
-                        {label}
-                      </button>
-                  );
-                })}
-              </div>
+              <div className="h-9 w-9" aria-hidden="true" />
             )}
+            <div className="pt-0.5 text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Filter</p>
+              <h3 className="mt-1 text-[15px] font-semibold leading-tight text-gray-900">
+                {activeFilterMeta?.label || 'Filter roles'}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={closeMobileSheet}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-600"
+              aria-label="Close filter options"
+            >
+              <span className="material-icons-round text-base">close</span>
+            </button>
           </div>
-        </div>,
-        document.body
+          {activeFilter === null ? (
+            <div className="space-y-2 pb-1">
+              {filters.map((filter) => {
+                const currentValues = selectedFilters[filter.id] || [];
+                const summary = currentValues.length === 0
+                  ? 'All'
+                  : currentValues.length <= 2
+                    ? currentValues.map((value) => getOptionLabel(filter.id, value)).join(', ')
+                    : `${currentValues.length} selected`;
+                return (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    onClick={() => setActiveFilter(filter.id)}
+                    className="flex w-full items-center justify-between rounded-[1.25rem] border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:bg-gray-50"
+                  >
+                    <div>
+                      <div className="text-[15px] font-semibold leading-tight text-gray-900">{filter.label}</div>
+                      <div className="mt-0.5 text-[14px] text-gray-500">{summary}</div>
+                    </div>
+                    <span className="material-icons-round text-base text-gray-400">chevron_right</span>
+                  </button>
+                );
+              })}
+              {anyFilterSelected && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="mt-2 w-full rounded-[1.25rem] border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2 pb-1">
+              <button
+                onClick={() => { updateFilter(activeFilter as keyof FilterOptions, []); }}
+                className="rounded-full bg-gray-100 px-3 py-2 text-[14px] text-gray-700 whitespace-nowrap"
+              >
+                All
+              </button>
+              {fieldOptions[activeFilter as string].map((opt: FilterOption) => {
+                const value = typeof opt === 'string' ? opt : opt.value;
+                const label = typeof opt === 'string' ? opt : opt.label;
+                const curr = selectedFilters[activeFilter as keyof FilterOptions] || [];
+                const isPicked = Array.isArray(curr) && curr.includes(value);
+                return (
+                  <button
+                    key={value}
+                    onClick={() => {
+                      const currVals = selectedFilters[activeFilter as keyof FilterOptions] || [];
+                      const next = currVals.includes(value) ? currVals.filter((v) => v !== value) : [...currVals, value];
+                      updateFilter(activeFilter as keyof FilterOptions, next);
+                    }}
+                    className={`rounded-full border px-3 py-2 text-[14px] whitespace-nowrap ${isPicked ? 'bg-primary text-white border-transparent' : 'bg-white text-gray-700 border-gray-200'}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
     </>
   );

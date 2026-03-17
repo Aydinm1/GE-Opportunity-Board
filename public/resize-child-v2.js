@@ -48,6 +48,7 @@ function sendHeightToParentDebounced(trigger = 'unknown') {
 
 window.addEventListener('load', () => sendHeightToParentDebounced('window-load'));
 window.addEventListener('resize', () => sendHeightToParentDebounced('window-resize'));
+window.addEventListener('opportunityboard:request-resize', () => sendHeightToParentDebounced('manual-request'));
 
 const mutationObserver = new MutationObserver(() => sendHeightToParentDebounced('mutation'));
 mutationObserver.observe(document.body, { childList: true, subtree: true, attributes: true });

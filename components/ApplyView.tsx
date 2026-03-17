@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Person, Job } from '../types';
+import { MAX_APPLICATION_ATTACHMENT_BYTES, MAX_APPLICATION_ATTACHMENT_LABEL } from '../lib/application-constraints';
 import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
 
 export interface ApplyDraft {
@@ -38,6 +39,8 @@ const createSubmissionKey = () => {
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
+
+const ATTACHMENT_SIZE_ERROR = `CV / Resume must be ${MAX_APPLICATION_ATTACHMENT_LABEL} or smaller.`;
 
 const ApplyView: React.FC<ApplyViewProps> = ({ job, onBackToDetails, initialDraft, onDraftChange }) => {
   const [person, setPerson] = useState<Person>(() => initialDraft?.person ? { ...emptyPerson(), ...initialDraft.person } : emptyPerson());
@@ -498,8 +501,17 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
                     accept=".pdf,.doc,.docx,.txt"
                     onChange={(e) => {
                       const f = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+                      if (f && f.size > MAX_APPLICATION_ATTACHMENT_BYTES) {
+                        setCoverLetterFile(null);
+                        setJustAttached(false);
+                        setError(ATTACHMENT_SIZE_ERROR);
+                        if (attachTimeoutRef.current) { clearTimeout(attachTimeoutRef.current); attachTimeoutRef.current = null; }
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                        return;
+                      }
                       setCoverLetterFile(f);
-                        if (f) {
+                      if (error === ATTACHMENT_SIZE_ERROR) setError(null);
+                      if (f) {
                         setJustAttached(true);
                         if (attachTimeoutRef.current) clearTimeout(attachTimeoutRef.current);
                         attachTimeoutRef.current = setTimeout(() => setJustAttached(false), ATTACH_FEEDBACK_MS);
@@ -510,6 +522,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
                     }}
                     className="hidden"
                   />
+                  <p className="mt-2 text-xs text-gray-500">Accepted: PDF, DOC, DOCX, TXT up to {MAX_APPLICATION_ATTACHMENT_LABEL}.</p>
                 </div>
               </div>
             </section>

@@ -1,8 +1,12 @@
 import { AppError } from './errors';
+import {
+  MAX_APPLICATION_ATTACHMENT_BASE64_CHARS,
+  MAX_APPLICATION_ATTACHMENT_BYTES,
+  MAX_APPLICATION_ATTACHMENT_LABEL,
+} from './application-constraints';
 import type { Person } from '../types';
 
 const WORD_LIMIT = 100;
-const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const WHY_FIELD = 'Why are you interested in or qualified for this job?';
 const SAFE_IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,128}$/;
 const CONTROL_CHARS = /[\u0000-\u001F\u007F]/g;
@@ -79,7 +83,7 @@ function validateAttachment(attachment: unknown): AttachmentInput {
   const record = attachment as Record<string, unknown>;
   const filename = requireString(record.filename, 'CV / Resume filename', 255);
   const contentTypeRaw = requireString(record.contentType, 'CV / Resume content type', 255);
-  const base64 = requireString(record.base64, 'CV / Resume payload', 20_000_000);
+  const base64 = requireString(record.base64, 'CV / Resume payload', MAX_APPLICATION_ATTACHMENT_BASE64_CHARS);
   if (filename.includes('/') || filename.includes('\\')) {
     throw new AppError('CV / Resume filename is invalid.');
   }
@@ -103,8 +107,8 @@ function validateAttachment(attachment: unknown): AttachmentInput {
   if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
     throw new AppError('CV / Resume payload is invalid.');
   }
-  if (sizeBytes > MAX_ATTACHMENT_BYTES) {
-    throw new AppError('CV / Resume must be 5MB or smaller.');
+  if (sizeBytes > MAX_APPLICATION_ATTACHMENT_BYTES) {
+    throw new AppError(`CV / Resume must be ${MAX_APPLICATION_ATTACHMENT_LABEL} or smaller.`);
   }
 
   return { filename, contentType, base64 };

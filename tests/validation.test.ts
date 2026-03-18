@@ -46,4 +46,13 @@ describe('application attachment validation', () => {
       `CV / Resume must be ${MAX_APPLICATION_ATTACHMENT_LABEL} or smaller.`
     );
   });
+
+  it('rejects unsupported select options before the Airtable write path', () => {
+    const payload = validApplicationPayload(Buffer.from('resume').toString('base64'));
+    payload.person.age = '35 to 44';
+
+    expect(() => validateApplicationPayload(payload)).toThrowError(
+      'We couldn\'t submit your application because one of the selected options is temporarily unavailable. Please refresh the page and try again.'
+    );
+  });
 });

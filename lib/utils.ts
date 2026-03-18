@@ -60,6 +60,22 @@ export function asOptionalTrimmedString(v: unknown): string | null {
   return t ? t : null;
 }
 
+export function parseErrorResponseMessage(bodyText: string, fallback: string): string {
+  const trimmed = bodyText.trim();
+  if (!trimmed) return fallback;
+
+  try {
+    const parsed = JSON.parse(trimmed) as { error?: unknown };
+    if (typeof parsed.error === 'string' && parsed.error.trim() !== '') {
+      return parsed.error.trim();
+    }
+  } catch {
+    // Fall through to raw text when the response is not JSON.
+  }
+
+  return trimmed;
+}
+
 export function formatStartDate(dateStr?: string) {
   if (!dateStr) return '';
   const m = dateStr.match(/^(\d{4})-(\d{2})/);

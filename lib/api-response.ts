@@ -22,6 +22,7 @@ export function jsonError(
 ) {
   const isAppError = err instanceof AppError;
   const resolvedStatus = isAppError ? err.status : status;
+  const exposedError = isAppError && err.expose && resolvedStatus < 500 ? err : null;
   const errorDetails =
     err instanceof Error
       ? {
@@ -49,5 +50,13 @@ export function jsonError(
     console.warn('API request rejected', logPayload);
   }
 
-  return NextResponse.json({ error: fallbackMessage }, { status: resolvedStatus, headers });
+  const responseBody: { error: string; code?: string } = {
+    error: exposedError ? exposedError.message : fallbackMessage,
+  };
+
+  if (exposedError?.code) {
+    responseBody.code = exposedError.code;
+  }
+
+  return NextResponse.json(responseBody, { status: resolvedStatus, headers });
 }

@@ -1,7 +1,17 @@
+import {
+  APPLICANT_STATUS,
+  COUNTRY_OPTIONS,
+  OPPORTUNITY_BOARD_SOURCE,
+  PERSON_AGE_OPTIONS,
+  PERSON_GENDER_OPTIONS,
+} from './application-select-options';
+
 export type AirtableFieldContract = {
   name: string;
   expectedTypes: string[];
   usage: 'read' | 'write' | 'readWrite';
+  expectedOptions?: readonly string[];
+  optionValidation?: 'contains' | 'exact';
 };
 
 export type AirtableTableContract = {
@@ -41,14 +51,26 @@ export const AIRTABLE_SCHEMA_CONTRACT: Record<'jobs' | 'people' | 'applications'
     fallbackName: 'People',
     fields: [
       { name: 'Full Name', expectedTypes: ['singleLineText'], usage: 'write' },
-      { name: 'Candidate Status', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write' },
+      {
+        name: 'Candidate Status',
+        expectedTypes: ['singleSelect', 'singleLineText'],
+        usage: 'write',
+        expectedOptions: [APPLICANT_STATUS],
+        optionValidation: 'contains',
+      },
       { name: 'Email Address', expectedTypes: ['email', 'singleLineText'], usage: 'readWrite' },
       { name: 'Phone Number (incl. Country Code)', expectedTypes: ['phoneNumber', 'singleLineText'], usage: 'write' },
       { name: 'LinkedIn Profile Link (if available)', expectedTypes: ['url', 'singleLineText'], usage: 'write' },
-      { name: 'Age', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write' },
-      { name: 'Gender', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write' },
-      { name: 'Country of Birth', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write' },
-      { name: 'Country of Living (Current Location)', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write' },
+      { name: 'Age', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: PERSON_AGE_OPTIONS, optionValidation: 'exact' },
+      { name: 'Gender', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: PERSON_GENDER_OPTIONS, optionValidation: 'exact' },
+      { name: 'Country of Birth', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: COUNTRY_OPTIONS, optionValidation: 'exact' },
+      {
+        name: 'Country of Living (Current Location)',
+        expectedTypes: ['singleSelect', 'singleLineText'],
+        usage: 'write',
+        expectedOptions: COUNTRY_OPTIONS,
+        optionValidation: 'exact',
+      },
       { name: 'Jurisdiction', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write' },
       { name: 'Academic / Professional Education', expectedTypes: ['multilineText'], usage: 'write' },
       { name: 'Current Profession / Occupation', expectedTypes: ['multilineText', 'singleLineText'], usage: 'write' },
@@ -62,8 +84,8 @@ export const AIRTABLE_SCHEMA_CONTRACT: Record<'jobs' | 'people' | 'applications'
     fields: [
       { name: 'People', expectedTypes: ['multipleRecordLinks'], usage: 'write' },
       { name: 'GE Roles', expectedTypes: ['multipleRecordLinks'], usage: 'write' },
-      { name: 'Status', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write' },
-      { name: 'Source', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write' },
+      { name: 'Status', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: [APPLICANT_STATUS], optionValidation: 'contains' },
+      { name: 'Source', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: [OPPORTUNITY_BOARD_SOURCE], optionValidation: 'contains' },
       { name: 'Why are you interested in or qualified for this job?', expectedTypes: ['multilineText'], usage: 'write' },
       { name: 'CV / Resume', expectedTypes: ['multipleAttachments'], usage: 'write' },
       { name: 'Idempotency Key', expectedTypes: ['singleLineText'], usage: 'write' },

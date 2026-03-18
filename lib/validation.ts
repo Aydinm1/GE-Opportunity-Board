@@ -4,6 +4,11 @@ import {
   MAX_APPLICATION_ATTACHMENT_BYTES,
   MAX_APPLICATION_ATTACHMENT_LABEL,
 } from './application-constraints';
+import {
+  APPLICANT_STATUS,
+  OPPORTUNITY_BOARD_SOURCE,
+  PERSON_SELECT_ALLOWLISTS,
+} from './application-select-options';
 import type { Person } from '../types';
 
 const WORD_LIMIT = 100;
@@ -18,6 +23,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/plain',
 ]);
+const FRIENDLY_SELECT_OPTION_ERROR = 'We couldn\'t submit your application because one of the selected options is temporarily unavailable. Please refresh the page and try again.';
 
 type AttachmentInput = { filename: string; contentType: string; base64: string };
 
@@ -48,6 +54,15 @@ function optionalString(value: unknown, maxLength = 512): string | undefined {
   const trimmed = sanitizeText(value);
   if (!trimmed) return undefined;
   return trimmed.length > maxLength ? trimmed.slice(0, maxLength) : trimmed;
+}
+
+function requireAllowedOption(value: string, options: readonly string[]) {
+  if (!options.includes(value)) {
+    throw new AppError(FRIENDLY_SELECT_OPTION_ERROR, {
+      status: 400,
+      code: 'INVALID_SELECT_OPTION',
+    });
+  }
 }
 
 function countWords(text: string): number {
@@ -147,6 +162,10 @@ export function validateApplicationPayload(payload: unknown) {
   const gender = requireString(personRaw.gender, 'Gender', 64);
   const countryOfOrigin = requireString(personRaw.countryOfOrigin, 'Country of Origin', 120);
   const countryOfLiving = requireString(personRaw.countryOfLiving, 'Current Country', 120);
+  requireAllowedOption(age, PERSON_SELECT_ALLOWLISTS.age);
+  requireAllowedOption(gender, PERSON_SELECT_ALLOWLISTS.gender);
+  requireAllowedOption(countryOfOrigin, PERSON_SELECT_ALLOWLISTS.countryOfOrigin);
+  requireAllowedOption(countryOfLiving, PERSON_SELECT_ALLOWLISTS.countryOfLiving);
   const education = requireString(personRaw.education, 'Academic / Professional Education', 4000);
   const profession = requireString(personRaw.profession, 'Current Profession / Occupation', 4000);
   const jamatiExperience = requireString(personRaw.jamatiExperience, 'Jamati Experience', 4000);
@@ -178,14 +197,14 @@ export function validateApplicationPayload(payload: unknown) {
     profession,
     jamatiExperience,
     linkedIn: optionalString(personRaw.linkedIn, 512),
-    candidateStatus: optionalString(personRaw.candidateStatus, 128) ?? '1a - Applicant',
+    candidateStatus: optionalString(personRaw.candidateStatus, 128) ?? APPLICANT_STATUS,
   };
 
   const jobId = optionalString(body.jobId, 128) ?? null;
   const jobTitle = optionalString(body.jobTitle, 256) ?? null;
   const extras: Record<string, unknown> = {
-    Status: '1a - Applicant',
-    Source: 'Opportunity Board',
+    Status: APPLICANT_STATUS,
+    Source: OPPORTUNITY_BOARD_SOURCE,
     [WHY_FIELD]: whyText,
   };
 

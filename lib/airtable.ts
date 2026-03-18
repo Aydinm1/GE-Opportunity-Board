@@ -1,4 +1,5 @@
 import type { Person } from '../types';
+import { APPLICANT_STATUS, OPPORTUNITY_BOARD_SOURCE } from './application-select-options';
 import { splitBullets, parseDurationMonths, bucketFromMonths, asStringArray, asOptionalTrimmedString } from './utils';
 
 type AirtableRecord<T> = { id: string; fields: T; createdTime: string };
@@ -458,8 +459,8 @@ export async function submitApplication(payload: {
     const normalized = (person.normalizedEmail || person.emailAddress).trim().toLowerCase();
     // Ensure base application status metadata is always set
     const baseExtras = {
-      Status: '1a - Applicant',
-      Source: 'Opportunity Board',
+      Status: APPLICANT_STATUS,
+      Source: OPPORTUNITY_BOARD_SOURCE,
     };
     const mergedExtras = { ...baseExtras, ...(extras ?? {}) };
     delete (mergedExtras as Record<string, unknown>)['status'];

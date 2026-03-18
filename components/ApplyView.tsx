@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Person, Job } from '../types';
+import { COUNTRY_OPTIONS, PERSON_AGE_OPTIONS, PERSON_GENDER_OPTIONS } from '../lib/application-select-options';
 import { MAX_APPLICATION_ATTACHMENT_BYTES, MAX_APPLICATION_ATTACHMENT_LABEL } from '../lib/application-constraints';
 import { captureClientException } from '../lib/monitoring';
 import { requestIframeResize } from '../lib/request-iframe-resize';
 import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
+import { parseErrorResponseMessage } from '../lib/utils';
 
 export interface ApplyDraft {
   person: Person;
@@ -64,205 +66,6 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
   const formStartedAtRef = useRef<number>(Date.now());
 
   const update = (k: keyof Person, v: string) => setPerson((p) => ({ ...p, [k]: v }));
-
-const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Above 65+',"Prefer not to share"];
-  const genderOptions = ['', 'Female', 'Male', 'Non-binary', 'Prefer not to share'];
-  const countryOptions = ['',  "Afghanistan",
-    "Albania",
-    "Algeria",
-    "Andorra",
-    "Angola",
-    "Antigua & Deps",
-    "Argentina",
-    "Armenia",
-    "Australia",
-    "Austria",
-    "Azerbaijan",
-    "Bahamas",
-    "Bahrain",
-    "Bangladesh",
-    "Barbados",
-    "Belarus",
-    "Belgium",
-    "Belize",
-    "Benin",
-    "Bhutan",
-    "Bolivia",
-    "Bosnia Herzegovina",
-    "Botswana",
-    "Brazil",
-    "Brunei",
-    "Bulgaria",
-    "Burkina",
-    "Burundi",
-    "Cambodia",
-    "Cameroon",
-    "Canada",
-    "Cape Verde",
-    "Central African Rep",
-    "Chad",
-    "Chile",
-    "China",
-    "Colombia",
-    "Comoros",
-    "Congo",
-    "Congo {Democratic Rep}",
-    "Costa Rica",
-    "Croatia",
-    "Cuba",
-    "Cyprus",
-    "Czech Republic",
-    "Denmark",
-    "Djibouti",
-    "Dominica",
-    "Dominican Republic",
-    "East Timor",
-    "Ecuador",
-    "Egypt",
-    "El Salvador",
-    "Equatorial Guinea",
-    "Eritrea",
-    "Estonia",
-    "Ethiopia",
-    "Fiji",
-    "Finland",
-    "France",
-    "Gabon",
-    "Gambia",
-    "Georgia",
-    "Germany",
-    "Ghana",
-    "Greece",
-    "Grenada",
-    "Guatemala",
-    "Guinea",
-    "Guinea-Bissau",
-    "Guyana",
-    "Haiti",
-    "Honduras",
-    "Hungary",
-    "Iceland",
-    "India",
-    "Indonesia",
-    "Iran",
-    "Iraq",
-    "Ireland {Republic}",
-    "Israel",
-    "Italy",
-    "Ivory Coast",
-    "Jamaica",
-    "Japan",
-    "Jordan",
-    "Kazakhstan",
-    "Kenya",
-    "Kiribati",
-    "Korea North",
-    "Korea South",
-    "Kosovo",
-    "Kuwait",
-    "Kyrgyzstan",
-    "Laos",
-    "Latvia",
-    "Lebanon",
-    "Lesotho",
-    "Liberia",
-    "Libya",
-    "Liechtenstein",
-    "Lithuania",
-    "Luxembourg",
-    "Macedonia",
-    "Madagascar",
-    "Malawi",
-    "Malaysia",
-    "Maldives",
-    "Mali",
-    "Malta",
-    "Marshall Islands",
-    "Mauritania",
-    "Mauritius",
-    "Mexico",
-    "Micronesia",
-    "Moldova",
-    "Monaco",
-    "Mongolia",
-    "Montenegro",
-    "Morocco",
-    "Mozambique",
-    "Myanmar, {Burma}",
-    "Namibia",
-    "Nauru",
-    "Nepal",
-    "Netherlands",
-    "New Zealand",
-    "Nicaragua",
-    "Niger",
-    "Nigeria",
-    "Norway",
-    "Oman",
-    "Pakistan",
-    "Palau",
-    "Panama",
-    "Papua New Guinea",
-    "Paraguay",
-    "Peru",
-    "Philippines",
-    "Poland",
-    "Portugal",
-    "Qatar",
-    "Romania",
-    "Russian Federation",
-    "Rwanda",
-    "St Kitts & Nevis",
-    "St Lucia",
-    "Saint Vincent & the Grenadines",
-    "Samoa",
-    "San Marino",
-    "Sao Tome & Principe",
-    "Saudi Arabia",
-    "Senegal",
-    "Serbia",
-    "Seychelles",
-    "Sierra Leone",
-    "Singapore",
-    "Slovakia",
-    "Slovenia",
-    "Solomon Islands",
-    "Somalia",
-    "South Africa",
-    "South Sudan",
-    "Spain",
-    "Sri Lanka",
-    "Sudan",
-    "Suriname",
-    "Swaziland",
-    "Sweden",
-    "Switzerland",
-    "Syria",
-    "Taiwan",
-    "Tajikistan",
-    "Tanzania",
-    "Thailand",
-    "Togo",
-    "Tonga",
-    "Trinidad & Tobago",
-    "Tunisia",
-    "Turkey",
-    "Turkmenistan",
-    "Tuvalu",
-    "Uganda",
-    "Ukraine",
-    "United Arab Emirates",
-    "United Kingdom",
-    "United States",
-    "Uruguay",
-    "Uzbekistan",
-    "Vanuatu",
-    "Vatican City",
-    "Venezuela",
-    "Vietnam",
-    "Yemen",
-    "Zambia",
-    "Zimbabwe"];
 
   const WORD_LIMIT = 100; // change this in one place to update all word limits
   const ATTACH_FEEDBACK_MS = 2200; // ms the button shows the 'attached' state
@@ -407,7 +210,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
       });
       if (!res.ok) {
         const txt = await res.text();
-        const requestError = new Error(txt || 'Failed to submit application') as SubmitRequestError;
+        const requestError = new Error(parseErrorResponseMessage(txt, 'Failed to submit application')) as SubmitRequestError;
         requestError.endpoint = '/api/applications';
         requestError.status = res.status;
         throw requestError;
@@ -503,13 +306,15 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
                 <div>
                   <label className="block text-sm font-semibold text-gray-600 mb-2">Age<span className="text-red-600 ml-1">*</span></label>
                   <select required aria-required value={person.age || ''} onChange={(e) => update('age', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    {ageOptions.map((a) => (<option key={a} value={a}>{a || 'Select age range'}</option>))}
+                    <option value="">Select age range</option>
+                    {PERSON_AGE_OPTIONS.map((a) => (<option key={a} value={a}>{a}</option>))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-600 mb-2">Gender<span className="text-red-600 ml-1">*</span></label>
                   <select required aria-required value={person.gender || ''} onChange={(e) => update('gender', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    {genderOptions.map((g) => (<option key={g} value={g}>{g || 'Select gender'}</option>))}
+                    <option value="">Select gender</option>
+                    {PERSON_GENDER_OPTIONS.map((g) => (<option key={g} value={g}>{g}</option>))}
                   </select>
                 </div>
                 <div className="md:col-span-2">
@@ -587,13 +392,15 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
                 <div>
                   <label className="block text-sm font-semibold text-gray-600 mb-2">Country of Origin<span className="text-red-600 ml-1">*</span></label>
                   <select required aria-required value={person.countryOfOrigin || ''} onChange={(e) => update('countryOfOrigin', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    {countryOptions.map((o) => (<option key={o} value={o}>{o || 'Select country'}</option>))}
+                    <option value="">Select country</option>
+                    {COUNTRY_OPTIONS.map((o) => (<option key={o} value={o}>{o}</option>))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-600 mb-2">Current Country<span className="text-red-600 ml-1">*</span></label>
                   <select required aria-required value={person.countryOfLiving || ''} onChange={(e) => update('countryOfLiving', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    {countryOptions.map((o) => (<option key={o} value={o}>{o || 'Select country'}</option>))}
+                    <option value="">Select current country</option>
+                    {COUNTRY_OPTIONS.map((o) => (<option key={o} value={o}>{o}</option>))}
                   </select>
                 </div>
               </div>

@@ -4,6 +4,12 @@ type AirtableSchemaField = {
   id: string;
   name: string;
   type: string;
+  options?: {
+    choices?: Array<{
+      id?: string;
+      name: string;
+    }>;
+  };
 };
 
 type AirtableSchemaTable = {
@@ -72,6 +78,54 @@ function formatActualField(field: AirtableSchemaField) {
   return `"${field.name}" with type ${friendlyTypeLabel(field.type)} (${field.type})`;
 }
 
+function formatOptionList(options: readonly string[]) {
+  return `[${options.join(', ')}]`;
+}
+
+function selectChoices(field: AirtableSchemaField) {
+  return (field.options?.choices ?? [])
+    .map((choice) => choice.name)
+    .filter((choice) => typeof choice === 'string' && choice.trim() !== '');
+}
+
+function compareSelectOptions(
+  tableName: string,
+  expectedField: AirtableFieldContract,
+  actualField: AirtableSchemaField
+) {
+  if (!expectedField.expectedOptions || expectedField.expectedOptions.length === 0) {
+    return [];
+  }
+
+  if (actualField.type !== 'singleSelect' && actualField.type !== 'multipleSelects') {
+    return [
+      `${tableName}.${expectedField.name}: expected selectable options ${formatOptionList(expectedField.expectedOptions)}, but field type is ${actualField.type}.`,
+    ];
+  }
+
+  const expected = expectedField.expectedOptions;
+  const actual = selectChoices(actualField);
+  const actualSet = new Set(actual);
+  const expectedSet = new Set(expected);
+  const missing = expected.filter((option) => !actualSet.has(option));
+
+  if (expectedField.optionValidation === 'contains') {
+    return missing.length > 0
+      ? [`${tableName}.${expectedField.name}: missing Airtable options ${formatOptionList(missing)}.`]
+      : [];
+  }
+
+  const unexpected = actual.filter((option) => !expectedSet.has(option));
+  const failures: string[] = [];
+  if (missing.length > 0) {
+    failures.push(`${tableName}.${expectedField.name}: missing Airtable options ${formatOptionList(missing)}.`);
+  }
+  if (unexpected.length > 0) {
+    failures.push(`${tableName}.${expectedField.name}: unexpected Airtable options ${formatOptionList(unexpected)}.`);
+  }
+  return failures;
+}
+
 function resolveTableName(contract: AirtableTableContract) {
   return process.env[contract.envVar] || contract.fallbackName;
 }
@@ -128,7 +182,10 @@ export function compareAirtableSchema(schema: AirtableSchemaResponse) {
 
       if (!expectedField.expectedTypes.includes(actualField.type)) {
         failures.push(formatSchemaMismatch(actualTable.name, expectedField, actualField));
+        continue;
       }
+
+      failures.push(...compareSelectOptions(actualTable.name, expectedField, actualField));
     }
   }
 

@@ -325,7 +325,7 @@ describe('POST /api/applications', () => {
     const res = await postApplication(req);
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body).toEqual({ error: 'Failed to submit application' });
+    expect(body).toEqual({ error: 'Invalid JSON payload.' });
     expect(console.warn).toHaveBeenCalled();
   });
 
@@ -345,7 +345,33 @@ describe('POST /api/applications', () => {
     const res = await postApplication(req);
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body).toEqual({ error: 'Failed to submit application' });
+    expect(body).toEqual({ error: 'Idempotency key format is invalid.' });
+    expect(console.warn).toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a friendly 400 when a submitted select option is unsupported', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const payload = validApplicationPayload();
+    payload.person.age = '35 to 44';
+
+    const req = new Request('http://localhost/api/applications', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': nextIp('198.51.109'),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const res = await postApplication(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({
+      error: 'We couldn\'t submit your application because one of the selected options is temporarily unavailable. Please refresh the page and try again.',
+      code: 'INVALID_SELECT_OPTION',
+    });
     expect(console.warn).toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -368,7 +394,7 @@ describe('POST /api/applications', () => {
     expect(res!.status).toBe(429);
     expect(res!.headers.get('retry-after')).not.toBeNull();
     const body = await res!.json();
-    expect(body).toEqual({ error: 'Rate limit exceeded' });
+    expect(body).toEqual({ error: 'Too many requests. Please try again shortly.' });
     expect(console.warn).toHaveBeenCalled();
   });
 });

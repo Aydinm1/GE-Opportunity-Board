@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { splitBullets } from '../lib/utils';
+import { parseErrorResponseMessage, splitBullets } from '../lib/utils';
 
 describe('splitBullets', () => {
   it('keeps non-bullet numeric prefixes like 5+ years', () => {
@@ -26,5 +26,15 @@ describe('splitBullets', () => {
       'Coordinate teams',
       'Run retros',
     ]);
+  });
+});
+
+describe('parseErrorResponseMessage', () => {
+  it('extracts the error field from JSON API responses', () => {
+    expect(parseErrorResponseMessage('{"error":"Friendly error"}', 'Fallback error')).toBe('Friendly error');
+  });
+
+  it('falls back to trimmed plain text when the response is not JSON', () => {
+    expect(parseErrorResponseMessage('  Plain text error  ', 'Fallback error')).toBe('Plain text error');
   });
 });

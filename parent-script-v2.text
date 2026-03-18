@@ -2,7 +2,8 @@
   
 
   const IFRAME_ID = 'division-fixtures-iframe';
-  const MIN_IFRAME_HEIGHT = 600;
+  const MIN_DESKTOP_IFRAME_HEIGHT = 600;
+  const MIN_MOBILE_IFRAME_HEIGHT = 320;
   const DEFAULT_DESKTOP_IFRAME_HEIGHT = 1400;
   const MAX_MOBILE_IFRAME_HEIGHT = 10000;
   const DESKTOP_BREAKPOINT = 1024;
@@ -38,10 +39,10 @@
 
   function clampIframeHeight(requestedHeight) {
     if (window.innerWidth >= DESKTOP_BREAKPOINT) {
-      return Math.min(DEFAULT_DESKTOP_IFRAME_HEIGHT, Math.max(MIN_IFRAME_HEIGHT, requestedHeight));
+      return Math.min(DEFAULT_DESKTOP_IFRAME_HEIGHT, Math.max(MIN_DESKTOP_IFRAME_HEIGHT, requestedHeight));
     }
 
-    return Math.min(MAX_MOBILE_IFRAME_HEIGHT, Math.max(MIN_IFRAME_HEIGHT, requestedHeight));
+    return Math.min(MAX_MOBILE_IFRAME_HEIGHT, Math.max(MIN_MOBILE_IFRAME_HEIGHT, requestedHeight));
   }
 
   function isTrustedMessage(event) {

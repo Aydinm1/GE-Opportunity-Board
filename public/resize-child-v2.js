@@ -15,14 +15,23 @@ function computeFullHeight() {
   const doc = document.documentElement;
   const body = document.body;
   const root = document.getElementById(ROOT_ID);
-  const viewportBottom = window.pageYOffset + window.innerHeight;
+  const fallbackHeight = Math.max(
+    measureNodeHeight(doc),
+    measureNodeHeight(body)
+  );
+
+  if (!root) {
+    return Math.ceil(fallbackHeight);
+  }
+
+  const rootBottom = root.getBoundingClientRect
+    ? Math.ceil(root.getBoundingClientRect().bottom + window.pageYOffset)
+    : 0;
 
   return Math.ceil(
     Math.max(
-      measureNodeHeight(doc),
-      measureNodeHeight(body),
-      measureNodeHeight(root),
-      viewportBottom
+      rootBottom,
+      measureNodeHeight(root)
     )
   );
 }

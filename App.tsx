@@ -291,6 +291,7 @@ const App: React.FC = () => {
     }, [jobs, selectedJobId]);
     const isMobileDetailsView = isMobileViewport && mobileScreen === 'details';
     const usesDesktopPaneLayout = !isMobileViewport;
+    const usesEmbeddedMobileLayout = isEmbedded && isMobileViewport;
 
     // Filter UI and helper logic moved to `components/Filters.tsx`.
 
@@ -403,7 +404,9 @@ const App: React.FC = () => {
 
             {/* Main Content */}
             <main className={`relative z-20 mx-auto flex w-full max-w-7xl flex-1 px-0 pb-12 sm:px-6 lg:px-8 ${isMobileDetailsView ? 'mt-0' : '-mt-20'}`}>
-                <div className={`flex min-h-[520px] w-full flex-col bg-surface-light px-5 pb-10 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] dark:bg-surface-dark sm:rounded-3xl sm:p-6 ${
+                <div className={`flex w-full flex-col bg-surface-light px-5 pb-10 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] dark:bg-surface-dark sm:rounded-3xl sm:p-6 ${
+                    usesEmbeddedMobileLayout ? 'min-h-0' : 'min-h-[520px]'
+                } ${
                     usesDesktopPaneLayout
                         ? 'overflow-hidden lg:h-[820px] lg:shadow-2xl'
                         : 'overflow-visible'
@@ -472,7 +475,9 @@ const App: React.FC = () => {
                         {/* Detailed View */}
                         <div className={`border-gray-100 pl-0 dark:border-gray-800 lg:col-span-8 lg:border-l lg:pl-6 ${
                             isMobileViewport
-                                ? 'pt-0 min-h-[360px]'
+                                ? usesEmbeddedMobileLayout
+                                    ? 'pt-0 min-h-0'
+                                    : 'pt-0 min-h-[360px]'
                                 : usesDesktopPaneLayout
                                     ? 'border-t pt-4 h-[72svh] min-h-[420px] overflow-hidden'
                                     : 'border-t pt-4 min-h-[420px]'

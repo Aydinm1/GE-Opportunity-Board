@@ -303,6 +303,15 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
             document.body.removeChild(el);
         }
     };
+    const sectionHeadingClasses = isMobile
+        ? 'mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 font-display'
+        : 'mb-3.5 border-b border-gray-100 pb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500 dark:border-gray-800 dark:text-gray-400 font-display';
+    const bodyTextClasses = isMobile
+        ? 'text-[1rem] leading-[1.68] text-slate-600'
+        : 'leading-relaxed text-gray-600 dark:text-gray-300';
+    const bulletListClasses = isMobile
+        ? 'list-none space-y-4 pl-0 text-slate-600'
+        : 'list-none space-y-3.5 pl-0 text-gray-600 dark:text-gray-300';
 
     return (
         <div className={`flex flex-col min-h-0 ${usesFixedDetailsPane ? 'h-full' : ''} ${usesDetailsPaneScroll ? 'overflow-hidden' : 'overflow-visible'}`}>
@@ -317,56 +326,169 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
                     }}
                     onBackToDetails={() => setViewMode('details')}
                 />
-            ) : (
+            ) : isMobile ? (
                 <>
-                    <div className={isMobile ? 'mb-3' : 'mb-6'}>
-                        {isMobile && (
-                            <div className="mb-4 flex items-center justify-between gap-3">
-                                {onBackToList ? (
-                                    <button
-                                        type="button"
-                                        onClick={onBackToList}
-                                        className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-gray-500 transition-colors hover:text-primary"
-                                    >
-                                        <span className="material-icons-round text-base">arrow_back</span>
-                                        Results
-                                    </button>
-                                ) : <div />}
-                                <button
-                                    type="button"
-                                    onClick={handleShare}
-                                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-transparent text-primary transition-colors hover:border-primary/15 hover:bg-primary/5 hover:text-primary-hover active:border-primary/15 active:bg-primary/10 focus-visible:border-primary/15 focus-visible:bg-primary/5"
-                                    aria-label={copied ? 'Link copied' : 'Share job'}
-                                >
-                                    <span className="material-icons-round text-[18px]">{copied ? 'check' : 'share'}</span>
-                                </button>
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                        {onBackToList ? (
+                            <button
+                                type="button"
+                                onClick={onBackToList}
+                                className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-gray-500 transition-colors hover:text-primary"
+                            >
+                                <span className="material-icons-round text-base">arrow_back</span>
+                                Results
+                            </button>
+                        ) : <div />}
+                        <button
+                            type="button"
+                            onClick={handleShare}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-primary shadow-[0_8px_18px_rgba(15,23,42,0.05)] transition-colors hover:border-primary/15 hover:bg-primary/5 hover:text-primary-hover active:border-primary/15 active:bg-primary/10 focus-visible:border-primary/15 focus-visible:bg-primary/5"
+                            aria-label={copied ? 'Link copied' : 'Share job'}
+                        >
+                            <span className="material-icons-round text-[18px]">{copied ? 'check' : 'share'}</span>
+                        </button>
+                    </div>
+
+                    <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_22px_52px_rgba(15,23,42,0.08)] ring-1 ring-slate-100/80">
+                        <div className="border-b border-slate-100 bg-[radial-gradient(circle_at_top_left,rgba(15,23,42,0.03),transparent_42%),linear-gradient(180deg,#ffffff_0%,#fbfcfd_100%)] px-5 pb-5 pt-5">
+                            {(job.programmeArea || job.teamVertical) && (
+                                <div className="mb-4 space-y-1.5">
+                                    {job.programmeArea && (
+                                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{job.programmeArea}</p>
+                                    )}
+                                    {job.teamVertical && (
+                                        <p className="text-[13px] font-medium leading-snug text-slate-500">{job.teamVertical}</p>
+                                    )}
+                                </div>
+                            )}
+                            <h1 className="pr-4 text-[1.72rem] font-bold leading-[1.02] tracking-[-0.035em] text-slate-950 font-display">
+                                {job.roleTitle}
+                            </h1>
+                            <div className="mt-4 flex flex-wrap items-center gap-2">
+                                <span className={getStatusStyles(job.roleStatus || 'Actively Hiring')}>
+                                    {job.roleStatus || 'Actively Hiring'}
+                                </span>
+                                {job.roleType && (
+                                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/85 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-600">
+                                        {job.roleType}
+                                    </span>
+                                )}
                             </div>
-                        )}
-                        <div className="flex flex-col gap-3.5 md:flex-row md:items-start md:justify-between">
-                            <div className="flex-1">
-                                <h1 className={`${isMobile ? 'pr-4 text-[1.56rem] tracking-[-0.03em]' : 'text-2xl'} mb-2.5 font-bold leading-[1.03] text-black dark:text-white font-display`}>{job.roleTitle}</h1>
-                                {isMobile ? (
-                                    <div className="mb-3.5 space-y-1">
-                                        {job.programmeArea && (
-                                            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary">{job.programmeArea}</p>
-                                        )}
-                                        {job.teamVertical && (
-                                            <p className="text-[13px] font-medium text-gray-500">{job.teamVertical}</p>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-2 mb-3">
-                                        {job.teamVertical && (
-                                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{job.teamVertical}</p>
-                                        )}
-                                        {job.teamVertical && job.programmeArea && (
-                                            <span className="h-1 w-1 rounded-full bg-gray-300"></span>
-                                        )}
-                                        {job.programmeArea && (
-                                            <p className="text-xs font-bold text-primary uppercase tracking-widest">{job.programmeArea}</p>
-                                        )}
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('apply')}
+                                className="mt-5 w-full rounded-[1.15rem] bg-primary px-5 py-3.5 text-[13px] font-bold uppercase tracking-[0.14em] text-white shadow-[0_16px_30px_rgba(0,85,140,0.22)] transition-all active:scale-[0.99]"
+                            >
+                                Apply Now
+                            </button>
+                        </div>
+
+                        <div ref={detailsScrollRef} className="overflow-visible px-5 pb-6 pt-5">
+                            {metaItems.length > 0 && (
+                                <div className={`mb-6 grid ${metaItems.length === 1 ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
+                                    {metaItems.map((item) => (
+                                        <div
+                                            key={item.label}
+                                            className="min-w-0 rounded-[1.15rem] border border-slate-100 bg-white px-3.5 py-3.5 shadow-[0_8px_18px_rgba(15,23,42,0.04)]"
+                                        >
+                                            <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-50 text-primary shadow-[inset_0_0_0_1px_rgba(0,85,140,0.08)]">
+                                                <span className="material-icons-round text-[18px]">{item.icon}</span>
+                                            </div>
+                                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
+                                            <p className="mt-1 text-[0.98rem] font-semibold leading-[1.28] text-slate-900">
+                                                {item.value}
+                                            </p>
+                                            {item.helper && (
+                                                <p className="mt-1 text-[11px] font-medium leading-[1.3] text-slate-400">{item.helper}</p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="max-w-none font-body">
+                                {job.purposeShort && (
+                                    <div className="pb-6">
+                                        <h3 className={sectionHeadingClasses}>Role Overview</h3>
+                                        <p className={bodyTextClasses}>{job.purposeShort}</p>
                                     </div>
                                 )}
+
+                                {job.keyResponsibilities.length > 0 && (
+                                    <div className={`${job.purposeShort ? 'border-t border-slate-100 pt-5' : 'pt-0'} pb-6`}>
+                                        <h3 className={sectionHeadingClasses}>Key Responsibilities</h3>
+                                        <ul className={bulletListClasses}>
+                                            {job.keyResponsibilities.map((resp, idx) => (
+                                                <li key={idx} className="grid grid-cols-[10px_minmax(0,1fr)] items-start gap-x-4">
+                                                    <span className="mt-[0.72rem] h-2 w-2 rounded-full bg-primary"></span>
+                                                    <span className={bodyTextClasses}>{resp}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {requiredQualifications.length > 0 && (
+                                    <div className="border-t border-slate-100 py-6">
+                                        <h3 className={sectionHeadingClasses}>Required Qualifications</h3>
+                                        <ul className={bulletListClasses}>
+                                            {requiredQualifications.map((req, idx) => (
+                                                <li key={idx} className="grid grid-cols-[20px_minmax(0,1fr)] items-start gap-x-3">
+                                                    <span className="material-icons-round mt-[0.28rem] text-[18px] text-green-600">check_circle</span>
+                                                    <span className={bodyTextClasses}>{req}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {preferredQualifications.length > 0 && (
+                                    <div className="border-t border-slate-100 py-6">
+                                        <h3 className={sectionHeadingClasses}>Preferred Qualifications</h3>
+                                        <ul className={bulletListClasses}>
+                                            {preferredQualifications.map((req, idx) => (
+                                                <li key={idx} className="grid grid-cols-[20px_minmax(0,1fr)] items-start gap-x-3">
+                                                    <span className="material-icons-round mt-[0.28rem] text-[18px] text-primary/60">star</span>
+                                                    <span className={bodyTextClasses}>{req}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {job.languagesRequired.length > 0 && (
+                                    <div className="border-t border-slate-100 pt-6">
+                                        <h3 className={sectionHeadingClasses}>Languages Required</h3>
+                                        <div className="flex flex-wrap gap-2.5">
+                                            {job.languagesRequired.map((lang, idx) => (
+                                                <span key={idx} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                                                    {lang}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <>
+                    <div className="mb-6">
+                        <div className="flex flex-col gap-3.5 md:flex-row md:items-start md:justify-between">
+                            <div className="flex-1">
+                                <h1 className="mb-2.5 text-2xl font-bold leading-[1.03] text-black dark:text-white font-display">{job.roleTitle}</h1>
+                                <div className="mb-3 flex items-center gap-2">
+                                    {job.teamVertical && (
+                                        <p className="text-xs font-bold uppercase tracking-widest text-gray-500">{job.teamVertical}</p>
+                                    )}
+                                    {job.teamVertical && job.programmeArea && (
+                                        <span className="h-1 w-1 rounded-full bg-gray-300"></span>
+                                    )}
+                                    {job.programmeArea && (
+                                        <p className="text-xs font-bold uppercase tracking-widest text-primary">{job.programmeArea}</p>
+                                    )}
+                                </div>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className={getStatusStyles(job.roleStatus || 'Actively Hiring')}>
                                         {job.roleStatus || 'Actively Hiring'}
@@ -377,124 +499,91 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
                                         </span>
                                     )}
                                 </div>
-                                {isMobile && (
-                                    <button type="button" onClick={() => setViewMode('apply')} className="mt-4 w-full rounded-xl bg-primary px-5 py-3 text-[13px] font-bold uppercase tracking-[0.1em] text-white shadow-lg shadow-blue-900/10 transition-all active:scale-[0.99]">
-                                        Apply Now
-                                    </button>
-                                )}
                             </div>
-                            {!isMobile && (
-                                <div className="flex gap-3 flex-col sm:flex-row sm:items-center">
-                                    <button type="button" onClick={handleShare} aria-label="Share job" className="inline-flex w-full sm:w-auto items-center justify-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-primary hover:bg-gray-50 px-4 py-2.5 rounded-lg text-sm font-semibold transition">
-                                        {copied ? 'Copied!' : 'Share'}
-                                    </button>
-                                    <button type="button" onClick={() => setViewMode('apply')} className="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 px-6 rounded-lg shadow-lg shadow-blue-900/10 transition-all transform active:scale-95 text-[13px] uppercase tracking-[0.14em] font-body whitespace-nowrap sm:text-sm sm:tracking-wide">
-                                        Apply Now
-                                    </button>
-                                </div>
-                            )}
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                <button type="button" onClick={handleShare} aria-label="Share job" className="inline-flex w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 sm:w-auto">
+                                    {copied ? 'Copied!' : 'Share'}
+                                </button>
+                                <button type="button" onClick={() => setViewMode('apply')} className="w-full whitespace-nowrap rounded-lg bg-primary px-6 py-3 text-[13px] font-bold uppercase tracking-[0.14em] text-white shadow-lg shadow-blue-900/10 transition-all transform active:scale-95 font-body hover:bg-primary-hover sm:w-auto sm:text-sm sm:tracking-wide">
+                                    Apply Now
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    {!isMobile && <div className="mb-4 h-px w-full bg-gray-100 dark:bg-gray-800"></div>}
+                    <div className="mb-4 h-px w-full bg-gray-100 dark:bg-gray-800"></div>
 
                     <div ref={detailsScrollRef} className={`${usesDetailsPaneScroll ? 'flex-1 min-h-0 overflow-y-scroll pr-2' : 'overflow-visible pb-4 pr-0'}`}>
                         {metaItems.length > 0 && (
-                            isMobile ? (
-                                <div className="mb-8 rounded-[1.25rem] border border-slate-200/80 bg-white px-4 py-2 shadow-[0_16px_34px_rgba(15,23,42,0.05)] ring-1 ring-slate-100/80 dark:border-gray-800 dark:bg-gray-900/70 dark:shadow-none dark:ring-0">
-                                    <div className="divide-y divide-slate-200/80 dark:divide-gray-800">
-                                        {metaItems.map((item, index) => (
-                                            <div
-                                                key={item.label}
-                                                className={`flex items-center gap-3 py-3 ${index === 0 ? 'pt-2.5' : ''}`}
-                                            >
-                                                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/5 text-primary shadow-[inset_0_0_0_1px_rgba(0,85,140,0.12)] dark:bg-primary/10 dark:shadow-[inset_0_0_0_1px_rgba(148,163,184,0.12)]">
-                                                    <span className="material-icons-round text-[1.25rem]">{item.icon}</span>
+                            <div className="mb-8 grid grid-cols-2 gap-x-6 gap-y-4">
+                                {metaItems.map((item) => (
+                                    <div key={item.label} className="min-w-0 border-b border-slate-100 pb-3.5 dark:border-gray-800/80">
+                                        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-gray-400">{item.label}</p>
+                                        {item.helper ? (
+                                            <div className="grid grid-cols-[17px_minmax(0,1fr)] items-start gap-x-2.5 gap-y-0.5">
+                                                <span className="material-icons-round row-span-2 shrink-0 pt-0.5 text-[17px] leading-none text-primary/80">{item.icon}</span>
+                                                <span className="block text-[1rem] font-semibold leading-[1.24] text-slate-900 dark:text-white">
+                                                    {item.value}
                                                 </span>
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-gray-400">{item.label}</p>
-                                                    <p className="mt-1 text-[0.95rem] font-semibold leading-snug text-slate-900 dark:text-white">
-                                                        {item.value}
-                                                        {item.helper && <span className="ml-1 text-[12px] font-medium text-slate-400 dark:text-gray-500">({item.helper})</span>}
-                                                    </p>
-                                                </div>
+                                                <span className="col-start-2 text-[11px] font-medium leading-none text-slate-400 dark:text-gray-500">{item.helper}</span>
                                             </div>
-                                        ))}
+                                        ) : (
+                                            <div className="flex items-center gap-2.5">
+                                                <span className="material-icons-round shrink-0 text-[17px] leading-none text-primary/80">{item.icon}</span>
+                                                <span className="block text-[1rem] font-semibold leading-[1.24] text-slate-900 dark:text-white">
+                                                    {item.value}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="mb-8 grid grid-cols-2 gap-x-6 gap-y-4">
-                                    {metaItems.map((item) => (
-                                        <div key={item.label} className="min-w-0 border-b border-slate-100 pb-3.5 dark:border-gray-800/80">
-                                            <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-gray-400">{item.label}</p>
-                                            {item.helper ? (
-                                                <div className="grid grid-cols-[17px_minmax(0,1fr)] items-start gap-x-2.5 gap-y-0.5">
-                                                    <span className="material-icons-round row-span-2 shrink-0 pt-0.5 text-[17px] leading-none text-primary/80">{item.icon}</span>
-                                                    <span className="block text-[1rem] font-semibold leading-[1.24] text-slate-900 dark:text-white">
-                                                        {item.value}
-                                                    </span>
-                                                    <span className="col-start-2 text-[11px] font-medium leading-none text-slate-400 dark:text-gray-500">{item.helper}</span>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-2.5">
-                                                    <span className="material-icons-round shrink-0 text-[17px] leading-none text-primary/80">{item.icon}</span>
-                                                    <span className="block text-[1rem] font-semibold leading-[1.24] text-slate-900 dark:text-white">
-                                                        {item.value}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )
+                                ))}
+                            </div>
                         )}
 
                         <div className="prose prose-sm prose-slate dark:prose-invert max-w-none font-body">
                             {job.purposeShort && (
-                                <div className={isMobile ? 'mb-8' : 'mb-8'}>
-                                    <h3 className={`${isMobile ? 'mb-3 text-[10px] tracking-[0.12em] text-gray-500' : 'mb-3.5 border-b border-gray-100 pb-2 text-[11px] tracking-[0.18em] text-gray-500 dark:border-gray-800 dark:text-gray-400'} font-bold uppercase font-display`}>Role Overview</h3>
-                                    <p className="leading-relaxed text-gray-600 dark:text-gray-300">
-                                    {job.purposeShort}
-                                    </p>
+                                <div className="mb-8">
+                                    <h3 className={sectionHeadingClasses}>Role Overview</h3>
+                                    <p className={bodyTextClasses}>{job.purposeShort}</p>
                                 </div>
                             )}
 
                             {job.keyResponsibilities.length > 0 && (
-                                <div className={isMobile ? 'mb-8' : 'mb-8'}>
-                                    <h3 className={`${isMobile ? 'mb-3 text-[10px] tracking-[0.12em] text-gray-500' : 'mb-3.5 border-b border-gray-100 pb-2 text-[11px] tracking-[0.18em] text-gray-500 dark:border-gray-800 dark:text-gray-400'} font-bold uppercase font-display`}>Key Responsibilities</h3>
-                                    <ul className="list-none space-y-3.5 pl-0 text-gray-600 dark:text-gray-300">
-                                    {job.keyResponsibilities.map((resp, idx) => (
-                                            <li key={idx} className="flex items-start gap-3">
-                                            <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0"></span>
-                                                <span className="leading-relaxed">{resp}</span>
-                                        </li>
-                                    ))}
+                                <div className="mb-8">
+                                    <h3 className={sectionHeadingClasses}>Key Responsibilities</h3>
+                                    <ul className={bulletListClasses}>
+                                        {job.keyResponsibilities.map((resp, idx) => (
+                                            <li key={idx} className="grid grid-cols-[10px_minmax(0,1fr)] items-start gap-x-4">
+                                                <span className="mt-[0.72rem] h-2 w-2 rounded-full bg-primary"></span>
+                                                <span className={bodyTextClasses}>{resp}</span>
+                                            </li>
+                                        ))}
                                     </ul>
                                 </div>
                             )}
 
                             {requiredQualifications.length > 0 && (
-                                <div className={isMobile ? 'mb-8' : 'mb-8'}>
-                                    <h3 className={`${isMobile ? 'mb-3 text-[10px] tracking-[0.12em] text-gray-500' : 'mb-3.5 border-b border-gray-100 pb-2 text-[11px] tracking-[0.18em] text-gray-500 dark:border-gray-800 dark:text-gray-400'} font-bold uppercase font-display`}>Required Qualifications</h3>
-                                    <ul className="list-none space-y-3.5 pl-0 text-gray-600 dark:text-gray-300">
-                                    {requiredQualifications.map((req, idx) => (
-                                            <li key={idx} className="flex items-start gap-3">
-                                            <span className="material-icons-round text-green-600 dark:text-green-400 text-base">check_circle</span>
-                                                <span className="leading-relaxed">{req}</span>
-                                        </li>
-                                    ))}
+                                <div className="mb-8">
+                                    <h3 className={sectionHeadingClasses}>Required Qualifications</h3>
+                                    <ul className={bulletListClasses}>
+                                        {requiredQualifications.map((req, idx) => (
+                                            <li key={idx} className="grid grid-cols-[20px_minmax(0,1fr)] items-start gap-x-3">
+                                                <span className="material-icons-round mt-[0.28rem] text-[18px] text-green-600 dark:text-green-400">check_circle</span>
+                                                <span className={bodyTextClasses}>{req}</span>
+                                            </li>
+                                        ))}
                                     </ul>
                                 </div>
                             )}
 
                             {preferredQualifications.length > 0 && (
-                                <div className={isMobile ? 'mb-8' : 'mb-8'}>
-                                    <h3 className={`${isMobile ? 'mb-3 text-[10px] tracking-[0.12em] text-gray-500' : 'mb-3.5 border-b border-gray-100 pb-2 text-[11px] tracking-[0.18em] text-gray-500 dark:border-gray-800 dark:text-gray-400'} font-bold uppercase font-display`}>Preferred Qualifications</h3>
-                                    <ul className="list-none space-y-3.5 pl-0 text-gray-600 dark:text-gray-300">
+                                <div className="mb-8">
+                                    <h3 className={sectionHeadingClasses}>Preferred Qualifications</h3>
+                                    <ul className={bulletListClasses}>
                                         {preferredQualifications.map((req, idx) => (
-                                            <li key={idx} className="flex items-start gap-3">
-                                                <span className="material-icons-round text-primary/60 text-base">star</span>
-                                                <span className="leading-relaxed">{req}</span>
+                                            <li key={idx} className="grid grid-cols-[20px_minmax(0,1fr)] items-start gap-x-3">
+                                                <span className="material-icons-round mt-[0.28rem] text-[18px] text-primary/60">star</span>
+                                                <span className={bodyTextClasses}>{req}</span>
                                             </li>
                                         ))}
                                     </ul>
@@ -503,7 +592,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
 
                             {job.languagesRequired.length > 0 && (
                                 <div className="mb-6">
-                                    <h3 className={`${isMobile ? 'mb-3 text-[10px] tracking-[0.12em] text-gray-500' : 'mb-3.5 border-b border-gray-100 pb-2 text-[11px] tracking-[0.18em] text-gray-500 dark:border-gray-800 dark:text-gray-400'} font-bold uppercase font-display`}>Languages Required</h3>
+                                    <h3 className={sectionHeadingClasses}>Languages Required</h3>
                                     <div className="flex flex-wrap gap-2">
                                         {job.languagesRequired.map((lang, idx) => (
                                             <span key={idx} className="rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">

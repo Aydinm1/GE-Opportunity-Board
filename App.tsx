@@ -206,6 +206,13 @@ const App: React.FC = () => {
             setMobileScreen('list');
         }
     };
+    const scrollMobileViewportToTop = () => {
+        if (typeof window === 'undefined') return;
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        document.scrollingElement?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    };
 
     const filteredJobs = useMemo(() => {
         const q = appliedSearchQuery.toLowerCase();
@@ -255,13 +262,14 @@ const App: React.FC = () => {
     useEffect(() => {
         if (!isMobileViewport || mobileScreen !== 'details' || typeof window === 'undefined') return;
 
-        const frameId = window.requestAnimationFrame(() => {
-            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-            document.documentElement.scrollTop = 0;
-            document.body.scrollTop = 0;
-        });
+        scrollMobileViewportToTop();
+        const frameId = window.requestAnimationFrame(scrollMobileViewportToTop);
+        const timeoutId = window.setTimeout(scrollMobileViewportToTop, 60);
 
-        return () => window.cancelAnimationFrame(frameId);
+        return () => {
+            window.cancelAnimationFrame(frameId);
+            window.clearTimeout(timeoutId);
+        };
     }, [isMobileViewport, mobileScreen, selectedJobId]);
 
     useEffect(() => {
@@ -441,6 +449,9 @@ const App: React.FC = () => {
                                                     isMobile={isMobileViewport}
                                                     isSelected={selectedJobId === job.id}
                                                     onClick={() => {
+                                                        if (isMobileViewport) {
+                                                            scrollMobileViewportToTop();
+                                                        }
                                                         setSelectedJobId(job.id);
                                                         if (isMobileViewport) {
                                                             setMobileScreen('details');

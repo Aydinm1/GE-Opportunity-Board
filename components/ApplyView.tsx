@@ -282,8 +282,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   const [progress, setProgress] = useState(0);
   const progressRafRef = useRef<number | null>(null);
   const lastProgressRef = useRef(0);
-  const usesEmbeddedDesktopNaturalFlow = isEmbedded && !isMobile;
-  const usesFormPaneLayout = !usesEmbeddedDesktopNaturalFlow;
+  const usesFormPaneLayout = !isMobile;
   useScrollBoundaryTransfer(contentRef, !isMobile && !isEmbedded);
 
   useEffect(() => {

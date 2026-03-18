@@ -29,9 +29,9 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
     const applyDraftsRef = useRef<Record<string, ApplyDraft>>({});
     const previousJobIdRef = useRef<string>(job.id);
     const previousViewJobIdRef = useRef<string>(job.id);
-    const usesFixedDetailsPane = !isEmbedded || isMobile;
-    const usesStandalonePaneScroll = !isMobile && !isEmbedded;
-    useScrollBoundaryTransfer(detailsScrollRef, usesStandalonePaneScroll);
+    const usesFixedDetailsPane = !isMobile;
+    const usesDetailsPaneScroll = !isMobile;
+    useScrollBoundaryTransfer(detailsScrollRef, usesDetailsPaneScroll && !isEmbedded);
 
     useEffect(() => {
         return () => {
@@ -40,7 +40,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
     }, []);
 
     useEffect(() => {
-        if (!usesStandalonePaneScroll) return;
+        if (!usesDetailsPaneScroll) return;
         const el = detailsScrollRef.current;
         if (!el) return;
 
@@ -55,7 +55,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
             if (activeEl) activeEl.scrollTop = nextTop;
         });
         previousJobIdRef.current = job.id;
-    }, [job.id, usesStandalonePaneScroll]);
+    }, [job.id, usesDetailsPaneScroll]);
 
     useEffect(() => {
         if (previousViewJobIdRef.current !== job.id) {
@@ -77,7 +77,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
     }, [job.id, viewMode]);
 
     useEffect(() => {
-        if (!usesStandalonePaneScroll) return;
+        if (!usesDetailsPaneScroll) return;
         const el = detailsScrollRef.current;
         if (!el) return;
         const onScroll = () => {
@@ -87,7 +87,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
         return () => {
             el.removeEventListener('scroll', onScroll);
         };
-    }, [job.id, usesStandalonePaneScroll]);
+    }, [job.id, usesDetailsPaneScroll]);
 
     useEffect(() => {
         if (!isEmbedded || typeof window === 'undefined') return;
@@ -305,7 +305,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
     };
 
     return (
-        <div className={`flex flex-col min-h-0 ${usesFixedDetailsPane ? 'h-full' : ''} ${usesStandalonePaneScroll ? 'overflow-hidden' : 'overflow-visible'}`}>
+        <div className={`flex flex-col min-h-0 ${usesFixedDetailsPane ? 'h-full' : ''} ${usesDetailsPaneScroll ? 'overflow-hidden' : 'overflow-visible'}`}>
             {viewMode === 'apply' ? (
                 <ApplyView
                     job={job}
@@ -398,7 +398,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
 
                     {!isMobile && <div className="mb-4 h-px w-full bg-gray-100 dark:bg-gray-800"></div>}
 
-                    <div ref={detailsScrollRef} className={`${usesStandalonePaneScroll ? 'flex-1 min-h-0 overflow-y-scroll pr-2' : 'overflow-visible pb-4 pr-0'}`}>
+                    <div ref={detailsScrollRef} className={`${usesDetailsPaneScroll ? 'flex-1 min-h-0 overflow-y-scroll pr-2' : 'overflow-visible pb-4 pr-0'}`}>
                         {metaItems.length > 0 && (
                             isMobile ? (
                                 <div className="mb-8 rounded-[1.25rem] border border-slate-200/80 bg-white px-4 py-2 shadow-[0_16px_34px_rgba(15,23,42,0.05)] ring-1 ring-slate-100/80 dark:border-gray-800 dark:bg-gray-900/70 dark:shadow-none dark:ring-0">

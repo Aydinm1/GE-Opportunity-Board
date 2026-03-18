@@ -270,7 +270,7 @@ const App: React.FC = () => {
         return jobs.find(j => j.id === selectedJobId) || jobs[0] || null;
     }, [jobs, selectedJobId]);
     const isMobileDetailsView = isMobileViewport && mobileScreen === 'details';
-    const usesEmbeddedDesktopLayout = isEmbedded && !isMobileViewport;
+    const usesDesktopPaneLayout = !isMobileViewport;
 
     // Filter UI and helper logic moved to `components/Filters.tsx`.
 
@@ -384,17 +384,17 @@ const App: React.FC = () => {
             {/* Main Content */}
             <main className={`relative z-20 mx-auto flex w-full max-w-7xl flex-1 px-0 pb-12 sm:px-6 lg:px-8 ${isMobileDetailsView ? 'mt-0' : '-mt-20'}`}>
                 <div className={`flex min-h-[520px] w-full flex-col bg-surface-light px-5 pb-10 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] dark:bg-surface-dark sm:rounded-3xl sm:p-6 ${
-                    usesEmbeddedDesktopLayout
-                        ? 'overflow-visible'
-                        : 'overflow-hidden lg:h-[820px] lg:shadow-2xl'
+                    usesDesktopPaneLayout
+                        ? 'overflow-hidden lg:h-[820px] lg:shadow-2xl'
+                        : 'overflow-visible'
                 } ${
                     isMobileDetailsView
                         ? 'rounded-none pt-[calc(env(safe-area-inset-top)+1rem)]'
                         : 'rounded-t-[2rem] pt-5'
                 }`}>
-                    <div className={`grid grid-cols-1 gap-4 sm:gap-6 items-start lg:grid-cols-12 ${usesEmbeddedDesktopLayout ? '' : 'h-full lg:items-stretch'}`}>
+                    <div className={`grid grid-cols-1 gap-4 sm:gap-6 items-start lg:grid-cols-12 ${usesDesktopPaneLayout ? 'h-full lg:items-stretch' : ''}`}>
                         {/* Sidebar */}
-                        <div className={`flex flex-col gap-4 lg:col-span-4 ${usesEmbeddedDesktopLayout ? '' : 'h-full min-h-0'} ${isMobileViewport && mobileScreen !== 'list' ? 'hidden' : ''}`}>
+                        <div className={`flex flex-col gap-4 lg:col-span-4 ${usesDesktopPaneLayout ? 'h-full min-h-0' : ''} ${isMobileViewport && mobileScreen !== 'list' ? 'hidden' : ''}`}>
                             <div className="mb-1 border-b border-gray-100 pb-3 dark:border-gray-800">
                                 <div className="flex justify-between items-center gap-3">
                                     <h2 className="text-[13px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400 font-display sm:text-sm sm:tracking-[0.18em]">
@@ -412,7 +412,7 @@ const App: React.FC = () => {
                                     </div>
                                 )}
                             </div>
-                            <div ref={mobileListScrollRef} className={`flex flex-col gap-3.5 pr-0 sm:pr-2 lg:pr-2 ${usesEmbeddedDesktopLayout ? '' : 'min-h-0 lg:flex-1 lg:max-h-none lg:overflow-y-scroll'}`}>
+                            <div ref={mobileListScrollRef} className={`flex flex-col gap-3.5 pr-0 sm:pr-2 lg:pr-2 ${usesDesktopPaneLayout ? 'min-h-0 lg:flex-1 lg:max-h-none lg:overflow-y-scroll' : ''}`}>
                                 {loading ? (
                                     <div className="p-8 text-center text-gray-500 font-medium">
                                         Loading jobs...
@@ -450,10 +450,10 @@ const App: React.FC = () => {
                         <div className={`border-gray-100 pl-0 dark:border-gray-800 lg:col-span-8 lg:border-l lg:pl-6 ${
                             isMobileViewport
                                 ? 'pt-0 min-h-[360px]'
-                                : usesEmbeddedDesktopLayout
-                                    ? 'border-t pt-4 min-h-[420px]'
-                                    : 'border-t pt-4 h-[72svh] min-h-[420px] overflow-hidden'
-                        } ${usesEmbeddedDesktopLayout ? '' : 'lg:h-full lg:min-h-0 lg:overflow-hidden'} lg:border-t-0 lg:pt-0 ${isMobileViewport && mobileScreen !== 'details' ? 'hidden' : ''}`}>
+                                : usesDesktopPaneLayout
+                                    ? 'border-t pt-4 h-[72svh] min-h-[420px] overflow-hidden'
+                                    : 'border-t pt-4 min-h-[420px]'
+                        } ${usesDesktopPaneLayout ? 'lg:h-full lg:min-h-0 lg:overflow-hidden' : ''} lg:border-t-0 lg:pt-0 ${isMobileViewport && mobileScreen !== 'details' ? 'hidden' : ''}`}>
                             {loading ? (
                                 <div className="h-full flex items-center justify-center text-gray-400">
                                     Loading job details...

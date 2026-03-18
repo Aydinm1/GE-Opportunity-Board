@@ -401,19 +401,21 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
                     <div ref={detailsScrollRef} className={`${usesStandalonePaneScroll ? 'flex-1 min-h-0 overflow-y-scroll pr-2' : 'overflow-visible pb-4 pr-0'}`}>
                         {metaItems.length > 0 && (
                             isMobile ? (
-                                <div className="mb-8 rounded-[1.25rem] border border-gray-100 bg-gray-50 px-4 py-2 shadow-[0_8px_22px_rgba(15,23,42,0.035)] dark:border-gray-800 dark:bg-gray-900/50">
-                                    <div className="divide-y divide-gray-200/80 dark:divide-gray-800">
+                                <div className="mb-8 rounded-[1.25rem] border border-slate-200/80 bg-white px-4 py-2 shadow-[0_16px_34px_rgba(15,23,42,0.05)] ring-1 ring-slate-100/80 dark:border-gray-800 dark:bg-gray-900/70 dark:shadow-none dark:ring-0">
+                                    <div className="divide-y divide-slate-200/80 dark:divide-gray-800">
                                         {metaItems.map((item, index) => (
                                             <div
                                                 key={item.label}
                                                 className={`flex items-center gap-3 py-3 ${index === 0 ? 'pt-2.5' : ''}`}
                                             >
-                                                <span className="material-icons-round text-[1.45rem] text-primary">{item.icon}</span>
+                                                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/5 text-primary shadow-[inset_0_0_0_1px_rgba(0,85,140,0.12)] dark:bg-primary/10 dark:shadow-[inset_0_0_0_1px_rgba(148,163,184,0.12)]">
+                                                    <span className="material-icons-round text-[1.25rem]">{item.icon}</span>
+                                                </span>
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">{item.label}</p>
-                                                    <p className="mt-0.5 text-[0.94rem] font-semibold leading-snug text-gray-900 dark:text-white">
+                                                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-gray-400">{item.label}</p>
+                                                    <p className="mt-1 text-[0.95rem] font-semibold leading-snug text-slate-900 dark:text-white">
                                                         {item.value}
-                                                        {item.helper && <span className="ml-1 text-[12px] font-normal text-gray-400">({item.helper})</span>}
+                                                        {item.helper && <span className="ml-1 text-[12px] font-medium text-slate-400 dark:text-gray-500">({item.helper})</span>}
                                                     </p>
                                                 </div>
                                             </div>
@@ -421,17 +423,26 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
                                     </div>
                                 </div>
                             ) : (
-                                <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+                                <div className="mb-8 grid grid-cols-2 gap-x-6 gap-y-4">
                                     {metaItems.map((item) => (
-                                        <div key={item.label} className="rounded-[1.1rem] border border-gray-100 bg-gray-50 p-2.5 dark:border-gray-800 dark:bg-gray-900/50">
-                                            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500">{item.label}</p>
-                                            <div className="flex items-start gap-2">
-                                                <span className="material-icons-round text-base text-primary">{item.icon}</span>
-                                                <span className="text-sm font-semibold leading-snug dark:text-white">
-                                                    {item.value}
-                                                    {item.helper && <span className="ml-1 text-[11px] font-normal text-gray-400">({item.helper})</span>}
-                                                </span>
-                                            </div>
+                                        <div key={item.label} className="min-w-0 border-b border-slate-100 pb-3.5 dark:border-gray-800/80">
+                                            <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-gray-400">{item.label}</p>
+                                            {item.helper ? (
+                                                <div className="grid grid-cols-[17px_minmax(0,1fr)] items-start gap-x-2.5 gap-y-0.5">
+                                                    <span className="material-icons-round row-span-2 shrink-0 pt-0.5 text-[17px] leading-none text-primary/80">{item.icon}</span>
+                                                    <span className="block text-[1rem] font-semibold leading-[1.24] text-slate-900 dark:text-white">
+                                                        {item.value}
+                                                    </span>
+                                                    <span className="col-start-2 text-[11px] font-medium leading-none text-slate-400 dark:text-gray-500">{item.helper}</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className="material-icons-round shrink-0 text-[17px] leading-none text-primary/80">{item.icon}</span>
+                                                    <span className="block text-[1rem] font-semibold leading-[1.24] text-slate-900 dark:text-white">
+                                                        {item.value}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>

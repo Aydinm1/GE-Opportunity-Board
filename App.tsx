@@ -6,6 +6,7 @@ import { HOST_ORIGIN } from './constants';
 import JobCard from './components/JobCard';
 import JobDetails from './components/JobDetails';
 import Filters from './components/Filters';
+import { JOBS_LOAD_ERROR_MESSAGE, loadJobs, type RequestError } from './lib/jobs-load';
 import { captureClientException } from './lib/monitoring';
 import { isTrustedParentMessage, parseTrustedRedirectUrl } from './lib/message-security';
 import { requestIframeResize } from './lib/request-iframe-resize';
@@ -14,11 +15,6 @@ import { useScrollBoundaryTransfer } from './lib/useScrollBoundaryTransfer';
 type InitialParentParams = {
     jobParam: string | null;
     viewParam: string | null;
-};
-
-type RequestError = Error & {
-    endpoint?: string;
-    status?: number;
 };
 
 // Helper to get initial params from parent URL (for iframe embedding)
@@ -141,24 +137,15 @@ const App: React.FC = () => {
                 // Get initial params from parent URL (works in iframe)
                 const { jobParam, viewParam } = await getInitialParamsFromParentUrl(500);
                 setInitialViewMode(viewParam === 'apply' ? 'apply' : 'details');
-                
-                const response = await fetch('/api/jobs');
-                if (!response.ok) {
-                    const text = await response.text().catch(() => '');
-                    const msg = text || `Failed to fetch jobs (status ${response.status})`;
-                    const requestError = new Error(msg) as RequestError;
-                    requestError.endpoint = '/api/jobs';
-                    requestError.status = response.status;
-                    throw requestError;
-                }
-                const data = await response.json();
-                setJobs(data.jobs || []);
-                if (data.jobs && data.jobs.length > 0) {
-                    if (jobParam && data.jobs.find((j: Job) => j.id === jobParam)) {
+
+                const loadedJobs = await loadJobs();
+                setJobs(loadedJobs);
+                if (loadedJobs.length > 0) {
+                    if (jobParam && loadedJobs.find((j: Job) => j.id === jobParam)) {
                         setSelectedJobId(jobParam);
                         setMobileScreen('details');
                     } else {
-                        setSelectedJobId(data.jobs[0].id);
+                        setSelectedJobId(loadedJobs[0].id);
                         if (viewParam === 'apply') {
                             setMobileScreen('details');
                         }
@@ -176,7 +163,7 @@ const App: React.FC = () => {
                         status: requestError.status,
                     });
                 }
-                setError(err instanceof Error ? err.message : 'An error occurred');
+                setError(requestError.userMessage || (err instanceof Error ? err.message : JOBS_LOAD_ERROR_MESSAGE));
                 console.error('Error fetching jobs:', err);
             } finally {
                 setLoading(false);

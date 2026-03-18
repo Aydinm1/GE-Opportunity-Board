@@ -158,7 +158,7 @@ describe('GET /api/jobs', () => {
     const res = await getJobs();
     expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body).toEqual({ error: 'Failed to fetch jobs' });
+    expect(body).toEqual({ error: 'We couldn\'t load opportunities right now. Please try again.' });
     expect(console.error).toHaveBeenCalled();
   });
 });

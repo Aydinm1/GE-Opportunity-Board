@@ -1,5 +1,6 @@
 import { getJobs } from '../../../lib/airtable';
 import { jsonError, jsonOk } from '../../../lib/api-response';
+import { JOBS_LOAD_ERROR_MESSAGE } from '../../../lib/jobs-load';
 
 export const runtime = 'nodejs';
 
@@ -10,7 +11,7 @@ export async function GET() {
   } catch (err) {
     return jsonError(err, {
       context: '/api/jobs',
-      fallbackMessage: 'Failed to fetch jobs',
+      fallbackMessage: JOBS_LOAD_ERROR_MESSAGE,
     });
   }
 }

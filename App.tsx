@@ -253,6 +253,18 @@ const App: React.FC = () => {
     }, [filteredJobs, isMobileViewport, loading, selectedJobId]);
 
     useEffect(() => {
+        if (!isMobileViewport || mobileScreen !== 'details' || typeof window === 'undefined') return;
+
+        const frameId = window.requestAnimationFrame(() => {
+            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
+        });
+
+        return () => window.cancelAnimationFrame(frameId);
+    }, [isMobileViewport, mobileScreen, selectedJobId]);
+
+    useEffect(() => {
         if (!isEmbedded || typeof window === 'undefined') return;
 
         requestIframeResize();

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Job, FilterOptions } from '../types';
+import { requestIframeResize } from '../lib/request-iframe-resize';
 import { DURATION_BUCKETS, TIME_COMMITMENT_BUCKETS } from '../lib/utils';
 
 type FilterOption = string | { value: string; label: string };
@@ -132,10 +133,6 @@ const Filters: React.FC<Props> = ({ jobs, selectedFilters, setSelectedFilters, m
   const activeFilterMeta = filters.find((filter) => filter.id === activeFilter) || null;
   const isMobileSheet = typeof window !== 'undefined' && window.innerWidth < 1024;
   const isCompactMobile = mobileMode === 'compact' && isMobileSheet;
-  const requestIframeResize = () => {
-    if (typeof window === 'undefined') return;
-    window.dispatchEvent(new Event('opportunityboard:request-resize'));
-  };
   const closeMobileSheet = () => {
     setActiveFilter(null);
     setMobileSheetOpen(false);

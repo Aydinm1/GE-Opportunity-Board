@@ -1,29 +1,35 @@
+const ROOT_ID = 'opportunityboard-root';
+const HEIGHT_CHANGE_EPSILON = 4;
+
+function measureNodeHeight(node) {
+  if (!node) return 0;
+
+  return Math.max(
+    node.scrollHeight || 0,
+    node.offsetHeight || 0,
+    Math.ceil(node.getBoundingClientRect ? node.getBoundingClientRect().height : 0) || 0
+  );
+}
+
 function computeFullHeight() {
   const doc = document.documentElement;
   const body = document.body;
-
-  const base = Math.max(doc.scrollHeight || 0, body.scrollHeight || 0, doc.offsetHeight || 0, body.offsetHeight || 0);
-
-  let maxBottom = 0;
-  const nodes = document.querySelectorAll('body *');
-  for (let i = 0; i < nodes.length; i++) {
-    try {
-      const el = nodes[i];
-      const style = window.getComputedStyle(el);
-      if (style.position === 'fixed' || style.position === 'absolute') continue;
-      const r = el.getBoundingClientRect();
-      const bottom = r.bottom + window.pageYOffset;
-      if (bottom > maxBottom) maxBottom = bottom;
-    } catch (e) {
-    }
-  }
-
+  const root = document.getElementById(ROOT_ID);
   const viewportBottom = window.pageYOffset + window.innerHeight;
 
-  return Math.ceil(Math.max(base, maxBottom, viewportBottom));
+  return Math.ceil(
+    Math.max(
+      measureNodeHeight(doc),
+      measureNodeHeight(body),
+      measureNodeHeight(root),
+      viewportBottom
+    )
+  );
 }
 
 let resizeTimeout = null;
+let resizeFrame = null;
+let lastSentHeight = 0;
 const TARGET_PARENT_ORIGIN = (() => {
   try {
     return document.referrer ? new URL(document.referrer).origin : '*';
@@ -32,30 +38,52 @@ const TARGET_PARENT_ORIGIN = (() => {
   }
 })();
 
+function postHeightToParent() {
+  const height = computeFullHeight();
+  if (height <= 0) return;
+  if (Math.abs(height - lastSentHeight) < HEIGHT_CHANGE_EPSILON) return;
+
+  lastSentHeight = height;
+  try { parent.postMessage({ type: 'resize-iframe', height }, TARGET_PARENT_ORIGIN); } catch (e) {}
+}
+
 function sendHeightToParentDebounced(trigger = 'unknown') {
   if (window.parent === window) {
     return;
   }
+  if (resizeFrame !== null) {
+    cancelAnimationFrame(resizeFrame);
+  }
   if (resizeTimeout) {
     clearTimeout(resizeTimeout);
   }
-  resizeTimeout = setTimeout(() => {
-    const height = computeFullHeight();
-    try { parent.postMessage({ type: 'resize-iframe', height }, TARGET_PARENT_ORIGIN); } catch (e) {}
-    resizeTimeout = null;
-  }, 100);
+  resizeFrame = requestAnimationFrame(() => {
+    resizeFrame = null;
+    resizeTimeout = setTimeout(() => {
+      postHeightToParent();
+      resizeTimeout = null;
+    }, 80);
+  });
 }
 
 window.addEventListener('load', () => sendHeightToParentDebounced('window-load'));
 window.addEventListener('resize', () => sendHeightToParentDebounced('window-resize'));
+window.addEventListener('orientationchange', () => sendHeightToParentDebounced('orientation-change'));
 window.addEventListener('opportunityboard:request-resize', () => sendHeightToParentDebounced('manual-request'));
 
 const mutationObserver = new MutationObserver(() => sendHeightToParentDebounced('mutation'));
-mutationObserver.observe(document.body, { childList: true, subtree: true, attributes: true });
+mutationObserver.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
 
 if (typeof ResizeObserver !== 'undefined') {
   const ro = new ResizeObserver(() => sendHeightToParentDebounced('ResizeObserver'));
-  ro.observe(document.body);
+  const observedNodes = [document.documentElement, document.body, document.getElementById(ROOT_ID)]
+    .filter(Boolean);
+
+  observedNodes.forEach((node) => ro.observe(node));
+}
+
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => sendHeightToParentDebounced('fonts-ready')).catch(() => {});
 }
 
 sendHeightToParentDebounced('initial');

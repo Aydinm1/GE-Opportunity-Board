@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Person, Job } from '../types';
 import { MAX_APPLICATION_ATTACHMENT_BYTES, MAX_APPLICATION_ATTACHMENT_LABEL } from '../lib/application-constraints';
 import { captureClientException } from '../lib/monitoring';
+import { requestIframeResize } from '../lib/request-iframe-resize';
 import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
 
 export interface ApplyDraft {
@@ -13,6 +14,7 @@ export interface ApplyDraft {
 
 interface ApplyViewProps {
   job: Job;
+  isEmbedded?: boolean;
   isMobile?: boolean;
   onBackToDetails: () => void;
   initialDraft?: ApplyDraft;
@@ -49,7 +51,7 @@ type SubmitRequestError = Error & {
   status?: number;
 };
 
-const ApplyView: React.FC<ApplyViewProps> = ({ job, isMobile = false, onBackToDetails, initialDraft, onDraftChange }) => {
+const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile = false, onBackToDetails, initialDraft, onDraftChange }) => {
   const [person, setPerson] = useState<Person>(() => initialDraft?.person ? { ...emptyPerson(), ...initialDraft.person } : emptyPerson());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -280,7 +282,9 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   const [progress, setProgress] = useState(0);
   const progressRafRef = useRef<number | null>(null);
   const lastProgressRef = useRef(0);
-  useScrollBoundaryTransfer(contentRef, !isMobile);
+  const usesEmbeddedDesktopNaturalFlow = isEmbedded && !isMobile;
+  const usesFormPaneLayout = !usesEmbeddedDesktopNaturalFlow;
+  useScrollBoundaryTransfer(contentRef, !isMobile && !isEmbedded);
 
   useEffect(() => {
     const hydratedPerson = initialDraft?.person ? { ...emptyPerson(), ...initialDraft.person } : emptyPerson();
@@ -304,6 +308,19 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
     if (!onDraftChange) return;
     onDraftChange({ person, coverLetterFile, whyText, submissionKey });
   }, [person, coverLetterFile, whyText, submissionKey, onDraftChange]);
+
+  useEffect(() => {
+    if (!isEmbedded || typeof window === 'undefined') return;
+
+    requestIframeResize();
+    const frameId = window.requestAnimationFrame(requestIframeResize);
+    const timeoutId = window.setTimeout(requestIframeResize, 180);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [coverLetterFile, error, isEmbedded, job.id, success]);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -425,7 +442,7 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
   };
 
   return (
-    <div className={`h-full min-h-0 flex flex-col overflow-hidden bg-white dark:bg-gray-900 ${isMobile ? '' : 'rounded-xl border border-gray-100 shadow-sm dark:border-gray-800'}`}>
+    <div className={`flex flex-col min-h-0 bg-white dark:bg-gray-900 ${usesFormPaneLayout ? 'h-full overflow-hidden' : 'overflow-visible'} ${isMobile ? '' : 'rounded-xl border border-gray-100 shadow-sm dark:border-gray-800'}`}>
         <div className={`relative border-b px-4 pt-4 pb-3 ${isMobile ? '' : 'sm:px-6'}`}>
           <div className="sm:hidden">
             <button
@@ -456,8 +473,8 @@ const ageOptions = ['', '13-17', '18-24', '25-34', '35-44', '45-54','55-64','Abo
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-          <div ref={contentRef} className="flex-1 overflow-y-scroll px-4 pb-24 pt-5 sm:p-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <form onSubmit={handleSubmit} className={`${usesFormPaneLayout ? 'flex-1 flex flex-col overflow-hidden' : 'flex flex-col overflow-visible'}`}>
+          <div ref={contentRef} className={`${usesFormPaneLayout ? 'flex-1 overflow-y-scroll' : 'overflow-visible'} px-4 pb-24 pt-5 sm:p-6`} style={{ WebkitOverflowScrolling: 'touch' }}>
             <div className="hidden" aria-hidden="true">
               <label htmlFor="website-field">Website</label>
               <input

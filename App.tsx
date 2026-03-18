@@ -8,6 +8,7 @@ import JobDetails from './components/JobDetails';
 import Filters from './components/Filters';
 import { captureClientException } from './lib/monitoring';
 import { isTrustedParentMessage, parseTrustedRedirectUrl } from './lib/message-security';
+import { requestIframeResize } from './lib/request-iframe-resize';
 import { useScrollBoundaryTransfer } from './lib/useScrollBoundaryTransfer';
 
 type InitialParentParams = {
@@ -102,9 +103,15 @@ const App: React.FC = () => {
     });
     const [isMobileViewport, setIsMobileViewport] = useState(false);
     const [mobileScreen, setMobileScreen] = useState<'list' | 'details'>('list');
+    const [isEmbedded, setIsEmbedded] = useState(false);
     const mobileListScrollRef = useRef<HTMLDivElement | null>(null);
 
-    useScrollBoundaryTransfer(mobileListScrollRef, !isMobileViewport);
+    useScrollBoundaryTransfer(mobileListScrollRef, !isMobileViewport && !isEmbedded);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        setIsEmbedded(window.parent !== window);
+    }, []);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -245,17 +252,31 @@ const App: React.FC = () => {
         }
     }, [filteredJobs, isMobileViewport, loading, selectedJobId]);
 
+    useEffect(() => {
+        if (!isEmbedded || typeof window === 'undefined') return;
+
+        requestIframeResize();
+        const frameId = window.requestAnimationFrame(requestIframeResize);
+        const timeoutId = window.setTimeout(requestIframeResize, 180);
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+            window.clearTimeout(timeoutId);
+        };
+    }, [error, filteredJobs.length, isEmbedded, isMobileViewport, loading, mobileScreen, selectedFilters, selectedJobId]);
+
     const selectedJob = useMemo(() => {
         if (!selectedJobId) return null;
         return jobs.find(j => j.id === selectedJobId) || jobs[0] || null;
     }, [jobs, selectedJobId]);
     const isMobileDetailsView = isMobileViewport && mobileScreen === 'details';
+    const usesEmbeddedDesktopLayout = isEmbedded && !isMobileViewport;
 
     // Filter UI and helper logic moved to `components/Filters.tsx`.
 
 
     return (
-        <div className="flex flex-col">
+        <div id="opportunityboard-root" className="flex flex-col">
             {/* Header */}
             {/* <nav className="bg-white dark:bg-surface-dark border-b border-gray-200 dark:border-gray-800 py-4 px-4 sm:px-6 lg:px-8 z-50 relative">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -362,14 +383,18 @@ const App: React.FC = () => {
 
             {/* Main Content */}
             <main className={`relative z-20 mx-auto flex w-full max-w-7xl flex-1 px-0 pb-12 sm:px-6 lg:px-8 ${isMobileDetailsView ? 'mt-0' : '-mt-20'}`}>
-                <div className={`flex min-h-[520px] w-full flex-col overflow-hidden bg-surface-light px-5 pb-10 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] dark:bg-surface-dark sm:rounded-3xl sm:p-6 lg:h-[820px] lg:shadow-2xl ${
+                <div className={`flex min-h-[520px] w-full flex-col bg-surface-light px-5 pb-10 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] dark:bg-surface-dark sm:rounded-3xl sm:p-6 ${
+                    usesEmbeddedDesktopLayout
+                        ? 'overflow-visible'
+                        : 'overflow-hidden lg:h-[820px] lg:shadow-2xl'
+                } ${
                     isMobileDetailsView
                         ? 'rounded-none pt-[calc(env(safe-area-inset-top)+1rem)]'
                         : 'rounded-t-[2rem] pt-5'
                 }`}>
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start lg:items-stretch h-full">
+                    <div className={`grid grid-cols-1 gap-4 sm:gap-6 items-start lg:grid-cols-12 ${usesEmbeddedDesktopLayout ? '' : 'h-full lg:items-stretch'}`}>
                         {/* Sidebar */}
-                        <div className={`lg:col-span-4 flex flex-col gap-4 h-full min-h-0 ${isMobileViewport && mobileScreen !== 'list' ? 'hidden' : ''}`}>
+                        <div className={`flex flex-col gap-4 lg:col-span-4 ${usesEmbeddedDesktopLayout ? '' : 'h-full min-h-0'} ${isMobileViewport && mobileScreen !== 'list' ? 'hidden' : ''}`}>
                             <div className="mb-1 border-b border-gray-100 pb-3 dark:border-gray-800">
                                 <div className="flex justify-between items-center gap-3">
                                     <h2 className="text-[13px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400 font-display sm:text-sm sm:tracking-[0.18em]">
@@ -387,7 +412,7 @@ const App: React.FC = () => {
                                     </div>
                                 )}
                             </div>
-                            <div ref={mobileListScrollRef} className="flex flex-col gap-3.5 min-h-0 pr-0 sm:pr-2 lg:pr-2 lg:flex-1 lg:max-h-none lg:overflow-y-scroll">
+                            <div ref={mobileListScrollRef} className={`flex flex-col gap-3.5 pr-0 sm:pr-2 lg:pr-2 ${usesEmbeddedDesktopLayout ? '' : 'min-h-0 lg:flex-1 lg:max-h-none lg:overflow-y-scroll'}`}>
                                 {loading ? (
                                     <div className="p-8 text-center text-gray-500 font-medium">
                                         Loading jobs...
@@ -407,7 +432,7 @@ const App: React.FC = () => {
                                                         setSelectedJobId(job.id);
                                                         if (isMobileViewport) {
                                                             setMobileScreen('details');
-                                                        } else if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+                                                        } else if (!isEmbedded && typeof window !== 'undefined' && window.innerWidth >= 1024) {
                                                             window.scrollTo({ top: 400, behavior: 'smooth' });
                                                         }
                                                     }}
@@ -422,7 +447,13 @@ const App: React.FC = () => {
                         </div>
 
                         {/* Detailed View */}
-                        <div className={`lg:col-span-8 border-gray-100 dark:border-gray-800 lg:border-l pl-0 lg:pl-6 ${isMobileViewport ? 'pt-0 min-h-[360px]' : 'border-t pt-4 h-[72svh] min-h-[420px] overflow-hidden'} lg:border-t-0 lg:pt-0 lg:h-full lg:min-h-0 lg:overflow-hidden ${isMobileViewport && mobileScreen !== 'details' ? 'hidden' : ''}`}>
+                        <div className={`border-gray-100 pl-0 dark:border-gray-800 lg:col-span-8 lg:border-l lg:pl-6 ${
+                            isMobileViewport
+                                ? 'pt-0 min-h-[360px]'
+                                : usesEmbeddedDesktopLayout
+                                    ? 'border-t pt-4 min-h-[420px]'
+                                    : 'border-t pt-4 h-[72svh] min-h-[420px] overflow-hidden'
+                        } ${usesEmbeddedDesktopLayout ? '' : 'lg:h-full lg:min-h-0 lg:overflow-hidden'} lg:border-t-0 lg:pt-0 ${isMobileViewport && mobileScreen !== 'details' ? 'hidden' : ''}`}>
                             {loading ? (
                                 <div className="h-full flex items-center justify-center text-gray-400">
                                     Loading job details...
@@ -431,6 +462,7 @@ const App: React.FC = () => {
                                 <JobDetails
                                     job={selectedJob}
                                     initialViewMode={initialViewMode}
+                                    isEmbedded={isEmbedded}
                                     isMobile={isMobileViewport}
                                     onBackToList={isMobileViewport ? () => {
                                         setMobileScreen('list');

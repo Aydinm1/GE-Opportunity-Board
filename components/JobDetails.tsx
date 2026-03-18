@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Job } from '../types';
 import { DEFAULT_PARENT_PAGE_URL, HOST_ORIGIN } from '../constants';
 import { isTrustedParentMessage, parseTrustedRedirectUrl } from '../lib/message-security';
+import { requestIframeResize } from '../lib/request-iframe-resize';
 import { splitBullets, formatStartDate, statusVariant } from '../lib/utils';
 import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
 import ApplyView, { ApplyDraft } from './ApplyView';
@@ -9,11 +10,12 @@ import ApplyView, { ApplyDraft } from './ApplyView';
 interface JobDetailsProps {
     job: Job;
     initialViewMode?: 'details' | 'apply';
+    isEmbedded?: boolean;
     isMobile?: boolean;
     onBackToList?: () => void;
 }
 
-const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details', isMobile = false, onBackToList }) => {
+const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details', isEmbedded = false, isMobile = false, onBackToList }) => {
     const [viewMode, setViewMode] = useState<'details' | 'apply'>(() => {
         if (initialViewMode === 'apply') return 'apply';
         if (typeof window === 'undefined') return 'details';
@@ -27,7 +29,9 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
     const applyDraftsRef = useRef<Record<string, ApplyDraft>>({});
     const previousJobIdRef = useRef<string>(job.id);
     const previousViewJobIdRef = useRef<string>(job.id);
-    useScrollBoundaryTransfer(detailsScrollRef, !isMobile);
+    const usesFixedDetailsPane = !isEmbedded || isMobile;
+    const usesStandalonePaneScroll = !isMobile && !isEmbedded;
+    useScrollBoundaryTransfer(detailsScrollRef, usesStandalonePaneScroll);
 
     useEffect(() => {
         return () => {
@@ -36,6 +40,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
     }, []);
 
     useEffect(() => {
+        if (!usesStandalonePaneScroll) return;
         const el = detailsScrollRef.current;
         if (!el) return;
 
@@ -50,7 +55,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
             if (activeEl) activeEl.scrollTop = nextTop;
         });
         previousJobIdRef.current = job.id;
-    }, [job.id]);
+    }, [job.id, usesStandalonePaneScroll]);
 
     useEffect(() => {
         if (previousViewJobIdRef.current !== job.id) {
@@ -72,6 +77,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
     }, [job.id, viewMode]);
 
     useEffect(() => {
+        if (!usesStandalonePaneScroll) return;
         const el = detailsScrollRef.current;
         if (!el) return;
         const onScroll = () => {
@@ -81,7 +87,20 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
         return () => {
             el.removeEventListener('scroll', onScroll);
         };
-    }, [job.id]);
+    }, [job.id, usesStandalonePaneScroll]);
+
+    useEffect(() => {
+        if (!isEmbedded || typeof window === 'undefined') return;
+
+        requestIframeResize();
+        const frameId = window.requestAnimationFrame(requestIframeResize);
+        const timeoutId = window.setTimeout(requestIframeResize, 180);
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+            window.clearTimeout(timeoutId);
+        };
+    }, [isEmbedded, job.id, viewMode]);
 
     const inIframe = typeof window !== 'undefined' && window.parent !== window;
     const fallbackShareBaseUrl = () => (inIframe ? DEFAULT_PARENT_PAGE_URL : window.location.href);
@@ -286,10 +305,11 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
     };
 
     return (
-        <div className={`h-full min-h-0 flex flex-col ${isMobile ? 'overflow-visible' : 'overflow-hidden'}`}>
+        <div className={`flex flex-col min-h-0 ${usesFixedDetailsPane ? 'h-full' : ''} ${usesStandalonePaneScroll ? 'overflow-hidden' : 'overflow-visible'}`}>
             {viewMode === 'apply' ? (
                 <ApplyView
                     job={job}
+                    isEmbedded={isEmbedded}
                     isMobile={isMobile}
                     initialDraft={applyDraftsRef.current[job.id]}
                     onDraftChange={(draft) => {
@@ -378,7 +398,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
 
                     {!isMobile && <div className="mb-4 h-px w-full bg-gray-100 dark:bg-gray-800"></div>}
 
-                    <div ref={detailsScrollRef} className={`flex-1 min-h-0 ${isMobile ? 'overflow-visible pb-4 pr-0' : 'overflow-y-scroll pr-2'}`}>
+                    <div ref={detailsScrollRef} className={`${usesStandalonePaneScroll ? 'flex-1 min-h-0 overflow-y-scroll pr-2' : 'overflow-visible pb-4 pr-0'}`}>
                         {metaItems.length > 0 && (
                             isMobile ? (
                                 <div className="mb-8 rounded-[1.25rem] border border-gray-100 bg-gray-50 px-4 py-2 shadow-[0_8px_22px_rgba(15,23,42,0.035)] dark:border-gray-800 dark:bg-gray-900/50">

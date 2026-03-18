@@ -3,7 +3,9 @@
 
   const IFRAME_ID = 'division-fixtures-iframe';
   const MIN_IFRAME_HEIGHT = 600;
-  const MAX_IFRAME_HEIGHT = 1400;
+  const DEFAULT_DESKTOP_IFRAME_HEIGHT = 1400;
+  const MAX_IFRAME_HEIGHT = 10000;
+  const DESKTOP_BREAKPOINT = 1024;
 
   // Update this to match your deployed child app origin(s).
   const ALLOWED_CHILD_ORIGINS = [
@@ -32,6 +34,12 @@
 
   function isValidMessageShape(data) {
     return !!data && typeof data === 'object' && typeof data.type === 'string';
+  }
+
+  function getPreferredIframeHeightFloor() {
+    return window.innerWidth >= DESKTOP_BREAKPOINT
+      ? DEFAULT_DESKTOP_IFRAME_HEIGHT
+      : MIN_IFRAME_HEIGHT;
   }
 
   function isTrustedMessage(event) {
@@ -73,7 +81,8 @@
       const iframe = getIframeElement();
       if (!iframe) return;
 
-      const clampedHeight = Math.min(MAX_IFRAME_HEIGHT, Math.max(MIN_IFRAME_HEIGHT, requestedHeight));
+      const preferredFloor = getPreferredIframeHeightFloor();
+      const clampedHeight = Math.min(MAX_IFRAME_HEIGHT, Math.max(preferredFloor, requestedHeight));
       iframe.style.height = clampedHeight + 'px';
       return;
     }

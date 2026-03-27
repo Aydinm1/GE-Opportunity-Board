@@ -15,6 +15,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, isMobile = false, isSelected, on
         ? 'border-gray-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]'
         : 'border-primary bg-white shadow-md';
     const defaultCardClasses = 'border-gray-100 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)] hover:border-gray-200 hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)]';
+    const primaryMetaLabel = job.roleType || job.workType;
 
     const getLocationStyles = (loc: string | null) => {
         switch (loc) {
@@ -25,6 +26,22 @@ const JobCard: React.FC<JobCardProps> = ({ job, isMobile = false, isSelected, on
                 return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200';
             case 'Hybrid': return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border-indigo-200';
             default: return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200';
+        }
+    };
+
+    const getRoleTypeStyles = (roleType: string | null) => {
+        const normalized = roleType?.trim().toLowerCase();
+
+        switch (normalized) {
+            case 'paid':
+            case 'paid role':
+                return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+            case 'volunteer':
+            case 'volunteering':
+            case 'volunteer role':
+                return 'bg-violet-50 text-violet-700 border-violet-200';
+            default:
+                return 'bg-slate-100 text-slate-600 border-slate-200';
         }
     };
 
@@ -56,9 +73,9 @@ const JobCard: React.FC<JobCardProps> = ({ job, isMobile = false, isSelected, on
                     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide border ${getStatusStyles(job.roleStatus || 'Actively Hiring')}`}>
                         {job.roleStatus || 'Actively Hiring'}
                     </span>
-                    {job.workType && (
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide border ${getLocationStyles(job.workType)}`}>
-                            {job.workType}
+                    {primaryMetaLabel && (
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide border ${job.roleType ? getRoleTypeStyles(job.roleType) : getLocationStyles(job.workType)}`}>
+                            {primaryMetaLabel}
                         </span>
                     )}
                 </div>

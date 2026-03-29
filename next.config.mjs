@@ -2,10 +2,12 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {};
+const sentryTunnelRoute = process.env.NODE_ENV === "production" ? "/_board" : undefined;
 
 export default withSentryConfig(nextConfig, {
-  // Route browser requests to Sentry through a Next.js rewrite to reduce client-side ad-block blocking.
-  tunnelRoute: "/_board",
+  // Keep the browser tunnel in production, but avoid Next's local rewrite/proxy
+  // deprecation warning on Node 22+ during development.
+  tunnelRoute: sentryTunnelRoute,
   silent: true,
   telemetry: false,
 

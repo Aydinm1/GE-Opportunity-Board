@@ -24,7 +24,7 @@ If `SENTRY_ENVIRONMENT` is omitted, the app falls back to host/runtime values. F
 - Client/browser error capture
 - Server/API error capture
 - App Router global error capture
-- Browser tunnel through `/_board` to reduce client-side ad-block blocking
+- Browser tunnel through `/_board` in production to reduce client-side ad-block blocking
 
 Not used:
 

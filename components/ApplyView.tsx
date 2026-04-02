@@ -380,7 +380,7 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
                     }}
                     className="hidden"
                   />
-                  <p className="mt-2 text-xs text-gray-500">Accepted: PDF, DOC, DOCX, TXT up to {MAX_APPLICATION_ATTACHMENT_LABEL}.</p>
+                  <p className="mt-2 text-xs text-gray-500">Accepted: PDF, DOC, DOCX, TXT up to {MAX_APPLICATION_ATTACHMENT_LABEL}. If your file is larger, re-exporting as PDF usually reduces the size.</p>
                 </div>
               </div>
             </section>

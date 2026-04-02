@@ -23,7 +23,7 @@ function buildApplicationFormData(file: File) {
 }
 
 describe('application attachment validation', () => {
-  it('accepts resumes up to 10MB', async () => {
+  it('accepts resumes up to the configured size limit', async () => {
     const formData = buildApplicationFormData(
       new File([Buffer.alloc(MAX_APPLICATION_ATTACHMENT_BYTES, 0)], 'resume.pdf', { type: 'application/pdf' })
     );
@@ -38,7 +38,7 @@ describe('application attachment validation', () => {
     });
   });
 
-  it('rejects resumes larger than 10MB', async () => {
+  it('rejects resumes larger than the configured size limit', async () => {
     const formData = buildApplicationFormData(
       new File([Buffer.alloc(MAX_APPLICATION_ATTACHMENT_BYTES + 1, 0)], 'resume.pdf', { type: 'application/pdf' })
     );

@@ -124,7 +124,7 @@ Server-side validation is strict and enforced in `lib/validation.ts`:
 - Attachment validation enforces:
   - allowed extensions/content-types (`.pdf`, `.doc`, `.docx`, `.txt`)
   - valid uploaded file payload
-  - max size 10MB
+  - max size 5MB
   - filename safety checks (path separators are rejected)
 - Anti-bot checks validate honeypot/timing metadata when provided.
 

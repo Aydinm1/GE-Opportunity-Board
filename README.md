@@ -62,7 +62,7 @@ Client (App.tsx + components/*)
       -> lib/airtable.ts (read role records from Airtable)
 
 Client (ApplyView.tsx)
-  -> POST /api/applications
+  -> POST /api/applications (multipart/form-data)
       -> lib/airtable.ts
           1) upsert person by normalized email
           2) create application record
@@ -73,7 +73,7 @@ Client (ApplyView.tsx)
 ## Key API Endpoints
 
 - `GET /api/jobs`: fetch and normalize published job records
-- `POST /api/applications`: submit person + application + optional attachments
+- `POST /api/applications`: submit person + application fields plus a multipart CV/resume upload
   - Server-side sanitization/validation runs before Airtable writes
   - Supports `X-Idempotency-Key` to safely retry without creating duplicates
 

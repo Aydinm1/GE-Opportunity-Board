@@ -1,57 +1,60 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_APPLICATION_ATTACHMENT_BYTES, MAX_APPLICATION_ATTACHMENT_LABEL } from '../lib/application-constraints';
-import { validateApplicationPayload } from '../lib/validation';
+import { validateApplicationFormData } from '../lib/validation';
 
-const WHY_FIELD = 'Why are you interested in or qualified for this job?';
-
-function validApplicationPayload(base64: string) {
-  return {
-    person: {
-      fullName: 'Jane Doe',
-      emailAddress: 'jane@example.com',
-      phoneNumber: '+1 555 0100',
-      age: '25-34',
-      gender: 'Female',
-      countryOfOrigin: 'Canada',
-      countryOfLiving: 'United States',
-      education: 'Bachelor degree in project management.',
-      profession: 'Programme manager.',
-      jamatiExperience: 'Led local initiatives.',
-    },
-    jobId: 'recJob123',
-    extras: {
-      [WHY_FIELD]: 'I am well qualified and ready to contribute.',
-    },
-    attachments: {
-      cvResume: {
-        filename: 'resume.pdf',
-        contentType: 'application/pdf',
-        base64,
-      },
-    },
-  };
+function buildApplicationFormData(file: File) {
+  const formData = new FormData();
+  formData.append('fullName', 'Jane Doe');
+  formData.append('emailAddress', 'jane@example.com');
+  formData.append('phoneNumber', '+1 555 0100');
+  formData.append('age', '25-34');
+  formData.append('gender', 'Female');
+  formData.append('countryOfOrigin', 'Canada');
+  formData.append('countryOfLiving', 'United States');
+  formData.append('education', 'Bachelor degree in project management.');
+  formData.append('profession', 'Programme manager.');
+  formData.append('jamatiExperience', 'Led local initiatives.');
+  formData.append('jobId', 'recJob123');
+  formData.append('whyText', 'I am well qualified and ready to contribute.');
+  formData.append('formStartedAt', '1');
+  formData.append('submittedAt', '2500');
+  formData.append('cvResume', file);
+  return formData;
 }
 
 describe('application attachment validation', () => {
-  it('accepts resumes up to 10MB', () => {
-    const base64 = Buffer.alloc(MAX_APPLICATION_ATTACHMENT_BYTES, 0).toString('base64');
+  it('accepts resumes up to 10MB', async () => {
+    const formData = buildApplicationFormData(
+      new File([Buffer.alloc(MAX_APPLICATION_ATTACHMENT_BYTES, 0)], 'resume.pdf', { type: 'application/pdf' })
+    );
 
-    expect(() => validateApplicationPayload(validApplicationPayload(base64))).not.toThrow();
+    await expect(validateApplicationFormData(formData)).resolves.toMatchObject({
+      attachments: {
+        cvResume: {
+          filename: 'resume.pdf',
+          contentType: 'application/pdf',
+        },
+      },
+    });
   });
 
-  it('rejects resumes larger than 10MB', () => {
-    const base64 = Buffer.alloc(MAX_APPLICATION_ATTACHMENT_BYTES + 1, 0).toString('base64');
+  it('rejects resumes larger than 10MB', async () => {
+    const formData = buildApplicationFormData(
+      new File([Buffer.alloc(MAX_APPLICATION_ATTACHMENT_BYTES + 1, 0)], 'resume.pdf', { type: 'application/pdf' })
+    );
 
-    expect(() => validateApplicationPayload(validApplicationPayload(base64))).toThrowError(
+    await expect(validateApplicationFormData(formData)).rejects.toThrowError(
       `CV / Resume must be ${MAX_APPLICATION_ATTACHMENT_LABEL} or smaller.`
     );
   });
 
-  it('rejects unsupported select options before the Airtable write path', () => {
-    const payload = validApplicationPayload(Buffer.from('resume').toString('base64'));
-    payload.person.age = '35 to 44';
+  it('rejects unsupported select options before the Airtable write path', async () => {
+    const formData = buildApplicationFormData(
+      new File([Buffer.from('resume')], 'resume.pdf', { type: 'application/pdf' })
+    );
+    formData.set('age', '35 to 44');
 
-    expect(() => validateApplicationPayload(payload)).toThrowError(
+    await expect(validateApplicationFormData(formData)).rejects.toThrowError(
       'We couldn\'t submit your application because one of the selected options is temporarily unavailable. Please refresh the page and try again.'
     );
   });

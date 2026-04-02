@@ -2,7 +2,7 @@ import { submitApplication } from '../../../lib/airtable';
 import { jsonError, jsonOk } from '../../../lib/api-response';
 import { applyRateLimit } from '../../../lib/rate-limit';
 import { AppError } from '../../../lib/errors';
-import { validateApplicationPayload, validateIdempotencyKey } from '../../../lib/validation';
+import { validateApplicationFormData, validateIdempotencyKey } from '../../../lib/validation';
 
 export const runtime = 'nodejs';
 
@@ -22,23 +22,23 @@ export async function POST(req: Request) {
   }
 
   try {
-    let rawPayload: unknown;
-    try {
-      rawPayload = await req.json();
-    } catch {
-      throw new AppError('Invalid JSON payload.', { status: 400 });
+    const contentType = req.headers.get('content-type') || '';
+    if (!contentType.toLowerCase().startsWith('multipart/form-data')) {
+      throw new AppError('Expected multipart/form-data.', { status: 400 });
     }
-    const payload = validateApplicationPayload(rawPayload);
-    const bodyIdempotencyKey =
-      rawPayload &&
-      typeof rawPayload === 'object' &&
-      !Array.isArray(rawPayload) &&
-      (rawPayload as { meta?: { idempotencyKey?: unknown } }).meta &&
-      typeof (rawPayload as { meta?: { idempotencyKey?: unknown } }).meta?.idempotencyKey === 'string'
-        ? (rawPayload as { meta?: { idempotencyKey?: string } }).meta?.idempotencyKey
-        : null;
+
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch {
+      throw new AppError('Invalid form payload.', { status: 400 });
+    }
+    const payload = await validateApplicationFormData(formData);
+    const bodyIdempotencyKey = formData.get('idempotencyKey');
     const headerIdempotencyKey = req.headers.get('x-idempotency-key');
-    const idempotencyKey = validateIdempotencyKey(headerIdempotencyKey || bodyIdempotencyKey || null);
+    const idempotencyKey = validateIdempotencyKey(
+      headerIdempotencyKey || (typeof bodyIdempotencyKey === 'string' ? bodyIdempotencyKey : null)
+    );
     const result = await submitApplication({
       ...payload,
       idempotencyKey,

@@ -25,7 +25,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
 ]);
 const FRIENDLY_SELECT_OPTION_ERROR = 'We couldn\'t submit your application because one of the selected options is temporarily unavailable. Please refresh the page and try again.';
 
-type AttachmentInput = { filename: string; contentType: string; base64: string };
+export type AttachmentInput = { filename: string; contentType: string; bytes: Uint8Array };
 
 function sanitizeText(value: string): string {
   return value
@@ -87,18 +87,24 @@ function normalizeContentType(value: string): string {
   return value.toLowerCase().split(';')[0].trim();
 }
 
+function coerceFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
 function getExtension(filename: string): string {
   const idx = filename.lastIndexOf('.');
   if (idx === -1) return '';
   return filename.slice(idx).toLowerCase();
 }
 
-function validateAttachment(attachment: unknown): AttachmentInput {
-  requireObject(attachment, 'CV / Resume attachment is required.');
-  const record = attachment as Record<string, unknown>;
-  const filename = requireString(record.filename, 'CV / Resume filename', 255);
-  const contentTypeRaw = requireString(record.contentType, 'CV / Resume content type', 255);
-  const base64 = requireString(record.base64, 'CV / Resume payload', MAX_APPLICATION_ATTACHMENT_BASE64_CHARS);
+function validateAttachmentMetadata(filenameValue: unknown, contentTypeValue: unknown) {
+  const filename = requireString(filenameValue, 'CV / Resume filename', 255);
+  const contentTypeRaw = requireString(contentTypeValue, 'CV / Resume content type', 255);
   if (filename.includes('/') || filename.includes('\\')) {
     throw new AppError('CV / Resume filename is invalid.');
   }
@@ -113,12 +119,23 @@ function validateAttachment(attachment: unknown): AttachmentInput {
     throw new AppError('CV / Resume content type is not allowed.');
   }
 
-  let sizeBytes = 0;
-  try {
-    sizeBytes = Buffer.byteLength(base64, 'base64');
-  } catch {
+  return { filename, contentType };
+}
+
+function validateAttachmentBytes(filename: string, contentType: string, bytesValue: unknown): AttachmentInput {
+  let bytes: Uint8Array;
+
+  if (bytesValue instanceof Uint8Array) {
+    bytes = bytesValue;
+  } else if (bytesValue instanceof ArrayBuffer) {
+    bytes = new Uint8Array(bytesValue);
+  } else if (ArrayBuffer.isView(bytesValue)) {
+    bytes = new Uint8Array(bytesValue.buffer, bytesValue.byteOffset, bytesValue.byteLength);
+  } else {
     throw new AppError('CV / Resume payload is invalid.');
   }
+
+  const sizeBytes = bytes.byteLength;
   if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
     throw new AppError('CV / Resume payload is invalid.');
   }
@@ -126,7 +143,48 @@ function validateAttachment(attachment: unknown): AttachmentInput {
     throw new AppError(`CV / Resume must be ${MAX_APPLICATION_ATTACHMENT_LABEL} or smaller.`);
   }
 
-  return { filename, contentType, base64 };
+  return { filename, contentType, bytes };
+}
+
+function validateAttachment(attachment: unknown): AttachmentInput {
+  requireObject(attachment, 'CV / Resume attachment is required.');
+  const record = attachment as Record<string, unknown>;
+  const { filename, contentType } = validateAttachmentMetadata(record.filename, record.contentType);
+
+  if (typeof record.base64 === 'string') {
+    const base64 = requireString(record.base64, 'CV / Resume payload', MAX_APPLICATION_ATTACHMENT_BASE64_CHARS);
+    let sizeBytes = 0;
+    try {
+      sizeBytes = Buffer.byteLength(base64, 'base64');
+    } catch {
+      throw new AppError('CV / Resume payload is invalid.');
+    }
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+      throw new AppError('CV / Resume payload is invalid.');
+    }
+    if (sizeBytes > MAX_APPLICATION_ATTACHMENT_BYTES) {
+      throw new AppError(`CV / Resume must be ${MAX_APPLICATION_ATTACHMENT_LABEL} or smaller.`);
+    }
+    return validateAttachmentBytes(filename, contentType, Buffer.from(base64, 'base64'));
+  }
+
+  return validateAttachmentBytes(filename, contentType, record.bytes);
+}
+
+async function validateUploadedFile(fileValue: FormDataEntryValue | null): Promise<AttachmentInput> {
+  if (!(fileValue instanceof File)) {
+    throw new AppError('CV / Resume attachment is required.');
+  }
+
+  const { filename, contentType } = validateAttachmentMetadata(fileValue.name, fileValue.type);
+  if (!Number.isFinite(fileValue.size) || fileValue.size <= 0) {
+    throw new AppError('CV / Resume payload is invalid.');
+  }
+  if (fileValue.size > MAX_APPLICATION_ATTACHMENT_BYTES) {
+    throw new AppError(`CV / Resume must be ${MAX_APPLICATION_ATTACHMENT_LABEL} or smaller.`);
+  }
+
+  return validateAttachmentBytes(filename, contentType, await fileValue.arrayBuffer());
 }
 
 function validateBotMeta(payload: Record<string, unknown>) {
@@ -146,9 +204,7 @@ function validateBotMeta(payload: Record<string, unknown>) {
   }
 }
 
-export function validateApplicationPayload(payload: unknown) {
-  requireObject(payload, 'Invalid application payload.');
-  const body = payload as Record<string, unknown>;
+function validateApplicationBody(body: Record<string, unknown>, cvResume: AttachmentInput) {
   validateBotMeta(body);
 
   requireObject(body.person, 'Person details are required.');
@@ -179,10 +235,6 @@ export function validateApplicationPayload(payload: unknown) {
   const extrasObj = extrasRaw as Record<string, unknown>;
   const whyText = requireString(extrasObj[WHY_FIELD], WHY_FIELD, 4000);
   enforceWordLimit(whyText, WHY_FIELD);
-
-  requireObject(body.attachments, 'CV / Resume attachment is required.');
-  const attachmentsObj = body.attachments as Record<string, unknown>;
-  const cvResume = validateAttachment(attachmentsObj.cvResume);
 
   const person: Person = {
     fullName,
@@ -215,6 +267,52 @@ export function validateApplicationPayload(payload: unknown) {
     extras,
     attachments: { cvResume },
   };
+}
+
+export function validateApplicationPayload(payload: unknown) {
+  requireObject(payload, 'Invalid application payload.');
+  const body = payload as Record<string, unknown>;
+  requireObject(body.attachments, 'CV / Resume attachment is required.');
+  const attachmentsObj = body.attachments as Record<string, unknown>;
+  const cvResume = validateAttachment(attachmentsObj.cvResume);
+  return validateApplicationBody(body, cvResume);
+}
+
+function readFormText(formData: FormData, fieldName: string): string | undefined {
+  const value = formData.get(fieldName);
+  return typeof value === 'string' ? value : undefined;
+}
+
+export async function validateApplicationFormData(formData: FormData) {
+  const body: Record<string, unknown> = {
+    person: {
+      fullName: readFormText(formData, 'fullName'),
+      emailAddress: readFormText(formData, 'emailAddress'),
+      phoneNumber: readFormText(formData, 'phoneNumber'),
+      linkedIn: readFormText(formData, 'linkedIn'),
+      age: readFormText(formData, 'age'),
+      gender: readFormText(formData, 'gender'),
+      countryOfOrigin: readFormText(formData, 'countryOfOrigin'),
+      countryOfLiving: readFormText(formData, 'countryOfLiving'),
+      education: readFormText(formData, 'education'),
+      profession: readFormText(formData, 'profession'),
+      jamatiExperience: readFormText(formData, 'jamatiExperience'),
+    },
+    jobId: readFormText(formData, 'jobId'),
+    jobTitle: readFormText(formData, 'jobTitle'),
+    extras: {
+      [WHY_FIELD]: readFormText(formData, 'whyText'),
+    },
+    meta: {
+      website: readFormText(formData, 'website'),
+      idempotencyKey: readFormText(formData, 'idempotencyKey'),
+      formStartedAt: coerceFiniteNumber(readFormText(formData, 'formStartedAt')),
+      submittedAt: coerceFiniteNumber(readFormText(formData, 'submittedAt')),
+    },
+  };
+
+  const cvResume = await validateUploadedFile(formData.get('cvResume'));
+  return validateApplicationBody(body, cvResume);
 }
 
 export function validateIdempotencyKey(value: unknown): string | null {

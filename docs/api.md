@@ -70,33 +70,32 @@ Submits candidate application, creating/updating People and Applications records
 
 ### Request body
 
-```json
-{
-  "person": {
-    "fullName": "Jane Doe",
-    "emailAddress": "jane@example.com",
-    "phoneNumber": "+1 555 0100",
-    "age": "25-34",
-    "gender": "Female",
-    "countryOfOrigin": "Canada",
-    "countryOfLiving": "United States",
-    "education": "Text...",
-    "profession": "Text...",
-    "jamatiExperience": "Text..."
-  },
-  "jobId": "recJob123",
-  "extras": {
-    "Why are you interested in or qualified for this job?": "Text..."
-  },
-  "attachments": {
-    "cvResume": {
-      "filename": "resume.pdf",
-      "contentType": "application/pdf",
-      "base64": "JVBERi0xLjc..."
-    }
-  }
-}
-```
+`multipart/form-data`
+
+Required text fields:
+- `fullName`
+- `emailAddress`
+- `phoneNumber`
+- `age`
+- `gender`
+- `countryOfOrigin`
+- `countryOfLiving`
+- `education`
+- `profession`
+- `jamatiExperience`
+- `whyText`
+
+Optional text fields:
+- `linkedIn`
+- `jobId`
+- `jobTitle`
+- `website`
+- `idempotencyKey`
+- `formStartedAt`
+- `submittedAt`
+
+Required file field:
+- `cvResume` (`.pdf`, `.doc`, `.docx`, `.txt`)
 
 ### Response: 200
 
@@ -115,16 +114,16 @@ Submits candidate application, creating/updating People and Applications records
 ### Validation behavior
 
 Server-side validation is strict and enforced in `lib/validation.ts`:
-- Required objects/fields:
-  - `person` with full identity/profile fields
-  - `extras["Why are you interested in or qualified for this job?"]`
-  - `attachments.cvResume`
+- Required form fields:
+  - applicant identity/profile fields
+  - `whyText`
+  - `cvResume`
 - String sanitization is applied (`NFKC` normalization, control-char stripping, whitespace collapsing).
 - Email format is validated and normalized.
 - Word limits are enforced on long-text fields (100 words max).
 - Attachment validation enforces:
   - allowed extensions/content-types (`.pdf`, `.doc`, `.docx`, `.txt`)
-  - valid base64 payload
+  - valid uploaded file payload
   - max size 10MB
   - filename safety checks (path separators are rejected)
 - Anti-bot checks validate honeypot/timing metadata when provided.
@@ -139,7 +138,7 @@ Server-side validation is strict and enforced in `lib/validation.ts`:
 - Retry logic for unknown Airtable field name errors in create application path
 - Idempotency support:
   - optional request header: `X-Idempotency-Key: <unique-key>`
-  - optional payload field: `meta.idempotencyKey`
+  - optional form field: `idempotencyKey`
   - header takes precedence when both are present
   - accepted key format: `A-Z a-z 0-9 . _ : -` (max 128 chars)
   - invalid key formats are rejected with `400`
@@ -156,7 +155,7 @@ Example `400`:
 
 ```json
 {
-  "error": "Invalid JSON payload."
+  "error": "Expected multipart/form-data."
 }
 ```
 

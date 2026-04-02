@@ -4,7 +4,7 @@ import { splitBullets, parseDurationMonths, bucketFromMonths, asStringArray, asO
 
 type AirtableRecord<T> = { id: string; fields: T; createdTime: string };
 type AirtableListResponse<T> = { records: AirtableRecord<T>[]; offset?: string };
-type AttachmentInput = { filename: string; contentType: string; base64: string };
+type AttachmentInput = { filename: string; contentType: string; bytes: Uint8Array };
 type SubmitApplicationResult = { personRecordId: string; applicationRecord: AirtableRecord<AirtableApplicationFields> | null };
 
 const IDEMPOTENCY_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -378,7 +378,7 @@ async function uploadAttachmentToAirtable(recordId: string, fieldName: string, a
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contentType: attachment.contentType,
-      file: attachment.base64,
+      file: Buffer.from(attachment.bytes).toString('base64'),
       filename: attachment.filename,
     }),
   });

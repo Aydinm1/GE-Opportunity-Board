@@ -30,32 +30,48 @@ function jsonResponse(body: unknown, init: ResponseInit = {}) {
   });
 }
 
-function validApplicationPayload() {
+function validApplicationFields() {
   return {
-    person: {
-      fullName: 'Jane Doe',
-      emailAddress: 'JANE@EXAMPLE.COM',
-      phoneNumber: '+1 555 0100',
-      age: '25-34',
-      gender: 'Female',
-      countryOfOrigin: 'Canada',
-      countryOfLiving: 'United States',
-      education: 'Bachelor degree in project management.',
-      profession: 'Programme manager.',
-      jamatiExperience: 'Led local initiatives.',
-    },
+    fullName: 'Jane Doe',
+    emailAddress: 'JANE@EXAMPLE.COM',
+    phoneNumber: '+1 555 0100',
+    linkedIn: '',
+    age: '25-34',
+    gender: 'Female',
+    countryOfOrigin: 'Canada',
+    countryOfLiving: 'United States',
+    education: 'Bachelor degree in project management.',
+    profession: 'Programme manager.',
+    jamatiExperience: 'Led local initiatives.',
     jobId: 'recJob123',
-    extras: {
-      [WHY_FIELD]: 'I am well qualified and ready to contribute.',
-    },
-    attachments: {
-      cvResume: {
-        filename: 'resume.pdf',
-        contentType: 'application/pdf',
-        base64: Buffer.from('test resume bytes').toString('base64'),
-      },
-    },
+    whyText: 'I am well qualified and ready to contribute.',
+    website: '',
+    formStartedAt: '1',
+    submittedAt: '2500',
   };
+}
+
+function validResumeFile(size?: number) {
+  const bytes = typeof size === 'number' ? Buffer.alloc(size, 0) : Buffer.from('test resume bytes');
+  return new File([bytes], 'resume.pdf', { type: 'application/pdf' });
+}
+
+function buildApplicationFormData({
+  fieldOverrides = {},
+  file = validResumeFile(),
+}: {
+  fieldOverrides?: Record<string, string>;
+  file?: File | null;
+} = {}) {
+  const formData = new FormData();
+  const fields = { ...validApplicationFields(), ...fieldOverrides };
+  for (const [key, value] of Object.entries(fields)) {
+    formData.append(key, value);
+  }
+  if (file) {
+    formData.append('cvResume', file);
+  }
+  return formData;
 }
 
 afterEach(() => {
@@ -179,14 +195,14 @@ describe('POST /api/applications', () => {
       .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recApp1', fields: {} }] }));
     vi.stubGlobal('fetch', fetchMock);
 
+    const resumeBase64 = Buffer.from('test resume bytes').toString('base64');
     const req = new Request('http://localhost/api/applications', {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
         'x-forwarded-for': nextIp('198.51.101'),
         'x-idempotency-key': 'idem-key-1',
       },
-      body: JSON.stringify(validApplicationPayload()),
+      body: buildApplicationFormData(),
     });
 
     const res = await postApplication(req);
@@ -205,6 +221,13 @@ describe('POST /api/applications', () => {
     const calledUrls = fetchMock.mock.calls.map((call) => decodeURIComponent(String(call[0])));
     expect(calledUrls.some((url) => url.includes('jane@example.com'))).toBe(true);
     expect(calledUrls.some((url) => url.includes('idem-key-1'))).toBe(true);
+    const uploadRequest = fetchMock.mock.calls[3]?.[1] as RequestInit | undefined;
+    expect(uploadRequest).toBeDefined();
+    expect(JSON.parse(String(uploadRequest?.body))).toMatchObject({
+      contentType: 'application/pdf',
+      file: resumeBase64,
+      filename: 'resume.pdf',
+    });
   });
 
   it('returns cached success for repeated requests with same idempotency key', async () => {
@@ -223,24 +246,21 @@ describe('POST /api/applications', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const key = 'idem-cache-key-1';
-    const body = JSON.stringify(validApplicationPayload());
     const reqA = new Request('http://localhost/api/applications', {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
         'x-forwarded-for': nextIp('198.51.104'),
         'x-idempotency-key': key,
       },
-      body,
+      body: buildApplicationFormData(),
     });
     const reqB = new Request('http://localhost/api/applications', {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
         'x-forwarded-for': nextIp('198.51.105'),
         'x-idempotency-key': key,
       },
-      body,
+      body: buildApplicationFormData(),
     });
 
     const firstRes = await postApplication(reqA);
@@ -278,25 +298,21 @@ describe('POST /api/applications', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const key = 'idem-concurrent-key-1';
-    const body = JSON.stringify(validApplicationPayload());
-
     const reqA = new Request('http://localhost/api/applications', {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
         'x-forwarded-for': nextIp('198.51.106'),
         'x-idempotency-key': key,
       },
-      body,
+      body: buildApplicationFormData(),
     });
     const reqB = new Request('http://localhost/api/applications', {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
         'x-forwarded-for': nextIp('198.51.107'),
         'x-idempotency-key': key,
       },
-      body,
+      body: buildApplicationFormData(),
     });
 
     const firstPromise = postApplication(reqA);
@@ -315,17 +331,20 @@ describe('POST /api/applications', () => {
     expect(fetchMock.mock.calls.length).toBeGreaterThan(0);
   });
 
-  it('returns 400 for invalid JSON payload', async () => {
+  it('returns 400 for non-multipart payloads', async () => {
     const req = new Request('http://localhost/api/applications', {
       method: 'POST',
-      headers: { 'x-forwarded-for': nextIp('198.51.102') },
-      body: '{',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': nextIp('198.51.102'),
+      },
+      body: '{}',
     });
 
     const res = await postApplication(req);
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body).toEqual({ error: 'Invalid JSON payload.' });
+    expect(body).toEqual({ error: 'Expected multipart/form-data.' });
     expect(console.warn).toHaveBeenCalled();
   });
 
@@ -335,11 +354,10 @@ describe('POST /api/applications', () => {
     const req = new Request('http://localhost/api/applications', {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
         'x-forwarded-for': nextIp('198.51.108'),
         'x-idempotency-key': 'bad key with spaces',
       },
-      body: JSON.stringify(validApplicationPayload()),
+      body: buildApplicationFormData(),
     });
 
     const res = await postApplication(req);
@@ -353,16 +371,14 @@ describe('POST /api/applications', () => {
   it('returns a friendly 400 when a submitted select option is unsupported', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    const payload = validApplicationPayload();
-    payload.person.age = '35 to 44';
-
     const req = new Request('http://localhost/api/applications', {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
         'x-forwarded-for': nextIp('198.51.109'),
       },
-      body: JSON.stringify(payload),
+      body: buildApplicationFormData({
+        fieldOverrides: { age: '35 to 44' },
+      }),
     });
 
     const res = await postApplication(req);
@@ -376,6 +392,25 @@ describe('POST /api/applications', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when the resume file is missing', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const req = new Request('http://localhost/api/applications', {
+      method: 'POST',
+      headers: {
+        'x-forwarded-for': nextIp('198.51.110'),
+      },
+      body: buildApplicationFormData({ file: null }),
+    });
+
+    const res = await postApplication(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'CV / Resume attachment is required.' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('enforces rate limiting after 8 requests per minute', async () => {
     const ip = nextIp('198.51.103');
     let res: Response | null = null;
@@ -384,8 +419,11 @@ describe('POST /api/applications', () => {
       res = await postApplication(
         new Request('http://localhost/api/applications', {
           method: 'POST',
-          headers: { 'x-forwarded-for': ip },
-          body: '{',
+          headers: {
+            'content-type': 'application/json',
+            'x-forwarded-for': ip,
+          },
+          body: '{}',
         })
       );
     }

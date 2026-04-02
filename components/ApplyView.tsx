@@ -183,30 +183,29 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
     inFlightSubmitRef.current = true;
     setLoading(true);
     try {
-      const normalized = person.emailAddress.trim().toLowerCase();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader(); r.onload = () => resolve(typeof r.result === 'string' ? r.result : ''); r.onerror = reject; r.readAsDataURL(coverLetterFile);
-      });
-      const m = dataUrl.match(/^data:(.+);base64,(.+)$/);
-      if (!m) throw new Error('Could not read CV / Resume file');
-      const [, contentType, base64] = m;
-      const attachments = { cvResume: { filename: coverLetterFile.name, contentType, base64 } };
-      const payload = {
-        person: { ...person, normalizedEmail: normalized, candidateStatus: '1a - Applicant' },
-        jobId: job.id,
-        extras: { Status: '1a - Applicant', Source: 'Opportunity Board', 'Why are you interested in or qualified for this job?': whyText || '' },
-        attachments,
-        meta: {
-          website,
-          idempotencyKey: submissionKey,
-          formStartedAt: formStartedAtRef.current,
-          submittedAt: Date.now(),
-        },
-      };
+      const formData = new FormData();
+      formData.append('fullName', person.fullName);
+      formData.append('emailAddress', person.emailAddress);
+      formData.append('phoneNumber', person.phoneNumber || '');
+      formData.append('linkedIn', person.linkedIn || '');
+      formData.append('age', person.age || '');
+      formData.append('gender', person.gender || '');
+      formData.append('countryOfOrigin', person.countryOfOrigin || '');
+      formData.append('countryOfLiving', person.countryOfLiving || '');
+      formData.append('education', person.education || '');
+      formData.append('profession', person.profession || '');
+      formData.append('jamatiExperience', person.jamatiExperience || '');
+      formData.append('jobId', job.id);
+      formData.append('whyText', whyText);
+      formData.append('website', website);
+      formData.append('idempotencyKey', submissionKey);
+      formData.append('formStartedAt', String(formStartedAtRef.current));
+      formData.append('submittedAt', String(Date.now()));
+      formData.append('cvResume', coverLetterFile);
       const res = await fetch('/api/applications', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-idempotency-key': submissionKey },
-        body: JSON.stringify(payload),
+        headers: { 'x-idempotency-key': submissionKey },
+        body: formData,
       });
       if (!res.ok) {
         const txt = await res.text();

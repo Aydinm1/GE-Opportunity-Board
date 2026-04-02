@@ -111,6 +111,7 @@ describe('GET /api/jobs', () => {
 
     const res = await getJobs();
     expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     const body = await res.json();
 
     expect(body.jobs).toHaveLength(1);
@@ -123,6 +124,14 @@ describe('GET /api/jobs', () => {
       languagesRequired: ['English', 'French'],
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('https://api.airtable.com/v0/appTestBase/GE%20Roles?pageSize=100'),
+      expect.objectContaining({
+        cache: 'force-cache',
+        next: { revalidate: 300, tags: ['jobs'] },
+        headers: { Authorization: 'Bearer test-token' },
+      })
+    );
   });
 
   it('returns only jobs where Published? is true', async () => {

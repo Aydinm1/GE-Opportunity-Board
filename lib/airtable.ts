@@ -10,6 +10,8 @@ type SubmitApplicationResult = { personRecordId: string; applicationRecord: Airt
 const IDEMPOTENCY_CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_IDEMPOTENCY_CACHE_KEYS = 5000;
 const SAFE_IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,128}$/;
+const JOBS_CACHE_TTL_SECONDS = 300;
+const JOBS_CACHE_TAG = 'jobs';
 const APPLICATION_PERSON_LINK_FIELD = 'People';
 const APPLICATION_JOB_LINK_FIELD = 'GE Roles';
 const APPLICATION_ATTACHMENT_FIELD = 'CV / Resume';
@@ -145,6 +147,8 @@ export async function getJobs() {
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
+    cache: 'force-cache',
+    next: { revalidate: JOBS_CACHE_TTL_SECONDS, tags: [JOBS_CACHE_TAG] },
   });
 
   if (!res.ok) {

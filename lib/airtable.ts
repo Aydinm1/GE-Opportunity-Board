@@ -12,6 +12,28 @@ const MAX_IDEMPOTENCY_CACHE_KEYS = 5000;
 const SAFE_IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,128}$/;
 const JOBS_CACHE_TTL_SECONDS = 300;
 const JOBS_CACHE_TAG = 'jobs';
+const JOBS_QUERY_FIELDS = [
+  'Role Title',
+  'Programme / Functional Area',
+  'Team/Vertical',
+  'Displayed Status',
+  'Published?',
+  'Location / Base',
+  'Work Type',
+  'Role Type',
+  'Start Date',
+  'Duration (Months)',
+  'Duration Categories',
+  'Displayed Purpose of the Role',
+  'Key Responsibilities',
+  '10. Required Qualifications',
+  'Other Required Qualifications',
+  'Preferred Qualifications',
+  'Additional Skill Notes',
+  'Displayed Estimated Time Commitment',
+  'Languages Required',
+] as const;
+const JOBS_PUBLISHED_FORMULA = '{Published?}=1';
 const APPLICATION_PERSON_LINK_FIELD = 'People';
 const APPLICATION_JOB_LINK_FIELD = 'GE Roles';
 const APPLICATION_ATTACHMENT_FIELD = 'CV / Resume';
@@ -139,11 +161,18 @@ export async function getJobs() {
     throw new Error(`Missing Airtable env vars: ${missing.join(', ') || 'unknown'}`);
   }
 
+  const params = new URLSearchParams();
+  params.set('pageSize', '100');
+  params.set('filterByFormula', JOBS_PUBLISHED_FORMULA);
+  if (view) {
+    params.set('view', view);
+  }
+  for (const fieldName of JOBS_QUERY_FIELDS) {
+    params.append('fields[]', fieldName);
+  }
+
   const encodedTable = encodeURIComponent(table);
-  const viewQuery = view ? `&view=${encodeURIComponent(view)}` : "";
-  const url =
-    `https://api.airtable.com/v0/${baseId}/${encodedTable}` +
-    `?pageSize=100${viewQuery}`;
+  const url = `https://api.airtable.com/v0/${baseId}/${encodedTable}?${params.toString()}`;
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
@@ -158,9 +187,7 @@ export async function getJobs() {
 
   const data = (await res.json()) as AirtableListResponse<AirtableJobFields>;
 
-  const jobs = data.records
-    .filter((r) => r.fields["Published?"] === true)
-    .map((r) => {
+  const jobs = data.records.map((r) => {
     const durationMonths = parseDurationMonths(r.fields["Duration (Months)"]);
     const durationCategory =
       r.fields["Duration Categories"] ?? bucketFromMonths(durationMonths);

@@ -124,8 +124,33 @@ describe('GET /api/jobs', () => {
       languagesRequired: ['English', 'French'],
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    const airtableUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(`${airtableUrl.origin}${airtableUrl.pathname}`).toBe('https://api.airtable.com/v0/appTestBase/GE%20Roles');
+    expect(airtableUrl.searchParams.get('pageSize')).toBe('100');
+    expect(airtableUrl.searchParams.get('filterByFormula')).toBe('{Published?}=1');
+    expect(airtableUrl.searchParams.getAll('fields[]')).toEqual([
+      'Role Title',
+      'Programme / Functional Area',
+      'Team/Vertical',
+      'Displayed Status',
+      'Published?',
+      'Location / Base',
+      'Work Type',
+      'Role Type',
+      'Start Date',
+      'Duration (Months)',
+      'Duration Categories',
+      'Displayed Purpose of the Role',
+      'Key Responsibilities',
+      '10. Required Qualifications',
+      'Other Required Qualifications',
+      'Preferred Qualifications',
+      'Additional Skill Notes',
+      'Displayed Estimated Time Commitment',
+      'Languages Required',
+    ]);
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('https://api.airtable.com/v0/appTestBase/GE%20Roles?pageSize=100'),
+      String(fetchMock.mock.calls[0][0]),
       expect.objectContaining({
         cache: 'force-cache',
         next: { revalidate: 300, tags: ['jobs'] },
@@ -134,7 +159,7 @@ describe('GET /api/jobs', () => {
     );
   });
 
-  it('returns only jobs where Published? is true', async () => {
+  it('relies on Airtable-level filtering for published jobs', async () => {
     process.env.AIRTABLE_TOKEN = 'test-token';
     process.env.AIRTABLE_BASE_ID = 'appTestBase';
     process.env.AIRTABLE_GEROLES_TABLE = 'GE Roles';
@@ -145,21 +170,7 @@ describe('GET /api/jobs', () => {
           {
             id: 'recPublished',
             fields: {
-              'Published?': true,
               'Role Title': 'Published Role',
-            },
-          },
-          {
-            id: 'recDraft',
-            fields: {
-              'Published?': false,
-              'Role Title': 'Draft Role',
-            },
-          },
-          {
-            id: 'recMissingFlag',
-            fields: {
-              'Role Title': 'Missing Publish Flag',
             },
           },
         ],

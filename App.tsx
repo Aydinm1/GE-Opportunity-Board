@@ -89,6 +89,7 @@ const App: React.FC = () => {
     const [sentryServerTestResult, setSentryServerTestResult] = useState<string | null>(null);
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
     const [initialViewMode, setInitialViewMode] = useState<'details' | 'apply'>('details');
+    const [initialViewRequestId, setInitialViewRequestId] = useState(0);
     const [selectedFilters, setSelectedFilters] = useState<FilterOptions>({
         programmeArea: [],
         teamVertical: [],
@@ -130,28 +131,42 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        let cancelled = false;
+
         const fetchJobs = async () => {
+            const parentParamsPromise = getInitialParamsFromParentUrl(500).catch(() => ({
+                jobParam: null,
+                viewParam: null,
+            }));
+
             try {
                 setLoading(true);
-                
-                // Get initial params from parent URL (works in iframe)
-                const { jobParam, viewParam } = await getInitialParamsFromParentUrl(500);
-                setInitialViewMode(viewParam === 'apply' ? 'apply' : 'details');
 
                 const loadedJobs = await loadJobs();
+                if (cancelled) return;
                 setJobs(loadedJobs);
+                if (loadedJobs.length > 0) {
+                    setSelectedJobId(loadedJobs[0].id);
+                }
+                setLoading(false);
+
+                const { jobParam, viewParam } = await parentParamsPromise;
+                if (cancelled) return;
+
+                const resolvedInitialView = viewParam === 'apply' ? 'apply' : 'details';
+                setInitialViewMode(resolvedInitialView);
+                setInitialViewRequestId((current) => current + 1);
+
                 if (loadedJobs.length > 0) {
                     if (jobParam && loadedJobs.find((j: Job) => j.id === jobParam)) {
                         setSelectedJobId(jobParam);
                         setMobileScreen('details');
-                    } else {
-                        setSelectedJobId(loadedJobs[0].id);
-                        if (viewParam === 'apply') {
-                            setMobileScreen('details');
-                        }
+                    } else if (viewParam === 'apply') {
+                        setMobileScreen('details');
                     }
                 }
             } catch (err) {
+                if (cancelled) return;
                 const requestError = err as RequestError;
                 if (
                     err instanceof TypeError ||
@@ -166,11 +181,16 @@ const App: React.FC = () => {
                 setError(requestError.userMessage || (err instanceof Error ? err.message : JOBS_LOAD_ERROR_MESSAGE));
                 console.error('Error fetching jobs:', err);
             } finally {
+                if (cancelled) return;
                 setLoading(false);
             }
         };
 
         fetchJobs();
+
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     useEffect(() => {
@@ -477,6 +497,7 @@ const App: React.FC = () => {
                                 <JobDetails
                                     job={selectedJob}
                                     initialViewMode={initialViewMode}
+                                    initialViewRequestId={initialViewRequestId}
                                     isEmbedded={isEmbedded}
                                     isMobile={isMobileViewport}
                                     onBackToList={isMobileViewport ? () => {

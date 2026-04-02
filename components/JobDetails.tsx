@@ -10,12 +10,20 @@ import ApplyView, { ApplyDraft } from './ApplyView';
 interface JobDetailsProps {
     job: Job;
     initialViewMode?: 'details' | 'apply';
+    initialViewRequestId?: number;
     isEmbedded?: boolean;
     isMobile?: boolean;
     onBackToList?: () => void;
 }
 
-const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details', isEmbedded = false, isMobile = false, onBackToList }) => {
+const JobDetails: React.FC<JobDetailsProps> = ({
+    job,
+    initialViewMode = 'details',
+    initialViewRequestId = 0,
+    isEmbedded = false,
+    isMobile = false,
+    onBackToList,
+}) => {
     const [viewMode, setViewMode] = useState<'details' | 'apply'>(() => {
         if (initialViewMode === 'apply') return 'apply';
         if (typeof window === 'undefined') return 'details';
@@ -63,6 +71,10 @@ const JobDetails: React.FC<JobDetailsProps> = ({ job, initialViewMode = 'details
         }
         previousViewJobIdRef.current = job.id;
     }, [job.id]);
+
+    useEffect(() => {
+        setViewMode(initialViewMode);
+    }, [initialViewMode, initialViewRequestId]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;

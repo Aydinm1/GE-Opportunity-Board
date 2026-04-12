@@ -1,5 +1,6 @@
 import type { Person } from '../types';
 import { APPLICANT_STATUS, OPPORTUNITY_BOARD_SOURCE } from './application-select-options';
+import { AppError } from './errors';
 import { splitBullets, parseDurationMonths, bucketFromMonths, asStringArray, asOptionalTrimmedString } from './utils';
 
 type AirtableRecord<T> = { id: string; fields: T; createdTime: string };
@@ -38,6 +39,7 @@ const APPLICATION_PERSON_LINK_FIELD = 'People';
 const APPLICATION_JOB_LINK_FIELD = 'GE Roles';
 const APPLICATION_ATTACHMENT_FIELD = 'CV / Resume';
 const APPLICATION_IDEMPOTENCY_FIELD = 'Idempotency Key';
+const FRIENDLY_SELECT_OPTION_ERROR = 'We couldn\'t submit your application because one of the selected options is temporarily unavailable. Please refresh the page and try again.';
 const inFlightIdempotency = new Map<string, Promise<SubmitApplicationResult>>();
 const completedIdempotency = new Map<string, { result: SubmitApplicationResult; expiresAt: number }>();
 
@@ -234,6 +236,24 @@ function airtableBaseUrl(baseId: string, tableName: string) {
   return `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}`;
 }
 
+function toAirtableWriteError(prefix: string, details: string): Error {
+  try {
+    const parsed = JSON.parse(details) as {
+      error?: { type?: string; message?: string };
+    };
+    if (parsed.error?.type === 'INVALID_MULTIPLE_CHOICE_OPTIONS') {
+      return new AppError(FRIENDLY_SELECT_OPTION_ERROR, {
+        status: 400,
+        code: 'INVALID_SELECT_OPTION',
+      });
+    }
+  } catch {
+    // Fall back to the raw Airtable error text below.
+  }
+
+  return new Error(`${prefix}: ${details}`);
+}
+
 async function findPersonByNormalizedEmail(normalizedEmail: string): Promise<AirtableRecord<AirtablePeopleFields> | null> {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
@@ -305,7 +325,7 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
 
   if (!res.ok) {
     const d = await res.text();
-    throw new Error(`Airtable create person failed: ${d}`);
+    throw toAirtableWriteError('Airtable create person failed', d);
   }
   const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;
   return json.records && json.records.length > 0 ? json.records[0] : null;
@@ -385,7 +405,7 @@ async function createApplicationRecord(
           lastError = d;
           continue;
         }
-        throw new Error(`Airtable create application failed: ${d}`);
+        throw toAirtableWriteError('Airtable create application failed', d);
       }
       const json = await res.json() as AirtableListResponse<AirtableApplicationFields>;
       return json.records && json.records.length > 0 ? json.records[0] : null;

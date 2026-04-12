@@ -412,6 +412,47 @@ describe('POST /api/applications', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('returns a friendly 400 when Airtable rejects a select option during person creation', async () => {
+    process.env.AIRTABLE_TOKEN = 'test-token';
+    process.env.AIRTABLE_BASE_ID = 'appTestBase';
+    process.env.AIRTABLE_PEOPLE_TABLE = 'People';
+    process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ records: [] }))
+      .mockResolvedValueOnce(jsonResponse({ records: [] }))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: {
+              type: 'INVALID_MULTIPLE_CHOICE_OPTIONS',
+              message: 'Insufficient permissions to create new select option "Non-binary"',
+            },
+          },
+          { status: 422 }
+        )
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const req = new Request('http://localhost/api/applications', {
+      method: 'POST',
+      headers: {
+        'x-forwarded-for': nextIp('198.51.111'),
+      },
+      body: buildApplicationFormData(),
+    });
+
+    const res = await postApplication(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({
+      error: 'We couldn\'t submit your application because one of the selected options is temporarily unavailable. Please refresh the page and try again.',
+      code: 'INVALID_SELECT_OPTION',
+    });
+    expect(console.warn).toHaveBeenCalled();
+  });
+
   it('returns 400 when the resume file is missing', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

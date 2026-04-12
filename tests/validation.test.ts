@@ -23,6 +23,19 @@ function buildApplicationFormData(file: File) {
 }
 
 describe('application attachment validation', () => {
+  it('accepts the Airtable-cased gender option values', async () => {
+    const formData = buildApplicationFormData(
+      new File([Buffer.from('resume')], 'resume.pdf', { type: 'application/pdf' })
+    );
+    formData.set('gender', 'Non-Binary');
+
+    await expect(validateApplicationFormData(formData)).resolves.toMatchObject({
+      person: {
+        gender: 'Non-Binary',
+      },
+    });
+  });
+
   it('accepts resumes up to the configured size limit', async () => {
     const formData = buildApplicationFormData(
       new File([Buffer.alloc(MAX_APPLICATION_ATTACHMENT_BYTES, 0)], 'resume.pdf', { type: 'application/pdf' })

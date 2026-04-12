@@ -15,7 +15,7 @@ export const PERSON_AGE_OPTIONS = [
 export const PERSON_GENDER_OPTIONS = [
   'Female',
   'Male',
-  'Non-binary',
+  'Non-Binary',
   'Prefer not to share',
 ] as const;
 

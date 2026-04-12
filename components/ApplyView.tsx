@@ -53,6 +53,11 @@ type SubmitRequestError = Error & {
   status?: number;
 };
 
+function getFileExtension(name: string) {
+  const idx = name.lastIndexOf('.');
+  return idx === -1 ? '' : name.slice(idx).toLowerCase();
+}
+
 const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile = false, onBackToDetails, initialDraft, onDraftChange }) => {
   const [person, setPerson] = useState<Person>(() => initialDraft?.person ? { ...emptyPerson(), ...initialDraft.person } : emptyPerson());
   const [loading, setLoading] = useState(false);
@@ -64,6 +69,11 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
   const [website, setWebsite] = useState('');
   const inFlightSubmitRef = useRef(false);
   const formStartedAtRef = useRef<number>(Date.now());
+  const pageHideCountRef = useRef(0);
+  const visibilityChangeCountRef = useRef(0);
+  const lastVisibilityStateRef = useRef<string>(
+    typeof document !== 'undefined' ? document.visibilityState : 'unknown'
+  );
 
   const update = (k: keyof Person, v: string) => setPerson((p) => ({ ...p, [k]: v }));
 
@@ -123,6 +133,27 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
       window.clearTimeout(timeoutId);
     };
   }, [coverLetterFile, error, isEmbedded, job.id, success]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      visibilityChangeCountRef.current += 1;
+      lastVisibilityStateRef.current = document.visibilityState;
+    };
+    const handlePageHide = () => {
+      pageHideCountRef.current += 1;
+      lastVisibilityStateRef.current = document.visibilityState;
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, []);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -229,11 +260,26 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
         err instanceof TypeError ||
         (typeof requestError?.status === 'number' && requestError.status >= 500)
       ) {
+        const currentLocation = typeof window !== 'undefined' ? window.location : null;
+        const currentNavigator = typeof navigator !== 'undefined' ? navigator : null;
         captureClientException(err, {
           endpoint: requestError.endpoint || '/api/applications',
           jobId: job.id,
           operation: 'submit_application',
           status: requestError.status,
+          isEmbedded,
+          isMobile,
+          pagePath: currentLocation?.pathname || '',
+          pageSearch: currentLocation?.search || '',
+          navigatorOnline: currentNavigator?.onLine ?? null,
+          visibilityState: typeof document !== 'undefined' ? document.visibilityState : lastVisibilityStateRef.current,
+          lastVisibilityState: lastVisibilityStateRef.current,
+          pageHideCount: pageHideCountRef.current,
+          visibilityChangeCount: visibilityChangeCountRef.current,
+          submitElapsedMs: Date.now() - formStartedAtRef.current,
+          uploadBytes: coverLetterFile?.size ?? null,
+          uploadMimeType: coverLetterFile?.type || '',
+          uploadExtension: coverLetterFile ? getFileExtension(coverLetterFile.name) : '',
         });
       }
       setError(err?.message || 'Submission failed');

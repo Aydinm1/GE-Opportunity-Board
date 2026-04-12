@@ -24,7 +24,7 @@ vi.mock('@sentry/nextjs', () => ({
     }),
 }));
 
-import { captureServerException } from '../lib/monitoring';
+import { captureClientException, captureServerException } from '../lib/monitoring';
 import { sanitizeMonitoringValue, sanitizeSentryEvent } from '../lib/monitoring-config';
 
 describe('monitoring', () => {
@@ -50,6 +50,42 @@ describe('monitoring', () => {
       context: '/api/applications',
       person: '[redacted]',
       status: 500,
+    });
+    expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('captures client network failures with diagnostic metadata', () => {
+    captureClientException(new TypeError('Failed to fetch'), {
+      endpoint: '/api/applications',
+      operation: 'submit_application',
+      status: undefined,
+      navigatorOnline: false,
+      visibilityState: 'hidden',
+      pageHideCount: 1,
+      visibilityChangeCount: 2,
+      uploadBytes: 1024,
+      uploadMimeType: 'application/pdf',
+      uploadExtension: '.pdf',
+      pagePath: '/',
+      pageSearch: '?job=rec123&view=apply',
+    });
+
+    expect(sentryMock.setTag).toHaveBeenCalledWith('surface', 'client');
+    expect(sentryMock.setTag).toHaveBeenCalledWith('endpoint', '/api/applications');
+    expect(sentryMock.setTag).toHaveBeenCalledWith('operation', 'submit_application');
+    expect(sentryMock.setContext).toHaveBeenCalledWith('monitoring', {
+      endpoint: '/api/applications',
+      navigatorOnline: false,
+      operation: 'submit_application',
+      pageHideCount: 1,
+      pagePath: '/',
+      pageSearch: '?job=rec123&view=apply',
+      status: undefined,
+      uploadBytes: 1024,
+      uploadExtension: '.pdf',
+      uploadMimeType: 'application/pdf',
+      visibilityChangeCount: 2,
+      visibilityState: 'hidden',
     });
     expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
   });

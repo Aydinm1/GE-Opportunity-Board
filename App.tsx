@@ -78,7 +78,7 @@ const getInitialParamsFromParentUrl = async (timeout = 500): Promise<InitialPare
     });
 };
 
-const App: React.FC = () => {
+function App() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);

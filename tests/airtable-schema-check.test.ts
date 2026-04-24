@@ -6,7 +6,7 @@ import {
   PERSON_AGE_OPTIONS,
   PERSON_GENDER_OPTIONS,
 } from '../lib/application-select-options';
-import { compareAirtableSchema, formatSchemaMismatch } from '../lib/airtable-schema-check';
+import { compareAirtableSchema, compareAirtableSchemaReport, formatSchemaMismatch } from '../lib/airtable-schema-check';
 
 describe('airtable schema comparison', () => {
   it('formats mismatches with friendly field types', () => {
@@ -75,7 +75,7 @@ describe('airtable schema comparison', () => {
             { id: 'fldRequiredQualifications', name: '10. Required Qualifications', type: 'multipleSelects' },
             { id: 'fldOtherQualifications', name: 'Other Required Qualifications', type: 'multilineText' },
             { id: 'fldPreferredQualifications', name: 'Preferred Qualifications', type: 'multipleSelects' },
-            { id: 'fldAdditionalNotes', name: 'Additional Skill Notes', type: 'multilineText' },
+            { id: 'fldAdditionalNotes', name: 'Point form of essential skills, education & experience', type: 'multilineText' },
             { id: 'fldTimeCommitment', name: 'Displayed Estimated Time Commitment', type: 'singleLineText' },
             { id: 'fldLanguagesRequired', name: 'Languages Required', type: 'multipleSelects' },
           ],
@@ -184,7 +184,7 @@ describe('airtable schema comparison', () => {
             { id: 'fldRequiredQualifications', name: '10. Required Qualifications', type: 'multipleSelects' },
             { id: 'fldOtherQualifications', name: 'Other Required Qualifications', type: 'multilineText' },
             { id: 'fldPreferredQualifications', name: 'Preferred Qualifications', type: 'multipleSelects' },
-            { id: 'fldAdditionalNotes', name: 'Additional Skill Notes', type: 'multilineText' },
+            { id: 'fldAdditionalNotes', name: 'Point form of essential skills, education & experience', type: 'multilineText' },
             { id: 'fldTimeCommitment', name: 'Displayed Estimated Time Commitment', type: 'singleLineText' },
             { id: 'fldLanguagesRequired', name: 'Languages Required', type: 'multipleSelects' },
           ],
@@ -193,5 +193,78 @@ describe('airtable schema comparison', () => {
     });
 
     expect(failures).toContain('People.Age: missing Airtable options [35-44].');
+  });
+
+  it('allows missing optional read fields on jobs schema', () => {
+    process.env.AIRTABLE_GEROLES_TABLE = 'GE Roles';
+    process.env.AIRTABLE_PEOPLE_TABLE = 'People';
+    process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
+
+    const report = compareAirtableSchemaReport({
+      tables: [
+        {
+          id: 'tblRoles123',
+          name: 'GE Roles',
+          fields: [
+            { id: 'fldRoleTitle', name: 'Role Title', type: 'singleLineText' },
+            { id: 'fldDisplayedStatus', name: 'Displayed Status', type: 'singleSelect' },
+            { id: 'fldPublished', name: 'Published?', type: 'checkbox' },
+            { id: 'fldProgrammeArea', name: 'Programme / Functional Area', type: 'singleSelect' },
+            { id: 'fldTeamVertical', name: 'Team/Vertical', type: 'singleSelect' },
+            { id: 'fldLocationBase', name: 'Location / Base', type: 'singleLineText' },
+            { id: 'fldWorkType', name: 'Work Type', type: 'singleSelect' },
+            { id: 'fldRoleType', name: 'Role Type', type: 'singleSelect' },
+            { id: 'fldStartDate', name: 'Start Date', type: 'date' },
+            { id: 'fldDurationMonths', name: 'Duration (Months)', type: 'number' },
+            { id: 'fldDurationCategories', name: 'Duration Categories', type: 'singleSelect' },
+            { id: 'fldPurpose', name: 'Displayed Purpose of the Role', type: 'multilineText' },
+            { id: 'fldResponsibilities', name: 'Key Responsibilities', type: 'multilineText' },
+            { id: 'fldRequiredQualifications', name: '10. Required Qualifications', type: 'multipleSelects' },
+            { id: 'fldOtherQualifications', name: 'Other Required Qualifications', type: 'multilineText' },
+            { id: 'fldPreferredQualifications', name: 'Preferred Qualifications', type: 'multipleSelects' },
+            { id: 'fldTimeCommitment', name: 'Displayed Estimated Time Commitment', type: 'singleLineText' },
+            { id: 'fldLanguagesRequired', name: 'Languages Required', type: 'multipleSelects' },
+          ],
+        },
+        {
+          id: 'tblPeople123',
+          name: 'People',
+          fields: [
+            { id: 'fldFullName', name: 'Full Name', type: 'singleLineText' },
+            { id: 'fldCandidateStatus', name: 'Candidate Status', type: 'singleSelect', options: { choices: [{ name: APPLICANT_STATUS }] } },
+            { id: 'fldEmailAddress', name: 'Email Address', type: 'email' },
+            { id: 'fldPhone', name: 'Phone Number (incl. Country Code)', type: 'phoneNumber' },
+            { id: 'fldLinkedIn', name: 'LinkedIn Profile Link (if available)', type: 'url' },
+            { id: 'fldAge', name: 'Age', type: 'singleSelect', options: { choices: PERSON_AGE_OPTIONS.map((name) => ({ name })) } },
+            { id: 'fldGender', name: 'Gender', type: 'singleSelect', options: { choices: PERSON_GENDER_OPTIONS.map((name) => ({ name })) } },
+            { id: 'fldBirthCountry', name: 'Country of Birth', type: 'singleSelect', options: { choices: COUNTRY_OPTIONS.map((name) => ({ name })) } },
+            { id: 'fldLivingCountry', name: 'Country of Living (Current Location)', type: 'singleSelect', options: { choices: COUNTRY_OPTIONS.map((name) => ({ name })) } },
+            { id: 'fldJurisdiction', name: 'Jurisdiction', type: 'singleSelect' },
+            { id: 'fldEducation', name: 'Academic / Professional Education', type: 'multilineText' },
+            { id: 'fldProfession', name: 'Current Profession / Occupation', type: 'multilineText' },
+            { id: 'fldJamatiExperience', name: 'Jamati Experience', type: 'multilineText' },
+            { id: 'fldNormalizedEmail', name: 'normalized email', type: 'formula' },
+          ],
+        },
+        {
+          id: 'tblApps123',
+          name: 'Applications',
+          fields: [
+            { id: 'fldPeople', name: 'People', type: 'multipleRecordLinks' },
+            { id: 'fldRoles', name: 'GE Roles', type: 'multipleRecordLinks' },
+            { id: 'fldStatus', name: 'Status', type: 'singleSelect', options: { choices: [{ name: APPLICANT_STATUS }, { name: '2 - Interview' }] } },
+            { id: 'fldSource', name: 'Source', type: 'singleSelect', options: { choices: [{ name: OPPORTUNITY_BOARD_SOURCE }, { name: 'Referral' }] } },
+            { id: 'fldWhy', name: 'Why are you interested in or qualified for this job?', type: 'multilineText' },
+            { id: 'fldResume', name: 'CV / Resume', type: 'multipleAttachments' },
+            { id: 'fldIdempotency', name: 'Idempotency Key', type: 'singleLineText' },
+          ],
+        },
+      ],
+    });
+
+    expect(report.failures).toEqual([]);
+    expect(
+      report.warnings.some((warning) => warning.startsWith('GE Roles.Point form of essential skills, education & experience:'))
+    ).toBe(true);
   });
 });

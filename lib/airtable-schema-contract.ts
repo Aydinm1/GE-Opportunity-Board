@@ -10,6 +10,7 @@ export type AirtableFieldContract = {
   name: string;
   expectedTypes: string[];
   usage: 'read' | 'write' | 'readWrite';
+  required?: boolean;
   expectedOptions?: readonly string[];
   optionValidation?: 'contains' | 'exact';
 };
@@ -41,7 +42,7 @@ export const AIRTABLE_SCHEMA_CONTRACT: Record<'jobs' | 'people' | 'applications'
       { name: '10. Required Qualifications', expectedTypes: ['multilineText', 'multipleSelects'], usage: 'read' },
       { name: 'Other Required Qualifications', expectedTypes: ['multilineText', 'singleLineText'], usage: 'read' },
       { name: 'Preferred Qualifications', expectedTypes: ['multilineText', 'multipleSelects'], usage: 'read' },
-      { name: 'Additional Skill Notes', expectedTypes: ['multilineText', 'singleLineText'], usage: 'read' },
+      { name: 'Point form of essential skills, education & experience', expectedTypes: ['multilineText', 'singleLineText'], usage: 'read', required: false },
       { name: 'Displayed Estimated Time Commitment', expectedTypes: ['formula', 'singleLineText', 'singleSelect'], usage: 'read' },
       { name: 'Languages Required', expectedTypes: ['multipleSelects', 'multilineText'], usage: 'read' },
     ],

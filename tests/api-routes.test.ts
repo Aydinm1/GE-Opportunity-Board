@@ -145,9 +145,9 @@ describe('GET /api/jobs', () => {
       '10. Required Qualifications',
       'Other Required Qualifications',
       'Preferred Qualifications',
-      'Additional Skill Notes',
       'Displayed Estimated Time Commitment',
       'Languages Required',
+      'Point form of essential skills, education & experience',
     ]);
     expect(fetchMock).toHaveBeenCalledWith(
       String(fetchMock.mock.calls[0][0]),
@@ -196,6 +196,65 @@ describe('GET /api/jobs', () => {
     const body = await res.json();
     expect(body).toEqual({ error: 'We couldn\'t load opportunities right now. Please try again.' });
     expect(console.error).toHaveBeenCalled();
+  });
+
+  it('retries without missing optional Airtable fields', async () => {
+    process.env.AIRTABLE_TOKEN = 'test-token';
+    process.env.AIRTABLE_BASE_ID = 'appTestBase';
+    process.env.AIRTABLE_GEROLES_TABLE = 'GE Roles';
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: {
+              type: 'UNKNOWN_FIELD_NAME',
+              message: 'Unknown field name: "Point form of essential skills, education & experience"',
+            },
+          },
+          { status: 422 }
+        )
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          records: [
+            {
+              id: 'recJob123',
+              fields: {
+                'Role Title': 'Programme Lead',
+                'Published?': true,
+              },
+            },
+          ],
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await getJobs();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.jobs).toHaveLength(1);
+    expect(body.jobs[0]).toMatchObject({
+      id: 'recJob123',
+      roleTitle: 'Programme Lead',
+      additionalQualifications: null,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(console.warn).toHaveBeenCalledWith(
+      'Airtable jobs query skipped missing optional field',
+      { fieldName: 'Point form of essential skills, education & experience' }
+    );
+    expect(console.warn).toHaveBeenCalledWith(
+      'Airtable jobs response loaded without optional fields',
+      { fieldNames: ['Point form of essential skills, education & experience'] }
+    );
+
+    const firstUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    const secondUrl = new URL(String(fetchMock.mock.calls[1][0]));
+    expect(firstUrl.searchParams.getAll('fields[]')).toContain('Point form of essential skills, education & experience');
+    expect(secondUrl.searchParams.getAll('fields[]')).not.toContain('Point form of essential skills, education & experience');
   });
 });
 

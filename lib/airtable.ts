@@ -13,7 +13,7 @@ const MAX_IDEMPOTENCY_CACHE_KEYS = 5000;
 const SAFE_IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,128}$/;
 const JOBS_CACHE_TTL_SECONDS = 300;
 const JOBS_CACHE_TAG = 'jobs';
-const JOBS_QUERY_FIELDS = [
+const JOBS_REQUIRED_QUERY_FIELDS = [
   'Role Title',
   'Programme / Functional Area',
   'Team/Vertical',
@@ -30,10 +30,13 @@ const JOBS_QUERY_FIELDS = [
   '10. Required Qualifications',
   'Other Required Qualifications',
   'Preferred Qualifications',
-  'Additional Skill Notes',
   'Displayed Estimated Time Commitment',
   'Languages Required',
 ] as const;
+const JOBS_OPTIONAL_QUERY_FIELDS = [
+  'Point form of essential skills, education & experience',
+] as const;
+const JOBS_QUERY_FIELDS = [...JOBS_REQUIRED_QUERY_FIELDS, ...JOBS_OPTIONAL_QUERY_FIELDS] as const;
 const JOBS_PUBLISHED_FORMULA = '{Published?}=1';
 const APPLICATION_PERSON_LINK_FIELD = 'People';
 const APPLICATION_JOB_LINK_FIELD = 'GE Roles';
@@ -66,7 +69,7 @@ type AirtableJobFields = {
   "Other Required Qualifications"?: string;
 
   "Preferred Qualifications"?: string[] | string;
-  "Additional Skill Notes"?: string;
+  "Point form of essential skills, education & experience"?: string;
 
   "Displayed Estimated Time Commitment"?: string;
 
@@ -149,6 +152,36 @@ function setCompletedIdempotencyResult(key: string, result: SubmitApplicationRes
   completedIdempotency.set(key, { result, expiresAt: Date.now() + IDEMPOTENCY_CACHE_TTL_MS });
 }
 
+function buildJobsRequestUrl(baseId: string, table: string, view: string | undefined, fieldNames: readonly string[]) {
+  const params = new URLSearchParams();
+  params.set('pageSize', '100');
+  params.set('filterByFormula', JOBS_PUBLISHED_FORMULA);
+  if (view) {
+    params.set('view', view);
+  }
+  for (const fieldName of fieldNames) {
+    params.append('fields[]', fieldName);
+  }
+
+  return `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(table)}?${params.toString()}`;
+}
+
+function parseUnknownFieldName(details: string) {
+  try {
+    const parsed = JSON.parse(details) as {
+      error?: { type?: string; message?: string };
+    };
+    if (parsed.error?.type !== 'UNKNOWN_FIELD_NAME' || typeof parsed.error.message !== 'string') {
+      return null;
+    }
+
+    const match = parsed.error.message.match(/Unknown field name: "([^"]+)"/);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getJobs() {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
@@ -163,31 +196,46 @@ export async function getJobs() {
     throw new Error(`Missing Airtable env vars: ${missing.join(', ') || 'unknown'}`);
   }
 
-  const params = new URLSearchParams();
-  params.set('pageSize', '100');
-  params.set('filterByFormula', JOBS_PUBLISHED_FORMULA);
-  if (view) {
-    params.set('view', view);
-  }
-  for (const fieldName of JOBS_QUERY_FIELDS) {
-    params.append('fields[]', fieldName);
-  }
+  const optionalFields = new Set<string>(JOBS_OPTIONAL_QUERY_FIELDS);
+  const skippedOptionalFields = new Set<string>();
+  let requestedFields: string[] = [...JOBS_QUERY_FIELDS];
+  let data: AirtableListResponse<AirtableJobFields> | null = null;
 
-  const encodedTable = encodeURIComponent(table);
-  const url = `https://api.airtable.com/v0/${baseId}/${encodedTable}?${params.toString()}`;
+  while (!data) {
+    const res = await fetch(buildJobsRequestUrl(baseId, table, view, requestedFields), {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'force-cache',
+      next: { revalidate: JOBS_CACHE_TTL_SECONDS, tags: [JOBS_CACHE_TAG] },
+    });
 
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'force-cache',
-    next: { revalidate: JOBS_CACHE_TTL_SECONDS, tags: [JOBS_CACHE_TAG] },
-  });
+    if (res.ok) {
+      data = (await res.json()) as AirtableListResponse<AirtableJobFields>;
+      break;
+    }
 
-  if (!res.ok) {
     const details = await res.text();
+    const unknownFieldName = parseUnknownFieldName(details);
+    if (unknownFieldName && optionalFields.has(unknownFieldName) && requestedFields.includes(unknownFieldName)) {
+      skippedOptionalFields.add(unknownFieldName);
+      requestedFields = requestedFields.filter((fieldName) => fieldName !== unknownFieldName);
+      console.warn('Airtable jobs query skipped missing optional field', {
+        fieldName: unknownFieldName,
+      });
+      continue;
+    }
+
     throw new Error(`Airtable request failed: ${details}`);
   }
 
-  const data = (await res.json()) as AirtableListResponse<AirtableJobFields>;
+  if (skippedOptionalFields.size > 0) {
+    console.warn('Airtable jobs response loaded without optional fields', {
+      fieldNames: Array.from(skippedOptionalFields),
+    });
+  }
+
+  if (!data) {
+    throw new Error('Airtable jobs request completed without data');
+  }
 
   const jobs = data.records.map((r) => {
     const durationMonths = parseDurationMonths(r.fields["Duration (Months)"]);
@@ -219,7 +267,7 @@ export async function getJobs() {
       otherQualifications: asOptionalTrimmedString(r.fields["Other Required Qualifications"]),
 
       preferredQualifications: asStringArray(r.fields["Preferred Qualifications"]),
-      additionalQualifications: asOptionalTrimmedString(r.fields["Additional Skill Notes"]),
+      additionalQualifications: asOptionalTrimmedString(r.fields["Point form of essential skills, education & experience"]),
 
       timeCommitment: r.fields["Displayed Estimated Time Commitment"] ?? null,
 

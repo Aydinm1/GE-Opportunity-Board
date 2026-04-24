@@ -161,8 +161,14 @@ export function formatSchemaMismatch(
   return `${tableName}.${expectedField.name}: expected ${expected}, got ${formatActualField(actualField)}.`;
 }
 
-export function compareAirtableSchema(schema: AirtableSchemaResponse) {
+export type AirtableSchemaReport = {
+  failures: string[];
+  warnings: string[];
+};
+
+export function compareAirtableSchemaReport(schema: AirtableSchemaResponse): AirtableSchemaReport {
   const failures: string[] = [];
+  const warnings: string[] = [];
 
   for (const contract of Object.values(AIRTABLE_SCHEMA_CONTRACT)) {
     const tableIdentifier = resolveTableName(contract);
@@ -176,7 +182,12 @@ export function compareAirtableSchema(schema: AirtableSchemaResponse) {
     for (const expectedField of contract.fields) {
       const actualField = actualTable.fields.find((field) => field.name === expectedField.name);
       if (!actualField) {
-        failures.push(formatSchemaMismatch(actualTable.name, expectedField, findClosestField(expectedField, actualTable.fields)));
+        const message = formatSchemaMismatch(actualTable.name, expectedField, findClosestField(expectedField, actualTable.fields));
+        if (expectedField.required !== false) {
+          failures.push(message);
+        } else {
+          warnings.push(message);
+        }
         continue;
       }
 
@@ -189,6 +200,11 @@ export function compareAirtableSchema(schema: AirtableSchemaResponse) {
     }
   }
 
+  return { failures, warnings };
+}
+
+export function compareAirtableSchema(schema: AirtableSchemaResponse) {
+  const { failures } = compareAirtableSchemaReport(schema);
   return failures;
 }
 
@@ -228,7 +244,11 @@ export async function fetchAirtableSchema() {
 
 export async function assertLiveAirtableSchemaMatches() {
   const schema = await fetchAirtableSchema();
-  const failures = compareAirtableSchema(schema);
+  const { failures, warnings } = compareAirtableSchemaReport(schema);
+
+  if (warnings.length > 0) {
+    console.warn(['Optional Airtable schema warnings:', ...warnings].join('\n'));
+  }
 
   if (failures.length > 0) {
     throw new Error(['Airtable schema mismatches detected:', ...failures].join('\n'));

@@ -8,7 +8,7 @@ export const PERSON_AGE_OPTIONS = [
   '35-44',
   '45-54',
   '55-64',
-  'Above 65+',
+  'Above 64',
   'Prefer not to share',
 ] as const;
 

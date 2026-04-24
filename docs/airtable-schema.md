@@ -33,7 +33,7 @@ Key fields used by app:
 - `10. Required Qualifications`
 - `Other Required Qualifications`
 - `Preferred Qualifications`
-- `Additional Skill Notes`
+- `Point form of essential skills, education & experience`
 - `Displayed Estimated Time Commitment`
 - `Languages Required`
 

@@ -105,6 +105,22 @@ function compareSelectOptions(
 
   const expected = expectedField.expectedOptions;
   const actual = selectChoices(actualField);
+  if (expectedField.optionValidation === 'caseInsensitiveExact') {
+    const normalize = (option: string) => option.trim().toLowerCase();
+    const actualByNormalized = new Map(actual.map((option) => [normalize(option), option]));
+    const expectedByNormalized = new Map(expected.map((option) => [normalize(option), option]));
+    const missing = expected.filter((option) => !actualByNormalized.has(normalize(option)));
+    const unexpected = actual.filter((option) => !expectedByNormalized.has(normalize(option)));
+    const failures: string[] = [];
+    if (missing.length > 0) {
+      failures.push(`${tableName}.${expectedField.name}: missing Airtable options ${formatOptionList(missing)}.`);
+    }
+    if (unexpected.length > 0) {
+      failures.push(`${tableName}.${expectedField.name}: unexpected Airtable options ${formatOptionList(unexpected)}.`);
+    }
+    return failures;
+  }
+
   const actualSet = new Set(actual);
   const expectedSet = new Set(expected);
   const missing = expected.filter((option) => !actualSet.has(option));

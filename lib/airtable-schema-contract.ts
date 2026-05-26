@@ -12,7 +12,7 @@ export type AirtableFieldContract = {
   usage: 'read' | 'write' | 'readWrite';
   required?: boolean;
   expectedOptions?: readonly string[];
-  optionValidation?: 'contains' | 'exact';
+  optionValidation?: 'contains' | 'exact' | 'caseInsensitiveExact';
 };
 
 export type AirtableTableContract = {
@@ -63,16 +63,14 @@ export const AIRTABLE_SCHEMA_CONTRACT: Record<'jobs' | 'people' | 'applications'
       { name: 'Phone Number (incl. Country Code)', expectedTypes: ['phoneNumber', 'singleLineText'], usage: 'write' },
       { name: 'LinkedIn Profile Link (if available)', expectedTypes: ['url', 'singleLineText'], usage: 'write' },
       { name: 'Age', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: PERSON_AGE_OPTIONS, optionValidation: 'exact' },
-      { name: 'Gender', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: PERSON_GENDER_OPTIONS, optionValidation: 'exact' },
+      { name: 'Gender', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: PERSON_GENDER_OPTIONS, optionValidation: 'caseInsensitiveExact' },
       { name: 'Country of Birth', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: COUNTRY_OPTIONS, optionValidation: 'exact' },
       {
         name: 'Country of Living (Current Location)',
-        expectedTypes: ['singleSelect', 'singleLineText'],
+        expectedTypes: ['singleSelect', 'singleLineText', 'multipleSelects', 'multipleRecordLinks'],
         usage: 'write',
-        expectedOptions: COUNTRY_OPTIONS,
-        optionValidation: 'exact',
       },
-      { name: 'Jurisdiction', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write' },
+      { name: 'Jurisdiction', expectedTypes: ['singleSelect', 'singleLineText', 'multipleSelects', 'multipleRecordLinks', 'multipleLookupValues'], usage: 'write' },
       { name: 'Academic / Professional Education', expectedTypes: ['multilineText'], usage: 'write' },
       { name: 'Current Profession / Occupation', expectedTypes: ['multilineText', 'singleLineText'], usage: 'write' },
       { name: 'Jamati Experience', expectedTypes: ['multilineText'], usage: 'write' },

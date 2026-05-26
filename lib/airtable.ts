@@ -43,6 +43,7 @@ const APPLICATION_JOB_LINK_FIELD = 'GE Roles';
 const APPLICATION_ATTACHMENT_FIELD = 'CV / Resume';
 const APPLICATION_IDEMPOTENCY_FIELD = 'Idempotency Key';
 const FRIENDLY_SELECT_OPTION_ERROR = 'We couldn\'t submit your application because one of the selected options is temporarily unavailable. Please refresh the page and try again.';
+const SCHEMA_VARIABLE_PERSON_FIELDS = ['Country of Living (Current Location)', 'Jurisdiction'] as const;
 const inFlightIdempotency = new Map<string, Promise<SubmitApplicationResult>>();
 const completedIdempotency = new Map<string, { result: SubmitApplicationResult; expiresAt: number }>();
 
@@ -302,6 +303,10 @@ function toAirtableWriteError(prefix: string, details: string): Error {
   return new Error(`${prefix}: ${details}`);
 }
 
+function shouldRetryPersonCreateWithoutSchemaVariableFields(details: string) {
+  return SCHEMA_VARIABLE_PERSON_FIELDS.some((field) => details.includes(field));
+}
+
 async function findPersonByNormalizedEmail(normalizedEmail: string): Promise<AirtableRecord<AirtablePeopleFields> | null> {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
@@ -362,7 +367,7 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
   if (person.jamatiExperience && person.jamatiExperience.trim() !== '') fields['Jamati Experience'] = person.jamatiExperience.trim();
 
   const url = airtableBaseUrl(baseId, peopleTable);
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -373,6 +378,22 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
 
   if (!res.ok) {
     const d = await res.text();
+    if (shouldRetryPersonCreateWithoutSchemaVariableFields(d)) {
+      const retryFields = { ...fields };
+      for (const field of SCHEMA_VARIABLE_PERSON_FIELDS) delete retryFields[field];
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ records: [{ fields: retryFields }] }),
+      });
+      if (res.ok) {
+        const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;
+        return json.records && json.records.length > 0 ? json.records[0] : null;
+      }
+    }
     throw toAirtableWriteError('Airtable create person failed', d);
   }
   const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;

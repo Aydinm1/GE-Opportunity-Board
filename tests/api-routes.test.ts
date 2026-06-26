@@ -512,6 +512,55 @@ describe('POST /api/applications', () => {
     expect(console.warn).toHaveBeenCalled();
   });
 
+  it('retries person creation without linked-record country fields when Airtable requires record IDs', async () => {
+    process.env.AIRTABLE_TOKEN = 'test-token';
+    process.env.AIRTABLE_BASE_ID = 'appTestBase';
+    process.env.AIRTABLE_PEOPLE_TABLE = 'People';
+    process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ records: [] }))
+      .mockResolvedValueOnce(jsonResponse({ records: [] }))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: {
+              type: 'INVALID_VALUE_FOR_COLUMN',
+              message: 'Value is not an array of record IDs.',
+            },
+          },
+          { status: 422 }
+        )
+      )
+      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recPerson1', fields: {} }] }))
+      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recApp1', fields: {} }] }))
+      .mockResolvedValueOnce(jsonResponse({ attachment: { id: 'att1', url: 'https://cdn.test/file.pdf' } }))
+      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recApp1', fields: {} }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const req = new Request('http://localhost/api/applications', {
+      method: 'POST',
+      headers: {
+        'x-forwarded-for': nextIp('198.51.112'),
+      },
+      body: buildApplicationFormData(),
+    });
+
+    const res = await postApplication(req);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.result.personRecordId).toBe('recPerson1');
+
+    const firstCreateBody = JSON.parse(String((fetchMock.mock.calls[2][1] as RequestInit).body));
+    const retryCreateBody = JSON.parse(String((fetchMock.mock.calls[3][1] as RequestInit).body));
+    expect(firstCreateBody.records[0].fields).toMatchObject({
+      'Country of Living (Current Location)': 'United States',
+    });
+    expect(retryCreateBody.records[0].fields).not.toHaveProperty('Country of Living (Current Location)');
+    expect(retryCreateBody.records[0].fields).not.toHaveProperty('Jurisdiction');
+  });
+
   it('returns 400 when the resume file is missing', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

@@ -303,8 +303,25 @@ function toAirtableWriteError(prefix: string, details: string): Error {
   return new Error(`${prefix}: ${details}`);
 }
 
-function shouldRetryPersonCreateWithoutSchemaVariableFields(details: string) {
-  return SCHEMA_VARIABLE_PERSON_FIELDS.some((field) => details.includes(field));
+function shouldRetryPersonCreateWithoutSchemaVariableFields(details: string, fields: Record<string, unknown>) {
+  const hasSchemaVariableField = SCHEMA_VARIABLE_PERSON_FIELDS.some((field) => field in fields);
+  if (!hasSchemaVariableField) return false;
+
+  if (SCHEMA_VARIABLE_PERSON_FIELDS.some((field) => details.includes(field))) {
+    return true;
+  }
+
+  try {
+    const parsed = JSON.parse(details) as {
+      error?: { type?: string; message?: string };
+    };
+    return (
+      parsed.error?.type === 'INVALID_VALUE_FOR_COLUMN' &&
+      parsed.error.message === 'Value is not an array of record IDs.'
+    );
+  } catch {
+    return details.includes('Value is not an array of record IDs.');
+  }
 }
 
 async function findPersonByNormalizedEmail(normalizedEmail: string): Promise<AirtableRecord<AirtablePeopleFields> | null> {
@@ -378,7 +395,7 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
 
   if (!res.ok) {
     const d = await res.text();
-    if (shouldRetryPersonCreateWithoutSchemaVariableFields(d)) {
+    if (shouldRetryPersonCreateWithoutSchemaVariableFields(d, fields)) {
       const retryFields = { ...fields };
       for (const field of SCHEMA_VARIABLE_PERSON_FIELDS) delete retryFields[field];
       res = await fetch(url, {
@@ -393,6 +410,8 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
         const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;
         return json.records && json.records.length > 0 ? json.records[0] : null;
       }
+      const retryDetails = await res.text();
+      throw toAirtableWriteError('Airtable create person failed', retryDetails);
     }
     throw toAirtableWriteError('Airtable create person failed', d);
   }

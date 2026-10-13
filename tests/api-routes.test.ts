@@ -121,7 +121,7 @@ describe('GET /api/jobs', () => {
       durationMonths: 6,
       durationCategory: '3–6',
       keyResponsibilities: ['Lead planning', 'Coordinate teams'],
-      languagesRequired: ['English', 'French'],
+      languagesRequired: ['English, French'],
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const airtableUrl = new URL(String(fetchMock.mock.calls[0][0]));
@@ -147,6 +147,8 @@ describe('GET /api/jobs', () => {
       'Preferred Qualifications',
       'Displayed Estimated Time Commitment',
       'Languages Required',
+      'TOR',
+      'TOR Upload',
       'Point form of essential skills, education & experience',
     ]);
     expect(fetchMock).toHaveBeenCalledWith(

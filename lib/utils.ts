@@ -45,12 +45,13 @@ export function bucketFromMonths(months: number | null): string {
 }
 
 export function asStringArray(v: unknown): string[] {
-  if (Array.isArray(v)) return v.filter((x) => typeof x === 'string') as string[];
-  if (typeof v === 'string')
-    return v
-      .split(/\r?\n|,/g)
-      .map((s) => s.trim())
-      .filter(Boolean);
+  if (Array.isArray(v)) return v
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  // Commas belong inside sentences and select options. Only line breaks
+  // delimit items in a text field; Airtable multi-selects already return arrays.
+  if (typeof v === 'string') return splitBullets(v);
   return [];
 }
 

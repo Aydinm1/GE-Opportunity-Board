@@ -339,3 +339,26 @@ describe('airtable schema comparison', () => {
     ).toBe(true);
   });
 });
+
+
+describe('TOR schema contract', () => {
+  it.each(['url', 'singleLineText'])('accepts TOR as %s and uploaded attachments', (type) => {
+    process.env.AIRTABLE_GEROLES_TABLE = 'GE Roles';
+    const report = compareAirtableSchemaReport({ tables: [{ id: 'tblRoles', name: 'GE Roles', fields: [
+      { id: 'fldTor', name: 'TOR', type },
+      { id: 'fldTorUpload', name: 'TOR Upload', type: 'multipleAttachments' },
+    ] }] });
+    expect(report.failures.filter((failure) => failure.startsWith('GE Roles.TOR:') || failure.startsWith('GE Roles.TOR Upload:'))).toEqual([]);
+  });
+
+  it('tolerates missing fields but rejects incorrect TOR field types', () => {
+    process.env.AIRTABLE_GEROLES_TABLE = 'GE Roles';
+    const missing = compareAirtableSchemaReport({ tables: [{ id: 'tblRoles', name: 'GE Roles', fields: [] }] });
+    expect(missing.failures.filter((failure) => failure.startsWith('GE Roles.TOR'))).toEqual([]);
+    const wrong = compareAirtableSchemaReport({ tables: [{ id: 'tblRoles', name: 'GE Roles', fields: [
+      { id: 'fldTor', name: 'TOR', type: 'multipleRecordLinks' },
+      { id: 'fldTorUpload', name: 'TOR Upload', type: 'singleLineText' },
+    ] }] });
+    expect(wrong.failures.filter((failure) => failure.startsWith('GE Roles.TOR'))).toHaveLength(2);
+  });
+});

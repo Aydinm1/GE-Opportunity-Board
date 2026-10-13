@@ -36,6 +36,10 @@ Key fields used by app:
 - `Point form of essential skills, education & experience`
 - `Displayed Estimated Time Commitment`
 - `Languages Required`
+- `TOR` (optional URL or single-line text)
+- `TOR Upload` (optional attachments)
+
+Valid uploaded TOR documents take priority over the TOR link. Attachment links resolve a fresh Airtable download URL on click; documents are shown only for published roles in the configured jobs view.
 
 Suggested status enum:
 - `Draft`

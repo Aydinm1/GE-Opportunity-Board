@@ -26,6 +26,8 @@ export const AIRTABLE_SCHEMA_CONTRACT: Record<'jobs' | 'people' | 'applications'
     envVar: 'AIRTABLE_GEROLES_TABLE',
     fallbackName: 'GE Roles',
     fields: [
+      { name: 'TOR', expectedTypes: ['url', 'singleLineText'], usage: 'read', required: false },
+      { name: 'TOR Upload', expectedTypes: ['multipleAttachments'], usage: 'read', required: false },
       { name: 'Role Title', expectedTypes: ['singleLineText', 'formula'], usage: 'read' },
       { name: 'Displayed Status', expectedTypes: ['formula', 'singleSelect', 'singleLineText'], usage: 'read' },
       { name: 'Published?', expectedTypes: ['checkbox', 'formula'], usage: 'read' },

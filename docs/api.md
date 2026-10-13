@@ -19,6 +19,8 @@ Fetches and normalizes role data from Airtable.
     {
       "id": "rec123",
       "roleTitle": "International Program Lead",
+      "torUrl": "https://example.org/tor.pdf",
+      "torDocuments": [{ "id": "att123", "filename": "TOR.pdf", "href": "/api/jobs/rec123/tor/att123" }],
       "roleStatus": "Actively Hiring",
       "programmeArea": "Global Encounters",
       "teamVertical": "Operations",
@@ -173,3 +175,12 @@ As of the latest update, these legacy local-file endpoints have been removed:
 - `GET /uploads/[...path]`
 
 All upload behavior now goes through `POST /api/applications` and Airtable attachment handling.
+
+
+## `GET /api/jobs/[jobId]/tor/[attachmentId]`
+
+Downloads an uploaded TOR for a published role in the configured Airtable jobs view. The route fetches fresh attachment data with `cache: no-store`, then streams the file from the validated HTTPS Airtable attachment CDN with `Content-Disposition: attachment` and a safely encoded filename. CDN redirects are rejected and Airtable credentials are not forwarded. All responses use `Cache-Control: no-store`. Query parameters cannot override the destination.
+
+Returns `404` with a friendly JSON error when the role/document is unavailable, unpublished, excluded by the view, or has an unsafe URL. Returns `500` with a generic friendly JSON error on configuration or upstream failures.
+
+The jobs response includes `torUrl` (validated link or `null`) and `torDocuments` (IDs, filenames and stable app links, never temporary download URLs). The UI prefers uploads, falls back to the link, and hides the section if neither is valid. Uploaded TORs download without opening a new tab; regular TOR links open in a new tab. Loading and friendly error messages appear beside the action.

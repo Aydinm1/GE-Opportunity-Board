@@ -3,8 +3,10 @@ import { Job } from '../types';
 import { DEFAULT_PARENT_PAGE_URL, HOST_ORIGIN } from '../constants';
 import { isTrustedParentMessage, parseTrustedRedirectUrl } from '../lib/message-security';
 import { requestIframeResize } from '../lib/request-iframe-resize';
-import { splitBullets, formatStartDate, statusVariant } from '../lib/utils';
+import { formatStartDate, statusVariant } from '../lib/utils';
 import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
+import TorSection from './TorSection';
+import { getRoleLocation, normalizeQualificationItems } from '../lib/role-content';
 import ApplyView, { ApplyDraft } from './ApplyView';
 
 interface JobDetailsProps {
@@ -206,33 +208,10 @@ const JobDetails: React.FC<JobDetailsProps> = ({
             setTimeout(() => { window.removeEventListener('message', onMsg); resolve(false); }, timeout);
         });
     };
-    const otherQualifications = splitBullets(job.otherQualifications);
-    const requiredQualifications = otherQualifications.length
-        ? [...job.requiredQualifications, ...otherQualifications]
-        : job.requiredQualifications;
-
-    const additionalQualifications = splitBullets(job.additionalQualifications);
-    const normalizedPreferred = job.preferredQualifications
-        .map((pref) => pref.trim())
-        .filter(Boolean);
-    const hasOtherPreferredSelection = normalizedPreferred.some(
-        (pref) => pref.toLowerCase() === 'other (please specify below)'
-    );
-    const preferredQualifications =
-        hasOtherPreferredSelection && additionalQualifications.length
-            ? normalizedPreferred.filter((pref) => pref.toLowerCase() !== 'other (please specify below)')
-            : normalizedPreferred;
-    if ((hasOtherPreferredSelection || additionalQualifications.length) && additionalQualifications.length) {
-        preferredQualifications.push(...additionalQualifications);
-    }
-    const showSpecificLocation = (
-        job.workType === 'In-Person' ||
-        job.workType === 'Hybrid' ||
-        job.workType === 'Onsite' ||
-        job.workType === 'On-site'
-    ) && job.locationBase;
+    const requiredQualifications = normalizeQualificationItems(job.requiredQualifications, job.otherQualifications);
+    const preferredQualifications = normalizeQualificationItems(job.preferredQualifications, job.additionalQualifications);
+    const location = getRoleLocation(job.locationBase, job.workType);
     const getStatusStyles = (status: string | null) => statusVariant(status).details;
-    const locationValue = showSpecificLocation ? job.locationBase : job.workType;
     const formattedStartDate = formatStartDate(job.startDate ?? undefined);
     const commitmentValue = job.durationCategory && job.durationCategory !== 'TBD'
         ? `${job.durationCategory} Months`
@@ -240,9 +219,9 @@ const JobDetails: React.FC<JobDetailsProps> = ({
     const metaItems = [
         {
             label: 'Location',
-            icon: job.workType === 'Virtual' ? 'laptop' : 'place',
-            value: locationValue,
-            helper: showSpecificLocation ? job.workType : null,
+            icon: /^(remote|virtual)$/i.test(location.value || '') ? 'laptop' : 'place',
+            value: location.value,
+            helper: location.helper,
         },
         {
             label: 'Start Date',
@@ -419,6 +398,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({
                             )}
 
                             <div className="max-w-none font-body">
+                                <TorSection job={job} />
                                 {job.purposeShort && (
                                     <div className="pb-6">
                                         <h3 className={sectionHeadingClasses}>Role Overview</h3>
@@ -553,6 +533,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({
                         )}
 
                         <div className="prose prose-sm prose-slate dark:prose-invert max-w-none font-body">
+                            <TorSection job={job} />
                             {job.purposeShort && (
                                 <div className="mb-8">
                                     <h3 className={sectionHeadingClasses}>Role Overview</h3>

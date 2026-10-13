@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node api.js && next dev",
+    "dev": "next dev",
     "build": "next build",
-    "start": "node api.js && next start",
+    "start": "next start",
     "test": "vitest run",
     "test:airtable": "vitest run --config vitest.airtable.config.ts"
   },

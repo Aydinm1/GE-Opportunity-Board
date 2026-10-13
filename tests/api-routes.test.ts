@@ -121,7 +121,7 @@ describe('GET /api/jobs', () => {
       durationMonths: 6,
       durationCategory: '3–6',
       keyResponsibilities: ['Lead planning', 'Coordinate teams'],
-      languagesRequired: ['English', 'French'],
+      languagesRequired: ['English, French'],
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const airtableUrl = new URL(String(fetchMock.mock.calls[0][0]));

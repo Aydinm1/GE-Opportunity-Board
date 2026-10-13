@@ -147,6 +147,8 @@ describe('GET /api/jobs', () => {
       'Preferred Qualifications',
       'Displayed Estimated Time Commitment',
       'Languages Required',
+      'TOR',
+      'TOR Upload',
       'Point form of essential skills, education & experience',
     ]);
     expect(fetchMock).toHaveBeenCalledWith(

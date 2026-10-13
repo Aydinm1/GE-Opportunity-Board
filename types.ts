@@ -1,6 +1,14 @@
+export interface TorDocument {
+  id: string;
+  filename: string | null;
+  href: string;
+}
+
 export interface Job {
   id: string;
   roleTitle: string;
+  torUrl?: string | null;
+  torDocuments?: TorDocument[];
   roleStatus?: string | null;
   programmeArea: string | null;
   teamVertical: string | null;

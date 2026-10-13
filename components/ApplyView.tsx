@@ -473,7 +473,7 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
             
 
             <div className="mb-8">
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Why are you interested in or qualified for this job? <span className="text-gray-500 text-xs">({WORD_LIMIT} words max)</span><span className="text-red-600 ml-1">*</span></label>
+              <label className="block text-sm font-semibold text-gray-600 mb-2">Why are you interested in or qualified for this role? <span className="text-gray-500 text-xs">({WORD_LIMIT} words max)</span><span className="text-red-600 ml-1">*</span></label>
               <textarea required aria-required placeholder="Share why this opportunity is a fit for you" value={whyText} onChange={(e) => setWhyText(enforceWordLimit(e.target.value, WORD_LIMIT))} className="w-full p-4 border border-gray-200 rounded-md h-28 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
               <div className="text-xs text-gray-500 mt-1">{countWords(whyText)} / {WORD_LIMIT} words</div>
             </div>

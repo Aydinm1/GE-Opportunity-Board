@@ -1,6 +1,7 @@
 import type { Person } from '../types';
 import { APPLICANT_STATUS, OPPORTUNITY_BOARD_SOURCE } from './application-select-options';
 import { AppError } from './errors';
+import { normalizeDocumentUrl, normalizeTorDocuments } from './tor';
 import { splitBullets, parseDurationMonths, bucketFromMonths, asStringArray, asOptionalTrimmedString } from './utils';
 
 type AirtableRecord<T> = { id: string; fields: T; createdTime: string };
@@ -34,6 +35,8 @@ const JOBS_REQUIRED_QUERY_FIELDS = [
   'Languages Required',
 ] as const;
 const JOBS_OPTIONAL_QUERY_FIELDS = [
+  'TOR',
+  'TOR Upload',
   'Point form of essential skills, education & experience',
 ] as const;
 const JOBS_QUERY_FIELDS = [...JOBS_REQUIRED_QUERY_FIELDS, ...JOBS_OPTIONAL_QUERY_FIELDS] as const;
@@ -48,6 +51,8 @@ const inFlightIdempotency = new Map<string, Promise<SubmitApplicationResult>>();
 const completedIdempotency = new Map<string, { result: SubmitApplicationResult; expiresAt: number }>();
 
 type AirtableJobFields = {
+  "TOR"?: string;
+  "TOR Upload"?: AirtableAttachment[];
   "Role Title"?: string;
   "Programme / Functional Area"?: string;
   "Team/Vertical"?: string;
@@ -245,6 +250,8 @@ export async function getJobs() {
 
     return {
       id: r.id,
+      torUrl: normalizeDocumentUrl(r.fields.TOR),
+      torDocuments: normalizeTorDocuments(r.id, r.fields["TOR Upload"]),
 
       roleTitle: r.fields["Role Title"] ?? "",
       roleStatus: r.fields["Displayed Status"] ?? null,
@@ -277,6 +284,34 @@ export async function getJobs() {
   });
 
   return { jobs };
+}
+
+export async function getTorAttachmentUrl(jobId: string, attachmentId: string): Promise<string> {
+  const unavailable = () => new AppError('This TOR document is no longer available. Please return to the role and refresh.', { status: 404 });
+  if (!/^rec[A-Za-z0-9]+$/.test(jobId) || !/^att[A-Za-z0-9]+$/.test(attachmentId)) throw unavailable();
+  const token = process.env.AIRTABLE_TOKEN;
+  const baseId = process.env.AIRTABLE_BASE_ID;
+  const table = process.env.AIRTABLE_GEROLES_TABLE;
+  if (!token || !baseId || !table) throw new Error('Missing Airtable configuration for TOR documents');
+  const url = new URL(buildJobsRequestUrl(baseId, table, process.env.AIRTABLE_JOBS_VIEW, ['Published?', 'TOR Upload']));
+  url.searchParams.set('filterByFormula', `AND(${JOBS_PUBLISHED_FORMULA},RECORD_ID()='${jobId}')`);
+  url.searchParams.set('maxRecords', '1');
+  const response = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  if (!response.ok) {
+    const details = await response.text();
+    if (response.status === 404 || parseUnknownFieldName(details) === 'TOR Upload') throw unavailable();
+    throw new Error(`Airtable TOR request failed (${response.status})`);
+  }
+  const data = await response.json() as AirtableListResponse<AirtableJobFields>;
+  const role = data.records.find((record) => record.id === jobId && Boolean(record.fields['Published?']));
+  const attachments = role?.fields['TOR Upload'];
+  const attachment = Array.isArray(attachments) ? attachments.find((item) => item?.id === attachmentId) : undefined;
+  const destination = normalizeDocumentUrl(attachment?.url);
+  if (!destination) throw unavailable();
+  return destination;
 }
 
 // --- Airtable write helpers ---

@@ -63,22 +63,56 @@ describe('TOR job mapping and selection', () => {
   });
 });
 
-describe('fresh TOR attachment redirect', () => {
-  it('fetches a fresh URL on every click with publication/view filtering and no caching', async () => {
+describe('fresh TOR attachment download', () => {
+  it('fetches a fresh file on each click with publication/view filtering and no caching', async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(json({ records: [role({ 'TOR Upload': [{ ...upload, url: 'https://files.example/fresh1.pdf' }] })] }))
-      .mockResolvedValueOnce(json({ records: [role({ 'TOR Upload': [{ ...upload, url: 'https://files.example/fresh2.pdf' }] })] }));
+      .mockResolvedValueOnce(json({ records: [role({ 'TOR Upload': [{ ...upload, url: 'https://v5.airtableusercontent.com/fresh1.pdf' }] })] }))
+      .mockResolvedValueOnce(new Response('first document', { headers: { 'content-type': 'application/pdf' } }))
+      .mockResolvedValueOnce(json({ records: [role({ 'TOR Upload': [{ ...upload, url: 'https://v5.airtableusercontent.com/fresh2.pdf' }] })] }))
+      .mockResolvedValueOnce(new Response('second document', { headers: { 'content-type': 'application/pdf' } }));
     vi.stubGlobal('fetch', fetchMock);
     for (let index = 1; index <= 2; index++) {
       const response = await request();
-      expect(response.status).toBe(302);
-      expect(response.headers.get('location')).toBe(`https://files.example/fresh${index}.pdf`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('location')).toBeNull();
       expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('content-disposition')).toContain('attachment; filename="Role TOR.pdf"');
+      expect(response.headers.get('content-type')).toBe('application/pdf');
+      expect(await response.text()).toBe(index === 1 ? 'first document' : 'second document');
     }
     const url = new URL(fetchMock.mock.calls[0][0]);
     expect(url.searchParams.get('filterByFormula')).toBe("AND({Published?}=1,RECORD_ID()='recRole')");
     expect(url.searchParams.get('view')).toBe('Public roles');
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ cache: 'no-store', headers: { Authorization: 'Bearer test-token' } });
+    expect(fetchMock.mock.calls[1]).toEqual(['https://v5.airtableusercontent.com/fresh1.pdf', expect.objectContaining({ cache: 'no-store', redirect: 'error' })]);
+    expect(fetchMock.mock.calls[1][1]).not.toHaveProperty('headers');
+  });
+
+  it.each(['https://evil.example/document', 'https://airtableusercontent.com.evil.example/document', 'http://v5.airtableusercontent.com/document', 'https://127.0.0.1/document'])('never proxies untrusted destinations: %s', async (url) => {
+    const fetchMock = vi.fn().mockResolvedValue(json({ records: [role({ 'TOR Upload': [{ ...upload, url }] })] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const response = await request();
+    expect(response.status).toBe(500);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('safely encodes Unicode filenames and removes header/path controls', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(json({ records: [role({ 'TOR Upload': [{ ...upload, url: 'https://v5.airtableusercontent.com/file', filename: 'Résumé / TOR\r\n.pdf' }] })] }))
+      .mockResolvedValueOnce(new Response('file')));
+    const response = await request();
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-disposition')).toContain("filename*=UTF-8''R%C3%A9sum%C3%A9%20_%20TOR__.pdf");
+  });
+
+  it('returns a friendly error when the attachment CDN fails', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(json({ records: [role({ 'TOR Upload': [{ ...upload, url: 'https://v5.airtableusercontent.com/file' }] })] }))
+      .mockResolvedValueOnce(new Response('private upstream error', { status: 403 })));
+    const response = await request();
+    expect(response.status).toBe(500);
+    expect((await response.json()).error).not.toContain('private upstream');
+    expect(response.headers.get('cache-control')).toBe('no-store');
   });
 
   it.each([
@@ -115,7 +149,7 @@ describe('fresh TOR attachment redirect', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('private upstream details', { status: 503 })));
     const response = await request();
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: 'We could not open this TOR document. Please return to the role and try again.' });
+    expect(await response.json()).toEqual({ error: 'We could not download this TOR document. Please return to the role and try again.' });
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
 });

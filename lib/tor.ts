@@ -31,7 +31,8 @@ export function getTorLinks(job: { torDocuments?: TorDocument[]; torUrl?: string
     key: document.id,
     href: document.href,
     label: document.filename || 'View TOR',
+    download: true,
   }));
   const url = normalizeDocumentUrl(job.torUrl);
-  return url ? [{ key: 'tor-link', href: url, label: 'View TOR' }] : [];
+  return url ? [{ key: 'tor-link', href: url, label: 'View TOR', download: false }] : [];
 }

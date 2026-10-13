@@ -286,7 +286,7 @@ export async function getJobs() {
   return { jobs };
 }
 
-export async function getTorAttachmentUrl(jobId: string, attachmentId: string): Promise<string> {
+export async function getTorAttachment(jobId: string, attachmentId: string): Promise<{ url: string; filename: string | null }> {
   const unavailable = () => new AppError('This TOR document is no longer available. Please return to the role and refresh.', { status: 404 });
   if (!/^rec[A-Za-z0-9]+$/.test(jobId) || !/^att[A-Za-z0-9]+$/.test(attachmentId)) throw unavailable();
   const token = process.env.AIRTABLE_TOKEN;
@@ -311,7 +311,7 @@ export async function getTorAttachmentUrl(jobId: string, attachmentId: string): 
   const attachment = Array.isArray(attachments) ? attachments.find((item) => item?.id === attachmentId) : undefined;
   const destination = normalizeDocumentUrl(attachment?.url);
   if (!destination) throw unavailable();
-  return destination;
+  return { url: destination, filename: asOptionalTrimmedString(attachment?.filename) };
 }
 
 // --- Airtable write helpers ---

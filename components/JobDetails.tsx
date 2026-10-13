@@ -420,7 +420,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({
                             )}
 
                             <div className="max-w-none font-body">
-                                <TorSection job={job} headingClassName={sectionHeadingClasses} />
+                                <TorSection job={job} />
                                 {job.purposeShort && (
                                     <div className="pb-6">
                                         <h3 className={sectionHeadingClasses}>Role Overview</h3>
@@ -555,7 +555,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({
                         )}
 
                         <div className="prose prose-sm prose-slate dark:prose-invert max-w-none font-body">
-                            <TorSection job={job} headingClassName={sectionHeadingClasses} />
+                            <TorSection job={job} />
                             {job.purposeShort && (
                                 <div className="mb-8">
                                     <h3 className={sectionHeadingClasses}>Role Overview</h3>

@@ -50,6 +50,7 @@ const APPLICATION_IDEMPOTENCY_FIELD = 'Idempotency Key';
 const FRIENDLY_SELECT_OPTION_ERROR = 'We couldn\'t submit your application because one of your selected answers could not be saved. Your answers are still on this page. Please try again later, and let the Global Encounters team know if this keeps happening.';
 const SCHEMA_VARIABLE_PERSON_FIELDS = ['Country of Living (Current Location)', 'Jurisdiction'] as const;
 const PERSON_SELECT_FIELDS = ['Candidate Status', 'Age', 'Gender', 'Country of Birth', ...SCHEMA_VARIABLE_PERSON_FIELDS] as const;
+const OPTIONAL_PERSON_SELECT_FIELDS = new Set<string>(['Gender', 'Country of Birth', ...SCHEMA_VARIABLE_PERSON_FIELDS]);
 const MAX_PERSON_CREATE_RETRIES = 3;
 const inFlightIdempotency = new Map<string, Promise<SubmitApplicationResult>>();
 const completedIdempotency = new Map<string, { result: SubmitApplicationResult; expiresAt: number }>();
@@ -343,23 +344,23 @@ function parseRefusedSelectOption(details: string): string | null {
   return match?.[1] ?? null;
 }
 
-function toAirtableWriteError(prefix: string, details: string): Error {
+function toAirtableWriteError(prefix: string, details: string, status?: number): Error {
   const error = parseAirtableError(details);
   if (error?.type === 'INVALID_MULTIPLE_CHOICE_OPTIONS') {
     const appError = new AppError(FRIENDLY_SELECT_OPTION_ERROR, {
       status: 400,
       code: 'INVALID_SELECT_OPTION',
     });
-    // jsonError logs `cause`, so the refused value reaches the logs while the user sees the friendly copy.
+    // Error causes are logged: retain diagnostics, never the response message or applicant values.
     appError.cause = {
       operation: prefix,
       airtableErrorType: error.type,
-      airtableMessage: error.message,
+      status,
     };
     return appError;
   }
 
-  return new Error(`${prefix}: ${details}`);
+  return new Error(`${prefix} (${status ?? 'unknown status'}; ${typeof error?.type === 'string' && /^[A-Z_]+$/.test(error.type) ? error.type : 'UNKNOWN_ERROR'})`);
 }
 
 function selectFieldsHoldingRefusedOption(details: string, fields: Record<string, unknown>): string[] {
@@ -372,21 +373,9 @@ function shouldRetryPersonCreateWithoutSchemaVariableFields(details: string, fie
   const hasSchemaVariableField = SCHEMA_VARIABLE_PERSON_FIELDS.some((field) => field in fields);
   if (!hasSchemaVariableField) return false;
 
-  if (SCHEMA_VARIABLE_PERSON_FIELDS.some((field) => details.includes(field))) {
-    return true;
-  }
-
-  try {
-    const parsed = JSON.parse(details) as {
-      error?: { type?: string; message?: string };
-    };
-    return (
-      parsed.error?.type === 'INVALID_VALUE_FOR_COLUMN' &&
-      parsed.error.message === 'Value is not an array of record IDs.'
-    );
-  } catch {
-    return details.includes('Value is not an array of record IDs.');
-  }
+  const error = parseAirtableError(details);
+  return error?.type === 'INVALID_VALUE_FOR_COLUMN' &&
+    error.message === 'Value is not an array of record IDs.';
 }
 
 async function findPersonByNormalizedEmail(normalizedEmail: string): Promise<AirtableRecord<AirtablePeopleFields> | null> {
@@ -450,7 +439,7 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
 
   const url = airtableBaseUrl(baseId, peopleTable);
   let attemptFields: Record<string, unknown> = fields;
-  const refusedSelectFields: string[] = [];
+  const omissions: Array<{ field: string; airtableErrorType: string; status: number }> = [];
 
   for (let attempt = 0; ; attempt += 1) {
     const res = await fetch(url, {
@@ -463,40 +452,42 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
     });
 
     if (res.ok) {
-      if (refusedSelectFields.length > 0) reportRefusedPersonSelectFields(refusedSelectFields);
+      if (omissions.length > 0) reportRefusedPersonSelectFields(omissions);
       const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;
       return json.records && json.records.length > 0 ? json.records[0] : null;
     }
 
     const d = await res.text();
     if (attempt >= MAX_PERSON_CREATE_RETRIES) {
-      throw toAirtableWriteError('Airtable create person failed', d);
+      throw toAirtableWriteError('Airtable create person failed', d, res.status);
     }
 
     // A refused select option (schema drift in Airtable) should not block the applicant:
     // create the person without that field and report it so staff can fix the option.
     const refusedFields = selectFieldsHoldingRefusedOption(d, attemptFields);
-    let dropFields: readonly string[] = refusedFields;
+    let dropFields: readonly string[] = refusedFields.length === 1 && OPTIONAL_PERSON_SELECT_FIELDS.has(refusedFields[0])
+      ? refusedFields
+      : [];
     if (dropFields.length === 0 && shouldRetryPersonCreateWithoutSchemaVariableFields(d, attemptFields)) {
-      dropFields = SCHEMA_VARIABLE_PERSON_FIELDS;
+      dropFields = SCHEMA_VARIABLE_PERSON_FIELDS.filter((field) => field in attemptFields);
     }
     if (dropFields.length === 0) {
-      throw toAirtableWriteError('Airtable create person failed', d);
+      throw toAirtableWriteError('Airtable create person failed', d, res.status);
     }
 
-    for (const field of refusedFields) {
-      refusedSelectFields.push(`${field}=${String(attemptFields[field])}`);
+    for (const field of dropFields) {
+      omissions.push({ field, airtableErrorType: parseAirtableError(d)?.type ?? 'UNKNOWN_ERROR', status: res.status });
     }
     attemptFields = { ...attemptFields };
     for (const field of dropFields) delete attemptFields[field];
   }
 }
 
-function reportRefusedPersonSelectFields(refusedSelectFields: string[]) {
+function reportRefusedPersonSelectFields(omissions: Array<{ field: string; airtableErrorType: string; status: number }>) {
   const meta = {
     context: '/api/applications',
     operation: 'create_person_select_option_fallback',
-    refusedSelectOptions: refusedSelectFields.join('; '),
+    omissions,
   };
   console.warn('Airtable refused People select options; person created without them', meta);
   captureServerException(
@@ -579,7 +570,7 @@ async function createApplicationRecord(
           lastError = d;
           continue;
         }
-        throw toAirtableWriteError('Airtable create application failed', d);
+        throw toAirtableWriteError('Airtable create application failed', d, res.status);
       }
       const json = await res.json() as AirtableListResponse<AirtableApplicationFields>;
       return json.records && json.records.length > 0 ? json.records[0] : null;

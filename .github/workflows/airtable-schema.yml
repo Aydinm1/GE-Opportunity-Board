@@ -1,0 +1,28 @@
+name: Airtable schema check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  schema:
+    runs-on: ubuntu-latest
+    # Only trusted code from the default branch receives the schema credential.
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check live Airtable schema (read only)
+        run: npm run test:airtable
+        env:
+          AIRTABLE_TOKEN: ${{ secrets.AIRTABLE_SCHEMA_TOKEN }}
+          AIRTABLE_BASE_ID: ${{ vars.AIRTABLE_BASE_ID }}
+          AIRTABLE_GEROLES_TABLE: ${{ vars.AIRTABLE_GEROLES_TABLE }}
+          AIRTABLE_PEOPLE_TABLE: ${{ vars.AIRTABLE_PEOPLE_TABLE }}
+          AIRTABLE_APPLICATIONS_TABLE: ${{ vars.AIRTABLE_APPLICATIONS_TABLE }}

@@ -120,8 +120,8 @@ Server-side validation is strict and enforced in `lib/validation.ts`:
   - applicant identity/profile fields
   - `whyText`
   - `cvResume`
-- String sanitization is applied (`NFKC` normalization, control-char stripping, whitespace collapsing).
-- Email format is validated and normalized.
+- String sanitization applies NFKC normalization and control-character cleanup. Single-line values collapse whitespace; the four long answers preserve paragraph breaks, tabs and indentation while normalizing CRLF/CR line endings to LF.
+- Email format is validated and normalized. Optional LinkedIn values must be HTTP/HTTPS URLs on linkedin.com or its subdomains; a plain name or another host is rejected.
 - Word limits are enforced on long-text fields (100 words max).
 - Attachment validation enforces:
   - allowed extensions/content-types (`.pdf`, `.doc`, `.docx`, `.txt`)

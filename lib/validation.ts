@@ -10,8 +10,9 @@ import {
   PERSON_SELECT_ALLOWLISTS,
 } from './application-select-options';
 import type { Person } from './types';
+import { APPLICATION_WORD_LIMIT, isLinkedInProfileUrl } from './application-form';
 
-const WORD_LIMIT = 100;
+const WORD_LIMIT = APPLICATION_WORD_LIMIT;
 const WHY_FIELD = 'Why are you interested in or qualified for this job?';
 const SAFE_IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,128}$/;
 const CONTROL_CHARS = /[\u0000-\u001F\u007F]/g;
@@ -41,9 +42,11 @@ function requireObject(value: unknown, message: string) {
   }
 }
 
-function requireString(value: unknown, fieldName: string, maxLength = 512): string {
+function requireString(value: unknown, fieldName: string, maxLength = 512, multiline = false): string {
   if (typeof value !== 'string') throw new AppError(`${fieldName} is required.`);
-  const trimmed = sanitizeText(value);
+  const trimmed = multiline
+    ? value.normalize('NFKC').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ').trim()
+    : sanitizeText(value);
   if (!trimmed) throw new AppError(`${fieldName} is required.`);
   if (trimmed.length > maxLength) throw new AppError(`${fieldName} is too long.`);
   return trimmed;
@@ -222,9 +225,9 @@ function validateApplicationBody(body: Record<string, unknown>, cvResume: Attach
   requireAllowedOption(gender, PERSON_SELECT_ALLOWLISTS.gender);
   requireAllowedOption(countryOfOrigin, PERSON_SELECT_ALLOWLISTS.countryOfOrigin);
   requireAllowedOption(countryOfLiving, PERSON_SELECT_ALLOWLISTS.countryOfLiving);
-  const education = requireString(personRaw.education, 'Academic / Professional Education', 4000);
-  const profession = requireString(personRaw.profession, 'Current Profession / Occupation', 4000);
-  const jamatiExperience = requireString(personRaw.jamatiExperience, 'Jamati Experience', 4000);
+  const education = requireString(personRaw.education, 'Academic / Professional Education', 4000, true);
+  const profession = requireString(personRaw.profession, 'Current Profession / Occupation', 4000, true);
+  const jamatiExperience = requireString(personRaw.jamatiExperience, 'Jamati Experience', 4000, true);
 
   enforceWordLimit(education, 'Academic / Professional Education');
   enforceWordLimit(profession, 'Current Profession / Occupation');
@@ -233,8 +236,11 @@ function validateApplicationBody(body: Record<string, unknown>, cvResume: Attach
   const extrasRaw = body.extras;
   requireObject(extrasRaw, 'Application details are required.');
   const extrasObj = extrasRaw as Record<string, unknown>;
-  const whyText = requireString(extrasObj[WHY_FIELD], WHY_FIELD, 4000);
+  const whyText = requireString(extrasObj[WHY_FIELD], WHY_FIELD, 4000, true);
   enforceWordLimit(whyText, WHY_FIELD);
+
+  const linkedIn = optionalString(personRaw.linkedIn, 512);
+  if (linkedIn && !isLinkedInProfileUrl(linkedIn)) throw new AppError('LinkedIn must be a valid LinkedIn URL, or left blank.');
 
   const person: Person = {
     fullName,
@@ -248,7 +254,7 @@ function validateApplicationBody(body: Record<string, unknown>, cvResume: Attach
     education,
     profession,
     jamatiExperience,
-    linkedIn: optionalString(personRaw.linkedIn, 512),
+    linkedIn,
     candidateStatus: optionalString(personRaw.candidateStatus, 128) ?? APPLICANT_STATUS,
   };
 

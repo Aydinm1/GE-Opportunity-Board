@@ -88,6 +88,13 @@ describe('application attachment validation', () => {
 });
 
 describe('CV file format checks', () => {
+  it.each([0x80, 0x85, 0x9f])('rejects UTF-8 encoded C1 control U+%s in TXT resumes', async codePoint => {
+    const file = new File([`Experience${String.fromCodePoint(codePoint)}more text`], 'resume.txt', { type: 'text/plain' });
+    await expect(validateApplicationFormData(buildApplicationFormData(file))).rejects.toThrow(
+      'CV / Resume text files must contain UTF-8 text without binary control characters.'
+    );
+  });
+
   it.each([
     ['resume.pdf', 'application/pdf', Buffer.from('%PDF-1.7\n')],
     ['resume.doc', 'application/msword', Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])],

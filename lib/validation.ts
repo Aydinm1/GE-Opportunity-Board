@@ -165,9 +165,9 @@ function validateAttachmentBytes(filename: string, contentType: string, bytesVal
   if (extension === '.txt') {
     try {
       const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-      if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(text)) throw new Error('Binary content');
+      if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/.test(text)) throw new Error('Binary content');
     } catch {
-      throw new AppError('CV / Resume text files must contain valid UTF-8 text.');
+      throw new AppError('CV / Resume text files must contain UTF-8 text without binary control characters.');
     }
   }
 

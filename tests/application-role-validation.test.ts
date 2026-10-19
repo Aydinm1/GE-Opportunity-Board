@@ -92,8 +92,7 @@ describe('complete published role lookup', () => {
   it('accepts a published role on page two and uploads the application CV', async () => {
     const responses = [...pages(), json({ records: [{ id: 'recPerson', fields: {} }] }),
       json({ records: [{ id: 'recApplication', fields: {} }] }),
-      json({ attachment: { id: 'attCV', url: 'https://example.com/cv.pdf' } }),
-      json({ records: [{ id: 'recApplication', fields: {} }] })];
+      json({ attachment: { id: 'attCV', url: 'https://example.com/cv.pdf' } })];
     const fetch = vi.fn(async (..._args: unknown[]) => responses.shift()!);
     vi.stubGlobal('fetch', fetch);
     expect((await POST(request())).status).toBe(200);

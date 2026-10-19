@@ -43,11 +43,11 @@ export async function POST(req: Request) {
     if (!jobs.some((job) => job.id === payload.jobId)) {
       throw new AppError('This role is no longer available. Please choose a current role.', { status: 400 });
     }
-    const result = await submitApplication({
+    await submitApplication({
       ...payload,
       idempotencyKey,
     });
-    return jsonOk({ ok: true, result }, 200, limit.headers);
+    return jsonOk({ ok: true }, 200, limit.headers);
   } catch (err) {
     return jsonError(err, {
       context: '/api/applications',

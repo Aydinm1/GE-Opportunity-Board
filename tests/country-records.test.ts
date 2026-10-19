@@ -110,7 +110,7 @@ describe('country record mapping through the application API', () => {
     expect(people[0].body.records[0].fields['Country of Living (Current Location)']).toEqual(['recAssigned']);
     expect(people[0].body.records[0].fields).not.toHaveProperty('Jurisdiction');
     expect(people[0].body.records[0].fields).not.toHaveProperty('Notes RE: Candidate');
-    expect(writes.filter(write => write.path.endsWith('/Applications'))).toHaveLength(2); // application create and legacy CV PATCH
+    expect(writes.filter(write => write.path.endsWith('/Applications'))).toHaveLength(1); // application create; the upload endpoint saves the CV without a redundant PATCH
     expect(captureServerException).not.toHaveBeenCalled();
   });
   it.each([

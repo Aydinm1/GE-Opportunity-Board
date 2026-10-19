@@ -25,7 +25,7 @@ vi.mock('@sentry/nextjs', () => ({
 }));
 
 import { captureClientException, captureServerException } from '../lib/monitoring';
-import { sanitizeMonitoringValue, sanitizeSentryEvent } from '../lib/monitoring-config';
+import { sanitizeMonitoringMessage, sanitizeMonitoringValue, sanitizeSentryEvent } from '../lib/monitoring-config';
 
 describe('monitoring', () => {
   beforeEach(() => {
@@ -118,5 +118,57 @@ describe('monitoring', () => {
       },
       user: {},
     });
+  });
+});
+
+
+describe('diagnostic message privacy', () => {
+  it.each([
+    'Rejected "PRIVATE_PERSON"',
+    "Rejected 'PRIVATE_PERSON'",
+    'Rejected "PRIVATE_PERSON \\"quoted\\""',
+    'Contact PRIVATE_PERSON@example.invalid',
+    'Bearer PRIVATE_PERSON',
+    'Request https://files.example/PRIVATE_PERSON.pdf?token=secret',
+  ])('redacts applicant values in %s', message => {
+    expect(sanitizeMonitoringMessage(message)).not.toContain('PRIVATE_PERSON');
+  });
+
+  it('bounds messages while preserving ordinary diagnostic text and contractions', () => {
+    expect(sanitizeMonitoringMessage("We couldn't save your answer.")).toBe("We couldn't save your answer.");
+    expect(sanitizeMonitoringMessage('x'.repeat(5000))).toHaveLength(2000);
+  });
+
+  it('sanitizes exception values, breadcrumbs, log entries, and request queries without mutating the event', () => {
+    const message = 'Rejected "PRIVATE_PERSON"';
+    const frame = { filename: 'https://board.example/_next/chunks/app.js', lineno: 10 };
+    const event = {
+      message,
+      logentry: { formatted: message, params: ['"PRIVATE_PERSON"'] },
+      exception: { values: [{ value: message, stacktrace: { frames: [frame] }, mechanism: { data: { details: message } } }] },
+      breadcrumbs: [{ message, data: { response: message, authorization: 'Bearer PRIVATE_PERSON' } }],
+      request: { url: 'https://board.example/api/applications?email=PRIVATE_PERSON@example.invalid', query_string: 'name=PRIVATE_PERSON' },
+      extra: { cause: new Error(message) },
+    };
+    const safe = sanitizeSentryEvent(event);
+    expect(JSON.stringify(safe)).not.toContain('PRIVATE_PERSON');
+    expect(safe.exception.values[0].stacktrace.frames[0]).toEqual(frame);
+    expect(safe.request.url).toBe('https://board.example/api/applications');
+    expect(safe.request).not.toHaveProperty('query_string');
+    expect(event.message).toContain('PRIVATE_PERSON');
+  });
+
+  it('sanitizes exception messages and causes before handing them to the SDK, preserving source frames', () => {
+    process.env.NEXT_PUBLIC_SENTRY_DSN = 'https://public@example.ingest.sentry.io/1';
+    sentryMock.captureException.mockClear();
+    const error = new Error('Rejected "PRIVATE_PERSON"');
+    error.stack = 'Error: Rejected "PRIVATE_PERSON"\n    at submit (https://board.example/_next/chunks/app.js:10:2)';
+    error.cause = { details: 'Rejected "PRIVATE_PERSON"' };
+    captureServerException(error);
+    const captured = sentryMock.captureException.mock.calls[0][0] as Error;
+    expect(captured.message).not.toContain('PRIVATE_PERSON');
+    expect(captured.stack).not.toContain('PRIVATE_PERSON');
+    expect(JSON.stringify(captured.cause)).not.toContain('PRIVATE_PERSON');
+    expect(captured.stack).toContain('https://board.example/_next/chunks/app.js:10:2');
   });
 });

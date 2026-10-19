@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
-import { getSentryDsn, sanitizeMonitoringValue } from './monitoring-config';
+import { getSentryDsn, sanitizeMonitoringMessage, sanitizeMonitoringValue } from './monitoring-config';
 
 type MonitoringMeta = Record<string, unknown> & {
   endpoint?: string;
@@ -13,8 +13,16 @@ function isMonitoringEnabled() {
 }
 
 function toError(err: unknown) {
-  if (err instanceof Error) return err;
-  if (typeof err === 'string') return new Error(err);
+  if (err instanceof Error) {
+    const message = sanitizeMonitoringMessage(err.message);
+    const safe = new Error(message);
+    safe.name = err.name;
+    // Preserve source frames for grouping/source maps while replacing the message.
+    safe.stack = err.stack?.replace(err.message, message);
+    if (err.cause !== undefined) safe.cause = sanitizeMonitoringValue(err.cause, 'cause');
+    return safe;
+  }
+  if (typeof err === 'string') return new Error(sanitizeMonitoringMessage(err));
   return new Error('Unknown error');
 }
 

@@ -4,6 +4,7 @@ import { GET as getJobs } from '../app/api/jobs/route';
 import { COUNTRY_OPTIONS, PERSON_AGE_OPTIONS, PERSON_GENDER_OPTIONS } from '../lib/application-select-options';
 import { captureServerException } from '../lib/monitoring';
 import { submitApplication } from '../lib/airtable';
+import * as airtable from '../lib/airtable';
 import { validateApplicationFormData } from '../lib/validation';
 import { AIRTABLE_SCHEMA_CONTRACT } from '../lib/airtable-schema-contract';
 
@@ -74,7 +75,8 @@ function validApplicationFields() {
 }
 
 function validResumeFile(size?: number) {
-  const bytes = typeof size === 'number' ? Buffer.alloc(size, 0) : Buffer.from('test resume bytes');
+  const bytes = typeof size === 'number' ? Buffer.alloc(size, 0) : Buffer.from('%PDF-1.7 test resume bytes');
+  if (typeof size === 'number' && size >= 5) bytes.write('%PDF-');
   return new File([bytes], 'resume.pdf', { type: 'application/pdf' });
 }
 
@@ -296,6 +298,9 @@ describe('Airtable query contract coverage', () => {
 });
 
 describe('POST /api/applications', () => {
+  beforeEach(() => {
+    vi.spyOn(airtable, 'getJobs').mockResolvedValue({ jobs: [{ id: 'recJob123' }] } as Awaited<ReturnType<typeof airtable.getJobs>>);
+  });
   it('submits an application and returns rate-limit headers', async () => {
     process.env.AIRTABLE_TOKEN = 'test-token';
     process.env.AIRTABLE_BASE_ID = 'appTestBase';
@@ -311,7 +316,7 @@ describe('POST /api/applications', () => {
       .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recApp1', fields: {} }] }));
     vi.stubGlobal('fetch', fetchMock);
 
-    const resumeBase64 = Buffer.from('test resume bytes').toString('base64');
+    const resumeBase64 = Buffer.from('%PDF-1.7 test resume bytes').toString('base64');
     const req = new Request('http://localhost/api/applications', {
       method: 'POST',
       headers: {
@@ -742,6 +747,7 @@ describe('POST /api/applications', () => {
 // Live metadata checks independently establish that these values exist in Airtable.
 describe('application option and fallback regressions', () => {
   beforeEach(() => {
+    vi.spyOn(airtable, 'getJobs').mockResolvedValue({ jobs: [{ id: 'recJob123' }] } as Awaited<ReturnType<typeof airtable.getJobs>>);
     process.env.AIRTABLE_TOKEN = 'test-token';
     process.env.AIRTABLE_BASE_ID = 'appTestBase';
     process.env.AIRTABLE_PEOPLE_TABLE = 'People';

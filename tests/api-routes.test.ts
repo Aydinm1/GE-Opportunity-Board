@@ -5,10 +5,16 @@ import { COUNTRY_OPTIONS, PERSON_AGE_OPTIONS, PERSON_GENDER_OPTIONS } from '../l
 import { captureServerException } from '../lib/monitoring';
 import { submitApplication } from '../lib/airtable';
 import * as airtable from '../lib/airtable';
+import { resolveCountryRecord } from '../lib/country-records';
 import { validateApplicationFormData } from '../lib/validation';
 import { AIRTABLE_SCHEMA_CONTRACT } from '../lib/airtable-schema-contract';
 
 vi.mock('../lib/monitoring', () => ({ captureServerException: vi.fn() }));
+vi.mock('../lib/country-records', async importOriginal => ({
+  ...await importOriginal<typeof import('../lib/country-records')>(),
+  resolveCountryRecord: vi.fn(async (name: string) => ({ kind: 'resolved', id: `recCountry${COUNTRY_OPTIONS.findIndex(value => value === name)}` })),
+}));
+const countryRecordId = (name: string) => `recCountry${COUNTRY_OPTIONS.findIndex(value => value === name)}`;
 
 const WHY_FIELD = 'Why are you interested in or qualified for this job?';
 const ORIGINAL_ENV = { ...process.env };
@@ -554,54 +560,24 @@ describe('POST /api/applications', () => {
     expect(console.warn).toHaveBeenCalled();
   });
 
-  it('retries person creation without linked-record country fields when Airtable requires record IDs', async () => {
+  it('does not silently drop a correctly linked country on an unexpected column-type error', async () => {
     process.env.AIRTABLE_TOKEN = 'test-token';
     process.env.AIRTABLE_BASE_ID = 'appTestBase';
     process.env.AIRTABLE_PEOPLE_TABLE = 'People';
     process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
-
-    const fetchMock = vi
-      .fn()
+    const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ records: [] }))
       .mockResolvedValueOnce(jsonResponse({ records: [] }))
-      .mockResolvedValueOnce(
-        jsonResponse(
-          {
-            error: {
-              type: 'INVALID_VALUE_FOR_COLUMN',
-              message: 'Value is not an array of record IDs.',
-            },
-          },
-          { status: 422 }
-        )
-      )
-      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recPerson1', fields: {} }] }))
-      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recApp1', fields: {} }] }))
-      .mockResolvedValueOnce(jsonResponse({ attachment: { id: 'att1', url: 'https://cdn.test/file.pdf' } }))
-      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recApp1', fields: {} }] }));
+      .mockResolvedValueOnce(jsonResponse({ error: { type: 'INVALID_VALUE_FOR_COLUMN', message: 'Value is not an array of record IDs.' } }, { status: 422 }));
     vi.stubGlobal('fetch', fetchMock);
-
-    const req = new Request('http://localhost/api/applications', {
-      method: 'POST',
-      headers: {
-        'x-forwarded-for': nextIp('198.51.112'),
-      },
-      body: buildApplicationFormData(),
-    });
-
-    const res = await postApplication(req);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.result.personRecordId).toBe('recPerson1');
-
-    const firstCreateBody = JSON.parse(String((fetchMock.mock.calls[2][1] as RequestInit).body));
-    const retryCreateBody = JSON.parse(String((fetchMock.mock.calls[3][1] as RequestInit).body));
-    expect(firstCreateBody.records[0].fields).toMatchObject({
-      'Country of Living (Current Location)': 'United States',
-    });
-    expect(retryCreateBody.records[0].fields).not.toHaveProperty('Country of Living (Current Location)');
-    expect(retryCreateBody.records[0].fields).not.toHaveProperty('Jurisdiction');
-    expect(retryCreateBody.records[0].fields['Notes RE: Candidate']).toContain('Country of Living (Current Location): United States');
+    const response = await postApplication(new Request('http://localhost/api/applications', {
+      method: 'POST', headers: { 'x-forwarded-for': nextIp('198.51.112') }, body: buildApplicationFormData(),
+    }));
+    expect(response.status).toBe(500);
+    const fields = JSON.parse(String(fetchMock.mock.calls[2][1].body)).records[0].fields;
+    expect(fields['Country of Living (Current Location)']).toEqual([countryRecordId('United States')]);
+    expect(fields).not.toHaveProperty('Jurisdiction');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('creates the person without a select field whose option Airtable refuses', async () => {
@@ -632,11 +608,11 @@ describe('POST /api/applications', () => {
     expect(retryCreateBody.records[0].fields).not.toHaveProperty('Gender');
     expect(retryCreateBody.records[0].fields).toMatchObject({
       'Full Name': 'Jane Doe',
-      'Country of Living (Current Location)': 'United States',
+      'Country of Living (Current Location)': [countryRecordId('United States')],
     });
     expect(console.warn).toHaveBeenCalledWith(
-      'Airtable refused People select options; person created without them',
-      expect.objectContaining({ omissions: [{ field: 'Gender', airtableErrorType: 'INVALID_MULTIPLE_CHOICE_OPTIONS', status: 422 }] })
+      'People profile needs staff review; submitted answers preserved in notes',
+      expect.objectContaining({ operation: 'create_person_review_fallback', omittedFields: ['Gender'], airtableErrorTypes: ['INVALID_MULTIPLE_CHOICE_OPTIONS'], omissionStatuses: [422] })
     );
   });
 
@@ -651,7 +627,6 @@ describe('POST /api/applications', () => {
       .mockResolvedValueOnce(jsonResponse({ records: [] }))
       .mockResolvedValueOnce(jsonResponse({ records: [] }))
       .mockResolvedValueOnce(refusedSelectOptionResponse('female'))
-      .mockResolvedValueOnce(refusedSelectOptionResponse('United States'))
       .mockResolvedValueOnce(refusedSelectOptionResponse('Canada'))
       .mockResolvedValueOnce(refusedSelectOptionResponse('25-34'));
     vi.stubGlobal('fetch', fetchMock);
@@ -664,7 +639,7 @@ describe('POST /api/applications', () => {
 
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: AIRTABLE_SELECT_OPTION_ERROR, code: 'INVALID_SELECT_OPTION' });
-    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
     expect(console.warn).toHaveBeenCalledWith(
       'API request rejected',
       expect.objectContaining({
@@ -792,7 +767,7 @@ describe('application option and fallback regressions', () => {
     expect((await submit({ [input]: value })).status, JSON.stringify(vi.mocked(console.error).mock.calls)).toBe(200);
     const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
     const person = JSON.parse(String(calls[2][1].body)).records[0].fields;
-    expect(person[field]).toBe(value);
+    expect(person[field]).toEqual(input === 'countryOfLiving' ? [countryRecordId(value)] : value);
     for (const name of Object.keys(person)) {
       expect(AIRTABLE_SCHEMA_CONTRACT.people.fields.some(field => field.name === name), `Unmapped People field: ${name}`).toBe(true);
     }
@@ -811,10 +786,10 @@ describe('application option and fallback regressions', () => {
     const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
     const creates = calls.filter(([url, init]) => url.endsWith('/People') && init?.method === 'POST');
     expect(creates).toHaveLength(returning ? 0 : 1);
-    if (!returning) expect(JSON.parse(String(creates[0][1].body)).records[0].fields).toMatchObject({ Age: '18-24', Gender: 'female', 'Country of Birth': 'United States', 'Country of Living (Current Location)': 'United States' });
+    if (!returning) expect(JSON.parse(String(creates[0][1].body)).records[0].fields).toMatchObject({ Age: '18-24', Gender: 'female', 'Country of Birth': 'United States', 'Country of Living (Current Location)': [countryRecordId('United States')] });
   });
 
-  it.each(['female', 'Canada', 'United States'])('omits only the unambiguous permitted field for %s', async value => {
+  it.each(['female', 'Canada'])('omits only the unambiguous permitted field for %s', async value => {
     const mock = mockSubmission([refusedSelectOptionResponse(value), jsonResponse({ records: [{ id: 'recPerson', fields: {} }] })]);
     expect((await submit()).status).toBe(200);
     const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
@@ -845,16 +820,16 @@ describe('application option and fallback regressions', () => {
     expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain('Insufficient permissions');
   });
 
-  it('accepts matching countries while preserving both answers in staff review notes', async () => {
+  it('keeps the resolved country link when Country of Birth refuses the same country name', async () => {
     const mock = mockSubmission([refusedSelectOptionResponse('United States'), jsonResponse({ records: [{ id: 'recPerson', fields: {} }] })]);
     expect((await submit({ countryOfOrigin: 'United States' })).status).toBe(200);
     const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
     const fields = JSON.parse(String(calls[3][1].body)).records[0].fields;
     expect(fields).not.toHaveProperty('Country of Birth');
-    expect(fields).not.toHaveProperty('Country of Living (Current Location)');
+    expect(fields['Country of Living (Current Location)']).toEqual([countryRecordId('United States')]);
     expect(fields).toMatchObject({ Age: '25-34', Gender: 'female', 'Candidate Status': '1a - Applicant', 'Email Address': validApplicationFields().emailAddress });
     expect(fields['Notes RE: Candidate']).toContain('Country of Birth: United States');
-    expect(fields['Notes RE: Candidate']).toContain('Country of Living (Current Location): United States');
+    expect(fields['Notes RE: Candidate']).not.toContain('Country of Living (Current Location):');
     expect(JSON.parse(String(calls[4][1].body)).records[0].fields[WHY_FIELD]).toBe(validApplicationFields().whyText);
     expect(JSON.parse(String(calls[5][1].body)).filename).toBe('resume.pdf');
     const diagnostics = JSON.stringify([vi.mocked(console.warn).mock.calls, vi.mocked(captureServerException).mock.calls]);
@@ -871,7 +846,7 @@ describe('application option and fallback regressions', () => {
     expect(fields['Notes RE: Candidate']).toContain('Country of Birth: Canada');
     expect(fields).not.toHaveProperty('Gender');
     expect(fields).not.toHaveProperty('Country of Birth');
-    expect(fields['Country of Living (Current Location)']).toBe('United States');
+    expect(fields['Country of Living (Current Location)']).toEqual([countryRecordId('United States')]);
   });
 
   it('does not report success or create an application if review notes cannot be saved', async () => {
@@ -881,17 +856,17 @@ describe('application option and fallback regressions', () => {
     ]);
     expect((await submit()).status).toBe(500);
     expect(mock).toHaveBeenCalledTimes(4);
-    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_select_option_fallback' }));
+    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_review_fallback' }));
   });
 
   it('does not report an accepted fallback when Airtable returns no created person', async () => {
     const mock = mockSubmission([refusedSelectOptionResponse('female'), jsonResponse({ records: [] })]);
     expect((await submit()).status).toBe(500);
     expect(mock).toHaveBeenCalledTimes(4);
-    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_select_option_fallback' }));
+    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_review_fallback' }));
   });
 
-  it('stops after three retries even when a fourth optional field could be removed', async () => {
+  it('stops when the refused value is not a remaining writable select field', async () => {
     const mock = mockSubmission([
       refusedSelectOptionResponse('female'),
       refusedSelectOptionResponse('Canada'),
@@ -901,7 +876,7 @@ describe('application option and fallback regressions', () => {
     const payload = await validateApplicationFormData(buildApplicationFormData());
     payload.person.jurisdiction = 'Test Jurisdiction';
     await expect(submitApplication(payload)).rejects.toMatchObject({ status: 400, code: 'INVALID_SELECT_OPTION' });
-    expect(mock).toHaveBeenCalledTimes(6); // two lookups, initial create, three retries
+    expect(mock).toHaveBeenCalledTimes(5); // two lookups, initial create, two permitted select retries
   });
 
   it('does not repeatedly retry an already omitted field', async () => {

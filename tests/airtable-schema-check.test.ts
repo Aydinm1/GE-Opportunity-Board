@@ -8,6 +8,13 @@ import {
 } from '../lib/application-select-options';
 import { compareAirtableSchema, compareAirtableSchemaReport, formatSchemaMismatch } from '../lib/airtable-schema-check';
 
+const countryTableFixture = {
+  id: 'tblCountries', name: 'Country / Jurisdiction Table', fields: [
+    { id: 'fldCountryName', name: 'Name', type: 'singleLineText' },
+    { id: 'fldCountryJurisdiction', name: 'Jurisdiction', type: 'singleSelect' },
+  ],
+};
+
 describe('airtable schema comparison', () => {
   it('formats mismatches with friendly field types', () => {
     expect(
@@ -27,7 +34,7 @@ describe('airtable schema comparison', () => {
     process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
 
     const failures = compareAirtableSchema({
-      tables: [
+      tables: [countryTableFixture,
         {
           id: 'tblPeople',
           name: 'People',
@@ -54,7 +61,7 @@ describe('airtable schema comparison', () => {
     process.env.AIRTABLE_APPLICATIONS_TABLE = 'tblApps123';
 
     const failures = compareAirtableSchema({
-      tables: [
+      tables: [countryTableFixture,
         {
           id: 'tblRoles123',
           name: 'GE Roles',
@@ -93,8 +100,8 @@ describe('airtable schema comparison', () => {
             { id: 'fldAge', name: 'Age', type: 'singleSelect', options: { choices: PERSON_AGE_OPTIONS.map((name) => ({ name })) } },
             { id: 'fldGender', name: 'Gender', type: 'singleSelect', options: { choices: PERSON_GENDER_OPTIONS.map((name) => ({ name })) } },
             { id: 'fldBirthCountry', name: 'Country of Birth', type: 'singleSelect', options: { choices: COUNTRY_OPTIONS.map((name) => ({ name })) } },
-            { id: 'fldLivingCountry', name: 'Country of Living (Current Location)', type: 'singleSelect', options: { choices: COUNTRY_OPTIONS.map((name) => ({ name })) } },
-            { id: 'fldJurisdiction', name: 'Jurisdiction', type: 'singleSelect' },
+            { id: 'fldLivingCountry', name: 'Country of Living (Current Location)', type: 'multipleRecordLinks', options: { linkedTableId: 'tblCountries' } },
+            { id: 'fldJurisdiction', name: 'Jurisdiction', type: 'multipleLookupValues', options: { recordLinkFieldId: 'fldLivingCountry', fieldIdInLinkedTable: 'fldCountryJurisdiction' } },
             { id: 'fldEducation', name: 'Academic / Professional Education', type: 'multilineText' },
             { id: 'fldProfession', name: 'Current Profession / Occupation', type: 'multilineText' },
             { id: 'fldJamatiExperience', name: 'Jamati Experience', type: 'multilineText' },
@@ -126,7 +133,7 @@ describe('airtable schema comparison', () => {
     process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
 
     const failures = compareAirtableSchema({
-      tables: [
+      tables: [countryTableFixture,
         {
           id: 'tblPeople',
           name: 'People',
@@ -145,8 +152,8 @@ describe('airtable schema comparison', () => {
             },
             { id: 'fldGender', name: 'Gender', type: 'singleSelect', options: { choices: PERSON_GENDER_OPTIONS.map((name) => ({ name })) } },
             { id: 'fldBirthCountry', name: 'Country of Birth', type: 'singleSelect', options: { choices: COUNTRY_OPTIONS.map((name) => ({ name })) } },
-            { id: 'fldLivingCountry', name: 'Country of Living (Current Location)', type: 'singleSelect', options: { choices: COUNTRY_OPTIONS.map((name) => ({ name })) } },
-            { id: 'fldJurisdiction', name: 'Jurisdiction', type: 'singleSelect' },
+            { id: 'fldLivingCountry', name: 'Country of Living (Current Location)', type: 'multipleRecordLinks', options: { linkedTableId: 'tblCountries' } },
+            { id: 'fldJurisdiction', name: 'Jurisdiction', type: 'multipleLookupValues', options: { recordLinkFieldId: 'fldLivingCountry', fieldIdInLinkedTable: 'fldCountryJurisdiction' } },
             { id: 'fldEducation', name: 'Academic / Professional Education', type: 'multilineText' },
             { id: 'fldProfession', name: 'Current Profession / Occupation', type: 'multilineText' },
             { id: 'fldJamatiExperience', name: 'Jamati Experience', type: 'multilineText' },
@@ -197,13 +204,13 @@ describe('airtable schema comparison', () => {
     expect(failures).toContain('People.Age: missing Airtable options [35-44].');
   });
 
-  it('allows current People field variants for living country and jurisdiction', () => {
+  it('accepts the actual country link and derived jurisdiction lookup', () => {
     process.env.AIRTABLE_GEROLES_TABLE = 'GE Roles';
     process.env.AIRTABLE_PEOPLE_TABLE = 'People';
     process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
 
     const failures = compareAirtableSchema({
-      tables: [
+      tables: [countryTableFixture,
         {
           id: 'tblRoles',
           name: 'GE Roles',
@@ -242,8 +249,8 @@ describe('airtable schema comparison', () => {
             { id: 'fldAge', name: 'Age', type: 'singleSelect', options: { choices: PERSON_AGE_OPTIONS.map((name) => ({ name })) } },
             { id: 'fldGender', name: 'Gender', type: 'singleSelect', options: { choices: PERSON_GENDER_OPTIONS.map((name) => ({ name })) } },
             { id: 'fldBirthCountry', name: 'Country of Birth', type: 'singleSelect', options: { choices: COUNTRY_OPTIONS.map((name) => ({ name })) } },
-            { id: 'fldLivingCountry', name: 'Country of Living (Current Location)', type: 'multipleRecordLinks' },
-            { id: 'fldJurisdiction', name: 'Jurisdiction', type: 'multipleLookupValues' },
+            { id: 'fldLivingCountry', name: 'Country of Living (Current Location)', type: 'multipleRecordLinks', options: { linkedTableId: 'tblCountries' } },
+            { id: 'fldJurisdiction', name: 'Jurisdiction', type: 'multipleLookupValues', options: { recordLinkFieldId: 'fldLivingCountry', fieldIdInLinkedTable: 'fldCountryJurisdiction' } },
             { id: 'fldEducation', name: 'Academic / Professional Education', type: 'multilineText' },
             { id: 'fldProfession', name: 'Current Profession / Occupation', type: 'multilineText' },
             { id: 'fldJamatiExperience', name: 'Jamati Experience', type: 'multilineText' },
@@ -275,7 +282,7 @@ describe('airtable schema comparison', () => {
     process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
 
     const failures = compareAirtableSchema({
-      tables: [
+      tables: [countryTableFixture,
         {
           id: 'tblPeople',
           name: 'People',
@@ -294,7 +301,7 @@ describe('airtable schema comparison', () => {
 
     expect(failures).toContain('People.Gender: missing Airtable options [female, male].');
     expect(failures).toContain('People.Gender: unexpected Airtable options [Female, Male].');
-    expect(failures).toContain('People.Country of Living (Current Location): missing Airtable options [United States].');
+    expect(failures.some(failure => failure.includes('Country of Living (Current Location)') && failure.includes('multipleRecordLinks'))).toBe(true);
   });
 
   it('allows missing optional read fields on jobs schema', () => {
@@ -303,7 +310,7 @@ describe('airtable schema comparison', () => {
     process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
 
     const report = compareAirtableSchemaReport({
-      tables: [
+      tables: [countryTableFixture,
         {
           id: 'tblRoles123',
           name: 'GE Roles',
@@ -341,8 +348,8 @@ describe('airtable schema comparison', () => {
             { id: 'fldAge', name: 'Age', type: 'singleSelect', options: { choices: PERSON_AGE_OPTIONS.map((name) => ({ name })) } },
             { id: 'fldGender', name: 'Gender', type: 'singleSelect', options: { choices: PERSON_GENDER_OPTIONS.map((name) => ({ name })) } },
             { id: 'fldBirthCountry', name: 'Country of Birth', type: 'singleSelect', options: { choices: COUNTRY_OPTIONS.map((name) => ({ name })) } },
-            { id: 'fldLivingCountry', name: 'Country of Living (Current Location)', type: 'singleSelect', options: { choices: COUNTRY_OPTIONS.map((name) => ({ name })) } },
-            { id: 'fldJurisdiction', name: 'Jurisdiction', type: 'singleSelect' },
+            { id: 'fldLivingCountry', name: 'Country of Living (Current Location)', type: 'multipleRecordLinks', options: { linkedTableId: 'tblCountries' } },
+            { id: 'fldJurisdiction', name: 'Jurisdiction', type: 'multipleLookupValues', options: { recordLinkFieldId: 'fldLivingCountry', fieldIdInLinkedTable: 'fldCountryJurisdiction' } },
             { id: 'fldEducation', name: 'Academic / Professional Education', type: 'multilineText' },
             { id: 'fldProfession', name: 'Current Profession / Occupation', type: 'multilineText' },
             { id: 'fldJamatiExperience', name: 'Jamati Experience', type: 'multilineText' },
@@ -376,7 +383,7 @@ describe('airtable schema comparison', () => {
 describe('TOR schema contract', () => {
   it.each(['url', 'singleLineText'])('accepts TOR as %s and uploaded attachments', (type) => {
     process.env.AIRTABLE_GEROLES_TABLE = 'GE Roles';
-    const report = compareAirtableSchemaReport({ tables: [{ id: 'tblRoles', name: 'GE Roles', fields: [
+    const report = compareAirtableSchemaReport({ tables: [countryTableFixture, { id: 'tblRoles', name: 'GE Roles', fields: [
       { id: 'fldTor', name: 'TOR', type },
       { id: 'fldTorUpload', name: 'TOR Upload', type: 'multipleAttachments' },
     ] }] });
@@ -385,9 +392,9 @@ describe('TOR schema contract', () => {
 
   it('tolerates missing fields but rejects incorrect TOR field types', () => {
     process.env.AIRTABLE_GEROLES_TABLE = 'GE Roles';
-    const missing = compareAirtableSchemaReport({ tables: [{ id: 'tblRoles', name: 'GE Roles', fields: [] }] });
+    const missing = compareAirtableSchemaReport({ tables: [countryTableFixture, { id: 'tblRoles', name: 'GE Roles', fields: [] }] });
     expect(missing.failures.filter((failure) => failure.startsWith('GE Roles.TOR'))).toEqual([]);
-    const wrong = compareAirtableSchemaReport({ tables: [{ id: 'tblRoles', name: 'GE Roles', fields: [
+    const wrong = compareAirtableSchemaReport({ tables: [countryTableFixture, { id: 'tblRoles', name: 'GE Roles', fields: [
       { id: 'fldTor', name: 'TOR', type: 'multipleRecordLinks' },
       { id: 'fldTorUpload', name: 'TOR Upload', type: 'singleLineText' },
     ] }] });

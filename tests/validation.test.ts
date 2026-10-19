@@ -72,3 +72,29 @@ describe('application attachment validation', () => {
     );
   });
 });
+
+describe('application answer formatting and optional LinkedIn profile', () => {
+  it('preserves paragraphs, indentation and bullets in all long answers', async () => {
+    const form = buildApplicationFormData(new File(['%PDF-1.7 resume'], 'resume.pdf', { type: 'application/pdf' }));
+    const answer = 'First paragraph.\r\n\r\n  - First bullet\r\n\t- Second bullet';
+    for (const field of ['education', 'profession', 'jamatiExperience', 'whyText']) form.set(field, answer);
+    const result = await validateApplicationFormData(form);
+    const expected = answer.replace(/\r\n/g, '\n');
+    expect(result.person.education).toBe(expected);
+    expect(result.person.profession).toBe(expected);
+    expect(result.person.jamatiExperience).toBe(expected);
+    expect(result.extras['Why are you interested in or qualified for this job?']).toBe(expected);
+  });
+
+  it.each(['Just a name', 'https://not-linkedin.example/in/person', 'https://linkedin.com.evil.example/in/person', 'javascript:alert(1)'])('rejects an invalid LinkedIn profile %s', async linkedIn => {
+    const form = buildApplicationFormData(new File(['%PDF-1.7 resume'], 'resume.pdf', { type: 'application/pdf' }));
+    form.set('linkedIn', linkedIn);
+    await expect(validateApplicationFormData(form)).rejects.toThrow('LinkedIn');
+  });
+
+  it.each(['', 'https://www.linkedin.com/in/person', 'https://uk.linkedin.com/in/person'])('accepts an optional LinkedIn profile %s', async linkedIn => {
+    const form = buildApplicationFormData(new File(['%PDF-1.7 resume'], 'resume.pdf', { type: 'application/pdf' }));
+    form.set('linkedIn', linkedIn);
+    await expect(validateApplicationFormData(form)).resolves.toBeDefined();
+  });
+});

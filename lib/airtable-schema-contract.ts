@@ -1,4 +1,3 @@
-import { COUNTRY_DIRECTORY_TABLE } from './country-records';
 import {
   APPLICANT_STATUS,
   COUNTRY_OPTIONS,
@@ -16,16 +15,15 @@ export type AirtableFieldContract = {
   optionValidation?: 'contains' | 'exact' | 'caseInsensitiveExact';
   // Check expectedOptions only when Airtable has the field as a select; other allowed types are accepted as-is.
   optionsOnlyWhenSelect?: boolean;
-  linkedTable?: 'countries';
 };
 
 export type AirtableTableContract = {
-  envVar: 'AIRTABLE_GEROLES_TABLE' | 'AIRTABLE_PEOPLE_TABLE' | 'AIRTABLE_APPLICATIONS_TABLE' | 'AIRTABLE_COUNTRIES_TABLE';
+  envVar: 'AIRTABLE_GEROLES_TABLE' | 'AIRTABLE_PEOPLE_TABLE' | 'AIRTABLE_APPLICATIONS_TABLE';
   fallbackName: string;
   fields: AirtableFieldContract[];
 };
 
-export const AIRTABLE_SCHEMA_CONTRACT: Record<'jobs' | 'people' | 'applications' | 'countries', AirtableTableContract> = {
+export const AIRTABLE_SCHEMA_CONTRACT: Record<'jobs' | 'people' | 'applications', AirtableTableContract> = {
   jobs: {
     envVar: 'AIRTABLE_GEROLES_TABLE',
     fallbackName: 'GE Roles',
@@ -76,26 +74,17 @@ export const AIRTABLE_SCHEMA_CONTRACT: Record<'jobs' | 'people' | 'applications'
       { name: 'Country of Birth', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: COUNTRY_OPTIONS, optionsOnlyWhenSelect: true, optionValidation: 'exact' },
       {
         name: 'Country of Living (Current Location)',
-        expectedTypes: ['multipleRecordLinks'],
-        linkedTable: 'countries',
+        expectedTypes: ['singleSelect', 'singleLineText', 'multipleSelects', 'multipleRecordLinks'],
         usage: 'write',
         expectedOptions: COUNTRY_OPTIONS,
         optionValidation: 'contains',
         optionsOnlyWhenSelect: true,
       },
-      { name: 'Jurisdiction', expectedTypes: ['multipleLookupValues'], usage: 'read' },
+      { name: 'Jurisdiction', expectedTypes: ['singleSelect', 'singleLineText', 'multipleSelects', 'multipleRecordLinks', 'multipleLookupValues'], usage: 'write' },
       { name: 'Academic / Professional Education', expectedTypes: ['multilineText'], usage: 'write' },
       { name: 'Current Profession / Occupation', expectedTypes: ['multilineText', 'singleLineText'], usage: 'write' },
       { name: 'Jamati Experience', expectedTypes: ['multilineText'], usage: 'write' },
       { name: 'normalized email', expectedTypes: ['formula', 'singleLineText'], usage: 'read' },
-    ],
-  },
-  countries: {
-    envVar: 'AIRTABLE_COUNTRIES_TABLE',
-    fallbackName: COUNTRY_DIRECTORY_TABLE,
-    fields: [
-      { name: 'Name', expectedTypes: ['singleLineText'], usage: 'read' },
-      { name: 'Jurisdiction', expectedTypes: ['singleSelect'], usage: 'read' },
     ],
   },
   applications: {

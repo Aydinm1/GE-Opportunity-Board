@@ -6,26 +6,18 @@ const originalEnv = { ...process.env };
 afterEach(() => { process.env = { ...originalEnv }; });
 
 function schemaFixture() {
-  const schema = {
+  return {
     tables: Object.values(AIRTABLE_SCHEMA_CONTRACT).map((table, i) => {
       process.env[table.envVar] = table.fallbackName;
       return {
         id: `tbl${i}`, name: table.fallbackName,
         fields: table.fields.map((field, j) => ({
           id: `fld${i}_${j}`, name: field.name, type: field.expectedTypes[0],
-          options: { choices: (field.expectedOptions ?? []).map(name => ({ name })), linkedTableId: undefined as string | undefined, recordLinkFieldId: undefined as string | undefined, fieldIdInLinkedTable: undefined as string | undefined },
+          options: { choices: (field.expectedOptions ?? []).map(name => ({ name })) },
         })),
       };
     }),
   };
-  const countries = schema.tables.find(table => table.name === 'Country / Jurisdiction Table')!;
-  const people = schema.tables.find(table => table.name === 'People')!;
-  const link = people.fields.find(field => field.name === 'Country of Living (Current Location)')!;
-  link.options.linkedTableId = countries.id;
-  const jurisdiction = people.fields.find(field => field.name === 'Jurisdiction')!;
-  jurisdiction.options.recordLinkFieldId = link.id;
-  jurisdiction.options.fieldIdInLinkedTable = countries.fields.find(field => field.name === 'Jurisdiction')!.id;
-  return schema;
 }
 
 const fields = Object.values(AIRTABLE_SCHEMA_CONTRACT).flatMap(table =>
@@ -56,7 +48,7 @@ describe('coverage for every app-dependent Airtable field', () => {
     expect(compareAirtableSchema(schema).some(message => message.includes(field.name) && message.includes('unsupportedType'))).toBe(true);
   });
 
-  const selectableFields = fields.filter(({ field }) => field.expectedOptions?.length && field.expectedTypes.some(type => ['singleSelect', 'multipleSelects'].includes(type)));
+  const selectableFields = fields.filter(({ field }) => field.expectedOptions?.length);
   it.each(selectableFields)('detects missing and differently cased choices for $table.$field.name', ({ table, field }) => {
     for (const option of field.expectedOptions!) {
       const schema = schemaFixture();
@@ -90,21 +82,5 @@ describe('coverage for every app-dependent Airtable field', () => {
     expect(people.find(f => f.name === 'Candidate Status')?.expectedOptions).toEqual(['1a - Applicant']);
     expect(AIRTABLE_SCHEMA_CONTRACT.applications.fields.find(f => f.name === 'Status')?.expectedOptions).toEqual(['1a - Applicant']);
     expect(AIRTABLE_SCHEMA_CONTRACT.applications.fields.find(f => f.name === 'Source')?.expectedOptions).toEqual(['Opportunity Board']);
-  });
-});
-
-
-describe('country link and lookup schema', () => {
-  it('rejects a country link pointing at the wrong table', () => {
-    const schema = schemaFixture();
-    schema.tables.find(t => t.name === 'People')!.fields.find(f => f.name === 'Country of Living (Current Location)')!.options.linkedTableId = 'tblWrong';
-    expect(compareAirtableSchema(schema).join(' ')).toContain('linked table must be Country / Jurisdiction Table');
-  });
-  it('rejects a jurisdiction lookup through the wrong link or source field', () => {
-    for (const key of ['recordLinkFieldId', 'fieldIdInLinkedTable'] as const) {
-      const schema = schemaFixture();
-      schema.tables.find(t => t.name === 'People')!.fields.find(f => f.name === 'Jurisdiction')!.options[key] = 'fldWrong';
-      expect(compareAirtableSchema(schema)).toContain('People.Jurisdiction: lookup must use Current Country and the country directory Jurisdiction field.');
-    }
   });
 });

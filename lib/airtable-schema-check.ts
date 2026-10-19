@@ -1,5 +1,3 @@
-import { loadCountryRecords, matchCountryRecord } from './country-records';
-import { COUNTRY_OPTIONS } from './application-select-options';
 import { AIRTABLE_SCHEMA_CONTRACT, type AirtableFieldContract, type AirtableTableContract } from './airtable-schema-contract';
 
 type AirtableSchemaField = {
@@ -7,9 +5,6 @@ type AirtableSchemaField = {
   name: string;
   type: string;
   options?: {
-    linkedTableId?: string;
-    recordLinkFieldId?: string;
-    fieldIdInLinkedTable?: string;
     choices?: Array<{
       id?: string;
       name: string;
@@ -218,25 +213,10 @@ export function compareAirtableSchemaReport(schema: AirtableSchemaResponse): Air
         continue;
       }
 
-      if (expectedField.linkedTable) {
-        const target = findTable(schema, AIRTABLE_SCHEMA_CONTRACT[expectedField.linkedTable]);
-        if (!target || actualField.options?.linkedTableId !== target.id) {
-          failures.push(`${actualTable.name}.${expectedField.name}: linked table must be ${AIRTABLE_SCHEMA_CONTRACT[expectedField.linkedTable].fallbackName}.`);
-        }
-      }
       failures.push(...compareSelectOptions(actualTable.name, expectedField, actualField));
     }
   }
 
-  const people = findTable(schema, AIRTABLE_SCHEMA_CONTRACT.people);
-  const countries = findTable(schema, AIRTABLE_SCHEMA_CONTRACT.countries);
-  const countryLink = people?.fields.find(field => field.name === 'Country of Living (Current Location)');
-  const jurisdiction = people?.fields.find(field => field.name === 'Jurisdiction');
-  const source = countries?.fields.find(field => field.name === 'Jurisdiction');
-  if (countryLink && jurisdiction && source && jurisdiction.type === 'multipleLookupValues' &&
-      (jurisdiction.options?.recordLinkFieldId !== countryLink.id || jurisdiction.options?.fieldIdInLinkedTable !== source.id)) {
-    failures.push('People.Jurisdiction: lookup must use Current Country and the country directory Jurisdiction field.');
-  }
   return { failures, warnings };
 }
 
@@ -290,7 +270,4 @@ export async function assertLiveAirtableSchemaMatches() {
   if (failures.length > 0) {
     throw new Error(['Airtable schema mismatches detected:', ...failures].join('\n'));
   }
-  const records = await loadCountryRecords({ cache: false });
-  const unresolved = COUNTRY_OPTIONS.filter(name => matchCountryRecord(name, records).kind !== 'resolved');
-  if (unresolved.length) throw new Error(`Airtable current-country mappings missing or ambiguous: ${unresolved.join(', ')}`);
 }

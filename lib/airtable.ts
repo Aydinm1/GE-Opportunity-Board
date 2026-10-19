@@ -1,4 +1,3 @@
-import { CURRENT_COUNTRY_FIELD, resolveCountryRecord } from './country-records';
 import type { Person } from './types';
 import { APPLICANT_STATUS, OPPORTUNITY_BOARD_SOURCE } from './application-select-options';
 import { AppError } from './errors';
@@ -49,8 +48,9 @@ const APPLICATION_ATTACHMENT_FIELD = 'CV / Resume';
 const APPLICATION_IDEMPOTENCY_FIELD = 'Idempotency Key';
 // Refreshing cannot fix an option Airtable refuses, and it would clear the form, so this copy never suggests it.
 const FRIENDLY_SELECT_OPTION_ERROR = 'We couldn\'t submit your application because one of your selected answers could not be saved. Your answers are still on this page. Please try again later, and let the Global Encounters team know if this keeps happening.';
-const PERSON_SELECT_FIELDS = ['Candidate Status', 'Age', 'Gender', 'Country of Birth'] as const;
-const OPTIONAL_PERSON_SELECT_FIELDS = new Set<string>(['Gender', 'Country of Birth']);
+const SCHEMA_VARIABLE_PERSON_FIELDS = ['Country of Living (Current Location)', 'Jurisdiction'] as const;
+const PERSON_SELECT_FIELDS = ['Candidate Status', 'Age', 'Gender', 'Country of Birth', ...SCHEMA_VARIABLE_PERSON_FIELDS] as const;
+const OPTIONAL_PERSON_SELECT_FIELDS = new Set<string>(['Gender', 'Country of Birth', ...SCHEMA_VARIABLE_PERSON_FIELDS]);
 const PERSON_REVIEW_NOTES_FIELD = 'Notes RE: Candidate';
 const PERSON_REVIEW_MARKER = '[Opportunity Board: DATA REVIEW REQUIRED]';
 const MAX_PERSON_CREATE_RETRIES = 3;
@@ -371,6 +371,15 @@ function selectFieldsHoldingRefusedOption(details: string, fields: Record<string
   return PERSON_SELECT_FIELDS.filter((field) => typeof fields[field] === 'string' && (fields[field] as string).trim() === refused.trim());
 }
 
+function shouldRetryPersonCreateWithoutSchemaVariableFields(details: string, fields: Record<string, unknown>) {
+  const hasSchemaVariableField = SCHEMA_VARIABLE_PERSON_FIELDS.some((field) => field in fields);
+  if (!hasSchemaVariableField) return false;
+
+  const error = parseAirtableError(details);
+  return error?.type === 'INVALID_VALUE_FOR_COLUMN' &&
+    error.message === 'Value is not an array of record IDs.';
+}
+
 async function findPersonByNormalizedEmail(normalizedEmail: string): Promise<AirtableRecord<AirtablePeopleFields> | null> {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
@@ -425,31 +434,14 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
   if (person.gender && person.gender.trim() !== '') fields['Gender'] = person.gender.trim();
   if (person.countryOfOrigin && person.countryOfOrigin.trim() !== '') fields['Country of Birth'] = person.countryOfOrigin.trim();
   if (person.countryOfLiving && person.countryOfLiving.trim() !== '') fields['Country of Living (Current Location)'] = person.countryOfLiving.trim();
+  if (person.jurisdiction && person.jurisdiction.trim() !== '') fields['Jurisdiction'] = person.jurisdiction.trim();
   if (person.education && person.education.trim() !== '') fields['Academic / Professional Education'] = person.education.trim();
   if (person.profession && person.profession.trim() !== '') fields['Current Profession / Occupation'] = person.profession.trim();
   if (person.jamatiExperience && person.jamatiExperience.trim() !== '') fields['Jamati Experience'] = person.jamatiExperience.trim();
 
   const url = airtableBaseUrl(baseId, peopleTable);
-  const submittedFields = { ...fields };
-  const omissions: Array<{ field: string; airtableErrorType: string; status?: number }> = [];
-  if (typeof fields[CURRENT_COUNTRY_FIELD] === 'string') {
-    const country = await resolveCountryRecord(fields[CURRENT_COUNTRY_FIELD] as string);
-    if (country.kind === 'resolved') fields[CURRENT_COUNTRY_FIELD] = [country.id];
-    else {
-      delete fields[CURRENT_COUNTRY_FIELD];
-      omissions.push({ field: CURRENT_COUNTRY_FIELD, airtableErrorType: country.kind === 'missing' ? 'COUNTRY_RECORD_MISSING' : 'COUNTRY_RECORD_AMBIGUOUS' });
-    }
-  }
-  const withReviewNotes = (values: Record<string, unknown>) => omissions.length ? {
-    ...values,
-    [PERSON_REVIEW_NOTES_FIELD]: [
-      PERSON_REVIEW_MARKER,
-      'The following submitted answers could not be saved in their structured fields.',
-      'Staff: correct the configuration or linked-record mapping, restore these answers, then change the header to [Opportunity Board: REVIEW RESOLVED].',
-      ...omissions.map(({ field }) => `${field}: ${String(submittedFields[field])}`),
-    ].join('\n'),
-  } : values;
-  let attemptFields: Record<string, unknown> = withReviewNotes(fields);
+  let attemptFields: Record<string, unknown> = fields;
+  const omissions: Array<{ field: string; airtableErrorType: string; status: number }> = [];
 
   for (let attempt = 0; ; attempt += 1) {
     const res = await fetch(url, {
@@ -476,9 +468,12 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
     // A refused select option (schema drift in Airtable) should not block the applicant:
     // create the person without that field and report it so staff can fix the option.
     const refusedFields = selectFieldsHoldingRefusedOption(d, attemptFields);
-    const dropFields: readonly string[] = refusedFields.length > 0 && refusedFields.every((field) => OPTIONAL_PERSON_SELECT_FIELDS.has(field))
+    let dropFields: readonly string[] = refusedFields.length > 0 && refusedFields.every((field) => OPTIONAL_PERSON_SELECT_FIELDS.has(field))
       ? refusedFields
       : [];
+    if (dropFields.length === 0 && shouldRetryPersonCreateWithoutSchemaVariableFields(d, attemptFields)) {
+      dropFields = SCHEMA_VARIABLE_PERSON_FIELDS.filter((field) => field in attemptFields);
+    }
     if (dropFields.length === 0) {
       throw toAirtableWriteError('Airtable create person failed', d, res.status);
     }
@@ -490,22 +485,24 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
     for (const field of dropFields) delete attemptFields[field];
     // Save the original answers atomically with the new person. If notes cannot be
     // written, creation fails; never accept an unflagged omission or overwrite an existing person's notes.
-    attemptFields = withReviewNotes(attemptFields);
+    attemptFields[PERSON_REVIEW_NOTES_FIELD] = [
+      PERSON_REVIEW_MARKER,
+      'The following submitted answers could not be saved in their structured fields.',
+      'Staff: correct the configuration or linked-record mapping, restore these answers, then change the header to [Opportunity Board: REVIEW RESOLVED].',
+      ...omissions.map(({ field }) => `${field}: ${String(fields[field])}`),
+    ].join('\n');
   }
 }
 
-function reportRefusedPersonSelectFields(omissions: Array<{ field: string; airtableErrorType: string; status?: number }>) {
+function reportRefusedPersonSelectFields(omissions: Array<{ field: string; airtableErrorType: string; status: number }>) {
   const meta = {
     context: '/api/applications',
     operation: 'create_person_select_option_fallback',
-    // Flat primitive arrays survive Sentry's default context normalization depth.
-    omittedFields: omissions.map(item => item.field),
-    airtableErrorTypes: omissions.map(item => item.airtableErrorType),
-    omissionStatuses: omissions.flatMap(item => item.status === undefined ? [] : [item.status]),
+    omissions,
   };
-  console.warn('People profile needs staff review; submitted answers preserved in notes', meta);
+  console.warn('Airtable refused People select options; person created without them', meta);
   captureServerException(
-    new Error('People profile needs staff review; submitted answers preserved in notes'),
+    new Error('Airtable refused People select options; person created without them'),
     meta
   );
 }

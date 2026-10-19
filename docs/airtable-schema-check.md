@@ -1,24 +1,15 @@
 # Checking Airtable compatibility
 
-Run `npm run test:airtable` from a configured checkout. This reads base metadata and country-directory reference records;
+Run `npm run test:airtable` from a configured checkout. This reads base metadata;
 no records, options, or fields are created or modified. A nonzero exit means the
 check failed: read the reported table, field, type, or missing option. Do not
 weaken the contract to silence a mismatch without checking how the app writes it.
 
 The contract covers the fields the app reads/writes in GE Roles, People, and
-Applications, and the country directory. Required fields and incompatible types fail. Missing optional role
+Applications. Required fields and incompatible types fail. Missing optional role
 fields warn. Select choices are case-sensitive; text variants explicitly allowed
 by the contract do not require select choices. Extra choices are accepted only
 where the contract uses `contains`. Unrelated fields are ignored.
-
-Current Country is required to be a linked-record field targeting the configured
-country directory. Jurisdiction must be a lookup through that link to the directory
-Jurisdiction field. The live check also resolves every supported country against
-uncached directory records; missing or ambiguous mappings fail. This closes the
-previous gap where a linked field passed metadata checks even though the app sent
-a plain string. `AIRTABLE_COUNTRIES_TABLE` optionally selects the directory by ID
-or name; it defaults to `Country / Jurisdiction Table`. The workflow can use the
-default without another variable.
 
 ## GitHub manual check
 
@@ -35,7 +26,7 @@ workflow, selecting `main`. Configure the credential boundary in GitHub Settings
   secret.
 
 - **Environment secret** `AIRTABLE_SCHEMA_TOKEN` in `airtable-schema`: a dedicated PAT with
-  `schema.bases:read` and `data.records:read` scopes, limited to the configured base. The second scope is needed to validate actual country record IDs/names, which metadata does not contain; no write scope is needed. Do not reuse
+  `schema.bases:read` scope and access only to the configured base. Do not reuse
   the production write token. Do not also store this credential as a repository
   or organization secret; those copies would bypass the environment boundary.
   If migrating an existing repository secret, remove that copy before use.
@@ -88,7 +79,7 @@ names and error types/statuses, not the original answers.
 
 ## Limits and release checks
 
-Metadata checks do not verify arbitrary formula results, applicant field contents, write permissions,
+Metadata checks do not verify formula results, field contents, write permissions,
 network availability, or successful attachment uploads. API tests use mocked
 Airtable responses; a green suite does not prove production writes work. On the
 preview, verify a clearly marked new applicant and a returning applicant, including
@@ -99,6 +90,3 @@ synthetic submission requires explicit authorization and a cleanup arrangement.
 CV retry recovery, required-answer preservation under renamed fields, upload-size
 boundaries, and browser error presentation receive regression tests with their
 respective fixes (#43, #44, and #46), rather than accepting failing tests here.
-
-Current Country record mapping, fallback semantics and backfill procedure:
-[current-country mapping](current-country-mapping.md).

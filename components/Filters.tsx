@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Job, FilterOptions } from '../types';
+import { Job, FilterOptions } from '../lib/types';
 import { requestIframeResize } from '../lib/request-iframe-resize';
 import { DURATION_BUCKETS, TIME_COMMITMENT_BUCKETS } from '../lib/utils';
 

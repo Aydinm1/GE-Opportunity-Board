@@ -1,4 +1,4 @@
-import type { Person } from '../types';
+import type { Person } from './types';
 import { APPLICANT_STATUS, OPPORTUNITY_BOARD_SOURCE } from './application-select-options';
 import { AppError } from './errors';
 import { captureServerException } from './monitoring';

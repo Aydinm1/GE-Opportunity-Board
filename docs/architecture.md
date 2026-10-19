@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-  A[Candidate Browser<br/>Standalone or Iframe] --> B[Next.js Frontend<br/>App.tsx + components]
+  A[Candidate Browser<br/>Standalone or Iframe] --> B[Next.js Frontend<br/>components]
   B --> C[Next.js API Routes<br/>/api/jobs /api/applications]
   C --> D[(Airtable Base)]
   C --> E[(Airtable Content API<br/>Attachment Upload)]
@@ -17,7 +17,7 @@ flowchart LR
 
 ## Frontend
 
-- Main shell and orchestration: `App.tsx`
+- Main shell and orchestration: `components/OpportunityBoard.tsx`
 - UI components: `components/*`
 - Key patterns:
   - job list/details split view

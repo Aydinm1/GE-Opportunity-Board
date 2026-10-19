@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Person, Job } from '../types';
+import { Person, Job } from '../lib/types';
 import { COUNTRY_OPTIONS, PERSON_AGE_OPTIONS, PERSON_GENDER_OPTIONS, PERSON_GENDER_LABELS } from '../lib/application-select-options';
 import { MAX_APPLICATION_ATTACHMENT_BYTES, MAX_APPLICATION_ATTACHMENT_LABEL } from '../lib/application-constraints';
 import { captureClientException } from '../lib/monitoring';

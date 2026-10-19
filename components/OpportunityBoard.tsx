@@ -1,16 +1,16 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Job, FilterOptions } from './types';
-import { HOST_ORIGIN } from './constants';
-import JobCard from './components/JobCard';
-import JobDetails from './components/JobDetails';
-import Filters from './components/Filters';
-import { JOBS_LOAD_ERROR_MESSAGE, loadJobs, type RequestError } from './lib/jobs-load';
-import { captureClientException } from './lib/monitoring';
-import { isTrustedParentMessage, parseTrustedRedirectUrl } from './lib/message-security';
-import { requestIframeResize } from './lib/request-iframe-resize';
-import { useScrollBoundaryTransfer } from './lib/useScrollBoundaryTransfer';
+import { Job, FilterOptions } from '../lib/types';
+import { HOST_ORIGIN } from '../lib/host-config';
+import JobCard from './JobCard';
+import JobDetails from './JobDetails';
+import Filters from './Filters';
+import { JOBS_LOAD_ERROR_MESSAGE, loadJobs, type RequestError } from '../lib/jobs-load';
+import { captureClientException } from '../lib/monitoring';
+import { isTrustedParentMessage, parseTrustedRedirectUrl } from '../lib/message-security';
+import { requestIframeResize } from '../lib/request-iframe-resize';
+import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
 
 type InitialParentParams = {
     jobParam: string | null;
@@ -78,7 +78,7 @@ const getInitialParamsFromParentUrl = async (timeout = 500): Promise<InitialPare
     });
 };
 
-function App() {
+function OpportunityBoard() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -526,4 +526,4 @@ function App() {
     );
 };
 
-export default App;
+export default OpportunityBoard;

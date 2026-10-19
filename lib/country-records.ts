@@ -47,7 +47,10 @@ export async function loadCountryRecords({ cache = true }: { cache?: boolean } =
     try { page = await response.json(); } catch { throw new Error('Invalid Airtable country directory response'); }
     if (!Array.isArray(page.records)) throw new Error('Invalid Airtable country directory records');
     for (const record of page.records) {
-      const name = record.fields?.[COUNTRY_DIRECTORY_NAME_FIELD];
+      if (!record || typeof record !== 'object' || Array.isArray(record) || !record.fields || typeof record.fields !== 'object' || Array.isArray(record.fields)) {
+        throw new Error('Invalid Airtable country directory record');
+      }
+      const name = record.fields[COUNTRY_DIRECTORY_NAME_FIELD];
       const jurisdiction = record.fields?.[COUNTRY_DIRECTORY_JURISDICTION_FIELD];
       if (!/^rec[A-Za-z0-9]+$/.test(record.id)) throw new Error('Invalid Airtable country directory record');
       if (name === undefined || (typeof name === 'string' && !name.trim())) continue;

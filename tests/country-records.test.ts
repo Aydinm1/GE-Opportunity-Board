@@ -7,6 +7,11 @@ import { captureServerException } from '../lib/monitoring';
 vi.mock('../lib/monitoring', () => ({ captureServerException: vi.fn() }));
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const row = (id: string, name: string, jurisdiction?: string) => ({ id, fields: { Name: name, Jurisdiction: jurisdiction } });
+const malformedDirectoryRows = [
+  { label: 'missing fields', record: { id: 'recBad' } },
+  ...[null, [], 'invalid', 42, true].map(fields => ({ label: `fields ${JSON.stringify(fields)}`, record: { id: 'recBad', fields } })),
+  { label: 'null record', record: null },
+];
 let ip = 0;
 beforeEach(() => {
   vi.stubEnv('AIRTABLE_TOKEN', 'test-token'); vi.stubEnv('AIRTABLE_BASE_ID', 'appTest');
@@ -52,8 +57,12 @@ describe('country directory reads', () => {
     await loadCountryRecords({ cache: false }); expect(mock.mock.calls[0][1].cache).toBe('no-store');
   });
   it('does not let an unrelated blank country row block submissions', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ records: [row('recBlank', ''), row('recValid', 'Canada')] })));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ records: [row('recBlank', ''), row('recWhitespace', '  '), { id: 'recEmpty', fields: {} }, row('recValid', 'Canada')] })));
     expect(await loadCountryRecords()).toEqual([{ id: 'recValid', name: 'Canada', jurisdiction: undefined }]);
+  });
+  it.each(malformedDirectoryRows)('rejects malformed directory rows ($label)', async ({ record }) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ records: [row('recValid', 'Canada'), record] })));
+    await expect(loadCountryRecords()).rejects.toThrow('Invalid Airtable country directory record');
   });
   it('does not return a partial directory after a later-page failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json({ records: [row('recA', 'A')], offset: 'next' })).mockResolvedValueOnce(json({}, 503)));
@@ -71,7 +80,7 @@ function request() {
   form.set('cvResume', new File(['Synthetic CV'], 'cv.txt', { type: 'text/plain' }));
   return new Request('http://localhost/api/applications', { method: 'POST', headers: { 'x-forwarded-for': `192.0.2.${++ip}` }, body: form });
 }
-function mockApplication(directoryRows: ReturnType<typeof row>[], options: { directoryStatus?: number; returning?: boolean; notesFail?: boolean } = {}) {
+function mockApplication(directoryRows: unknown[], options: { directoryStatus?: number; returning?: boolean; notesFail?: boolean } = {}) {
   const writes: Array<{ path: string; body: any }> = []; const countryReads: string[] = [];
   const mock = vi.fn(async (input: string, init: RequestInit = {}) => {
     const url = new URL(input);
@@ -112,11 +121,18 @@ describe('country record mapping through the application API', () => {
     expect(fields['Notes RE: Candidate']).toContain('[Opportunity Board: DATA REVIEW REQUIRED]');
     expect(fields['Notes RE: Candidate']).toContain('Country of Living (Current Location): Canada');
     const meta = vi.mocked(captureServerException).mock.calls[0][1]!;
+    expect(meta.operation).toBe('create_person_review_fallback');
     expect(meta.omittedFields).toEqual(['Country of Living (Current Location)']); expect(meta.airtableErrorTypes).toEqual([reason]);
     expect(JSON.stringify(meta)).not.toContain('Canada'); expect(JSON.stringify(meta)).not.toContain('person@example.test');
   });
   it('fails before any writes if the directory cannot be read', async () => {
     const { writes } = mockApplication([], { directoryStatus: 403 }); expect((await POST(request())).status).toBe(500); expect(writes).toHaveLength(0);
+  });
+  it.each(malformedDirectoryRows)('fails before any writes for a malformed directory row ($label)', async ({ record }) => {
+    const { writes } = mockApplication([row('recValid', 'Canada'), record]);
+    expect((await POST(request())).status).toBe(500);
+    expect(writes).toHaveLength(0);
+    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_review_fallback' }));
   });
   it('does not accept a fallback if its review note cannot be saved', async () => {
     const { writes } = mockApplication([], { notesFail: true }); expect((await POST(request())).status).toBe(500);

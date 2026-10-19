@@ -607,7 +607,7 @@ describe('POST /api/applications', () => {
     });
     expect(console.warn).toHaveBeenCalledWith(
       'People profile needs staff review; submitted answers preserved in notes',
-      expect.objectContaining({ omittedFields: ['Gender'], airtableErrorTypes: ['INVALID_MULTIPLE_CHOICE_OPTIONS'], omissionStatuses: [422] })
+      expect.objectContaining({ operation: 'create_person_review_fallback', omittedFields: ['Gender'], airtableErrorTypes: ['INVALID_MULTIPLE_CHOICE_OPTIONS'], omissionStatuses: [422] })
     );
   });
 
@@ -850,14 +850,14 @@ describe('application option and fallback regressions', () => {
     ]);
     expect((await submit()).status).toBe(500);
     expect(mock).toHaveBeenCalledTimes(4);
-    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_select_option_fallback' }));
+    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_review_fallback' }));
   });
 
   it('does not report an accepted fallback when Airtable returns no created person', async () => {
     const mock = mockSubmission([refusedSelectOptionResponse('female'), jsonResponse({ records: [] })]);
     expect((await submit()).status).toBe(500);
     expect(mock).toHaveBeenCalledTimes(4);
-    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_select_option_fallback' }));
+    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_review_fallback' }));
   });
 
   it('stops when the refused value is not a remaining writable select field', async () => {

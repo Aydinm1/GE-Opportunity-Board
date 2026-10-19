@@ -1,5 +1,5 @@
-import App from '../App';
+import OpportunityBoard from '../components/OpportunityBoard';
 
 export default function HomePage() {
-  return <App />;
+  return <OpportunityBoard />;
 }

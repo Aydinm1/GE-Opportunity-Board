@@ -1,4 +1,4 @@
-import type { Job } from '../types';
+import type { Job } from './types';
 import { parseErrorResponseMessage } from './utils';
 
 export type RequestError = Error & {

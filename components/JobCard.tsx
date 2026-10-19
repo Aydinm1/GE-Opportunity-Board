@@ -1,5 +1,5 @@
 import React from 'react';
-import { Job } from '../types';
+import { Job } from '../lib/types';
 import { statusVariant } from '../lib/utils';
 
 interface JobCardProps {

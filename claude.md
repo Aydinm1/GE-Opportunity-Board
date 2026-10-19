@@ -8,44 +8,33 @@ A Next.js 15 / React 19 job board application designed to run as an **iframe wit
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **Backend**: Airtable API (jobs, people, applications tables)
-- **Deployment**: Vercel (https://ge-opportunity-board.vercel.app/)
+- **Deployment**: Vercel; canonical app/embed origin: https://ge-opp-board.the.ismaili/
 - **Embedding**: iframe with postMessage communication to parent site
 
 ## Project Structure
 
-```
-/
-├── App.tsx                 # Main application component (job list, filters, details panel)
-├── types.ts                # TypeScript interfaces (Job, Person, Application, FilterOptions)
-├── constants.ts            # HOST_ORIGIN config, mock job data
-├── host-origin.json        # Parent origin configuration {"HOST_ORIGIN": "..."}
-│
-├── app/
-│   ├── page.tsx            # Next.js page (renders App)
-│   ├── layout.tsx          # Root layout with fonts, metadata
-│   ├── globals.css         # Global styles
-│   └── api/
-│       ├── jobs/           # GET /api/jobs - fetch jobs from Airtable
-│       ├── applications/   # POST /api/applications - submit application
-│       └── upload/         # File upload endpoint
-│
-├── components/
-│   ├── JobCard.tsx         # Job listing card in sidebar
-│   ├── JobDetails.tsx      # Full job details with share/apply buttons
-│   ├── ApplyModal.tsx      # Application form modal
-│   └── Filters.tsx         # Multi-select filter dropdowns
-│
-├── lib/
-│   ├── airtable.ts         # Airtable API: getJobs(), submitApplication()
-│   └── utils.ts            # Helper functions (splitBullets, parseDuration, etc.)
-│
-├── public/
-│   ├── resize-child.js     # Iframe height sync script (runs in iframe)
-│   └── img/                # Logo, pattern background images
-│
-└── Parent Scripts (reference only - installed on the.ismaili):
-    ├── parent-script-original.txt  # Minimal parent script (resize only)
-    └── script.txt                  # Debug parent script with full message handling
+```text
+app/                         # Next.js pages, layout, global styles and API routes
+components/
+  OpportunityBoard.tsx       # Main client shell: jobs, filters and role details
+  JobCard.tsx
+  JobDetails.tsx
+  ApplyView.tsx              # Application form
+  Filters.tsx
+  TorSection.tsx
+lib/
+  types.ts                   # Shared TypeScript interfaces
+  host-config.ts             # Host origin and parent-page URL exports
+  airtable.ts                # Airtable integration
+config/
+  host-origin.json           # Single parent-origin configuration
+integrations/iframe/
+  parent-script.txt          # Reference installed separately on the.ismaili
+public/
+  resize-child.js            # Served iframe height sync script
+  img/
+tests/
+docs/
 ```
 
 ## Iframe Communication
@@ -78,12 +67,12 @@ Jobs can be deep-linked via `?job=<airtable-record-id>` in the parent URL. The i
 
 ### Host Origin Configuration
 
-Set in `host-origin.json`:
+Set in `config/host-origin.json`:
 ```json
 {"HOST_ORIGIN": "https://the.ismaili"}
 ```
 
-Used by `resize-child.js` and `App.tsx` to target postMessage correctly.
+Imported by `lib/host-config.ts` for React parent messaging. The resize script currently derives its target from the referrer; pinning it to the trusted host is tracked in #42. There is no separate public JSON copy.
 
 ## Airtable Integration
 
@@ -109,7 +98,7 @@ AIRTABLE_APPLICATIONS_TABLE=tbl...  # Applications table
 
 ### Application Flow
 
-1. User fills form in `ApplyModal.tsx`
+1. User fills form in `components/ApplyView.tsx`
 2. Submits to `POST /api/applications`
 3. `lib/airtable.ts` → `submitApplication()`:
    - Finds or creates Person record by email
@@ -136,14 +125,13 @@ npm run start        # Start production server
 
 ### Testing Locally
 
-The app works standalone but share/deep-link features require iframe context. Use `host-test-with-script.html` for local iframe testing.
+The app works standalone but share/deep-link features require iframe context. Use a local parent iframe harness for testing, then verify production host messaging on the actual the.ismaili embed.
 
 ## Parent Script Installation
 
-For the parent site (the.ismaili), install one of:
+For the parent site (`https://the.ismaili`), use `integrations/iframe/parent-script.txt` as the single reference. It handles resize, parent-URL requests, and share-copy requests, accepting messages only from the configured child origin and the matching iframe window.
 
-1. **Minimal** (`parent-script-original.txt`): Handles `resize-iframe` only
-2. **Debug** (`script.txt`): Full message handling with debug overlay
+The canonical child origin is `https://ge-opp-board.the.ismaili`. The parent script is installed separately on the host site; changing the reference file in this repository does not update that installation.
 
 The parent page needs:
 ```html
@@ -160,9 +148,9 @@ The parent page needs:
 ## Common Tasks
 
 ### Add a new filter field
-1. Add to `FilterOptions` in `types.ts`
-2. Add to `selectedFilters` initial state in `App.tsx`
-3. Add filter logic in `filteredJobs` memo in `App.tsx`
+1. Add to `FilterOptions` in `lib/types.ts`
+2. Add to `selectedFilters` initial state in `components/OpportunityBoard.tsx`
+3. Add filter logic in `filteredJobs` memo in `components/OpportunityBoard.tsx`
 4. Add dropdown in `components/Filters.tsx`
 
 ### Modify job card display
@@ -172,7 +160,7 @@ Edit `components/JobCard.tsx`
 Edit `components/JobDetails.tsx`
 
 ### Modify application form
-Edit `components/ApplyModal.tsx`
+Edit `components/ApplyView.tsx`
 
 ### Change Airtable field mappings
 Edit `lib/airtable.ts` - look for `AirtableJobFields` type and the field mappings in `getJobs()` and `submitApplication()`

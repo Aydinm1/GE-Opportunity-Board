@@ -8,7 +8,7 @@ A Next.js 15 / React 19 job board application designed to run as an **iframe wit
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **Backend**: Airtable API (jobs, people, applications tables)
-- **Deployment**: Vercel (https://ge-opportunity-board.vercel.app/)
+- **Deployment**: Vercel; canonical app/embed origin: https://ge-opp-board.the.ismaili/
 - **Embedding**: iframe with postMessage communication to parent site
 
 ## Project Structure
@@ -43,9 +43,7 @@ A Next.js 15 / React 19 job board application designed to run as an **iframe wit
 │   ├── resize-child.js     # Iframe height sync script (runs in iframe)
 │   └── img/                # Logo, pattern background images
 │
-└── Parent Scripts (reference only - installed on the.ismaili):
-    ├── parent-script-original.txt  # Minimal parent script (resize only)
-    └── script.txt                  # Debug parent script with full message handling
+└── parent-script.txt       # Canonical parent script installed on the.ismaili
 ```
 
 ## Iframe Communication
@@ -140,10 +138,9 @@ The app works standalone but share/deep-link features require iframe context. Us
 
 ## Parent Script Installation
 
-For the parent site (the.ismaili), install one of:
+For the parent site (`https://the.ismaili`), use `parent-script.txt` as the single reference. It handles resize, parent-URL requests, and share-copy requests, accepting messages only from the configured child origin and the matching iframe window.
 
-1. **Minimal** (`parent-script-original.txt`): Handles `resize-iframe` only
-2. **Debug** (`script.txt`): Full message handling with debug overlay
+The canonical child origin is `https://ge-opp-board.the.ismaili`. The parent script is installed separately on the host site; changing the reference file in this repository does not update that installation.
 
 The parent page needs:
 ```html

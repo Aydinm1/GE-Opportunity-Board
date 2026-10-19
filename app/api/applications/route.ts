@@ -1,4 +1,4 @@
-import { submitApplication } from '../../../lib/airtable';
+import { getJobs, submitApplication } from '../../../lib/airtable';
 import { jsonError, jsonOk } from '../../../lib/api-response';
 import { applyRateLimit } from '../../../lib/rate-limit';
 import { AppError } from '../../../lib/errors';
@@ -39,6 +39,10 @@ export async function POST(req: Request) {
     const idempotencyKey = validateIdempotencyKey(
       headerIdempotencyKey || (typeof bodyIdempotencyKey === 'string' ? bodyIdempotencyKey : null)
     );
+    const { jobs } = await getJobs();
+    if (!jobs.some((job) => job.id === payload.jobId)) {
+      throw new AppError('This role is no longer available. Please choose a current role.', { status: 400 });
+    }
     const result = await submitApplication({
       ...payload,
       idempotencyKey,

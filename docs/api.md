@@ -86,10 +86,10 @@ Required text fields:
 - `profession`
 - `jamatiExperience`
 - `whyText`
+- `jobId` (Airtable record ID for a published role in the configured jobs view)
 
 Optional text fields:
 - `linkedIn`
-- `jobId`
 - `jobTitle`
 - `website`
 - `idempotencyKey`
@@ -126,8 +126,14 @@ Server-side validation is strict and enforced in `lib/validation.ts`:
 - Attachment validation enforces:
   - allowed extensions/content-types (`.pdf`, `.doc`, `.docx`, `.txt`)
   - valid uploaded file payload
-  - max size 5MB
+  - max size 4MB (4 × 1024 × 1024 bytes), leaving multipart/form-field headroom under the [Vercel request limit](https://vercel.com/docs/functions/limitations)
   - filename safety checks (path separators are rejected)
+  - extension and declared MIME type must agree
+  - PDF, DOC, and DOCX must begin with their format signature; legacy DOC remains supported
+  - TXT must be valid UTF-8 without binary control characters
+- File signatures screen for format mismatches; they do not validate the full document or scan for malware. DOCX uses a ZIP signature, which other ZIP files can share.
+- `jobId` is required and must match `^rec[A-Za-z0-9]+$`. Before writes, it must appear in the published roles list, including all Airtable pages and the configured view restriction. Unavailable roles return `400`; lookup failures fail the submission.
+- Role eligibility uses the existing 300-second Airtable read cache; recent publication/view changes can take that long to appear.
 - Anti-bot checks validate honeypot/timing metadata when provided.
 
 ### Write behavior

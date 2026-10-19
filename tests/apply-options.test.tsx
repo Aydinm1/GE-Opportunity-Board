@@ -22,6 +22,7 @@ describe('rendered application dropdown contract', () => {
     { isMobile: true, isEmbedded: true },
   ])('maps every visible dropdown to the schema ($isMobile mobile, $isEmbedded embedded)', props => {
     const html = renderToStaticMarkup(<ApplyView job={job} onBackToDetails={() => {}} {...props} />);
+    expect(html).toContain('Accepted: PDF, DOC, DOCX, TXT up to 4MB.');
     expect(html).toContain('value="female">Female</option>');
     expect(html).toContain('value="male">Male</option>');
     const selects = [...html.matchAll(/<select\b[^>]*>([\s\S]*?)<\/select>/g)];

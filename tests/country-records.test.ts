@@ -15,6 +15,7 @@ const malformedDirectoryRows = [
 let ip = 0;
 beforeEach(() => {
   vi.stubEnv('AIRTABLE_TOKEN', 'test-token'); vi.stubEnv('AIRTABLE_BASE_ID', 'appTest');
+  vi.stubEnv('AIRTABLE_GEROLES_TABLE', 'Roles');
   vi.stubEnv('AIRTABLE_COUNTRIES_TABLE', 'Country / Jurisdiction Table');
   vi.stubEnv('AIRTABLE_PEOPLE_TABLE', 'People'); vi.stubEnv('AIRTABLE_APPLICATIONS_TABLE', 'Applications');
   vi.spyOn(console, 'warn').mockImplementation(() => {}); vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -84,6 +85,7 @@ function mockApplication(directoryRows: unknown[], options: { directoryStatus?: 
   const writes: Array<{ path: string; body: any }> = []; const countryReads: string[] = [];
   const mock = vi.fn(async (input: string, init: RequestInit = {}) => {
     const url = new URL(input);
+    if (url.pathname.endsWith('/Roles') && !init.method) return json({ records: [{ id: 'recRole', fields: { 'Published?': true, 'Role Title': 'Test role' } }] });
     if (url.pathname.endsWith('Country%20%2F%20Jurisdiction%20Table')) {
       countryReads.push(input); return json({ records: directoryRows }, options.directoryStatus ?? 200);
     }

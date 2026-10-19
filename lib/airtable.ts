@@ -165,9 +165,10 @@ function setCompletedIdempotencyResult(key: string, result: SubmitApplicationRes
   completedIdempotency.set(key, { result, expiresAt: Date.now() + IDEMPOTENCY_CACHE_TTL_MS });
 }
 
-function buildJobsRequestUrl(baseId: string, table: string, view: string | undefined, fieldNames: readonly string[]) {
+function buildJobsRequestUrl(baseId: string, table: string, view: string | undefined, fieldNames: readonly string[], offset?: string) {
   const params = new URLSearchParams();
   params.set('pageSize', '100');
+  if (offset) params.set('offset', offset);
   params.set('filterByFormula', JOBS_PUBLISHED_FORMULA);
   if (view) {
     params.set('view', view);
@@ -212,23 +213,37 @@ export async function getJobs() {
   const optionalFields = new Set<string>(JOBS_OPTIONAL_QUERY_FIELDS);
   const skippedOptionalFields = new Set<string>();
   let requestedFields: string[] = [...JOBS_QUERY_FIELDS];
-  let data: AirtableListResponse<AirtableJobFields> | null = null;
+  const records: AirtableRecord<AirtableJobFields>[] = [];
+  let offset: string | undefined;
+  const seenOffsets = new Set<string>();
 
-  while (!data) {
-    const res = await fetch(buildJobsRequestUrl(baseId, table, view, requestedFields), {
+  while (true) {
+    const res = await fetch(buildJobsRequestUrl(baseId, table, view, requestedFields, offset), {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'force-cache',
       next: { revalidate: JOBS_CACHE_TTL_SECONDS, tags: [JOBS_CACHE_TAG] },
     });
 
     if (res.ok) {
-      data = (await res.json()) as AirtableListResponse<AirtableJobFields>;
-      break;
+      const page = (await res.json()) as AirtableListResponse<AirtableJobFields>;
+      if (!Array.isArray(page.records)) throw new Error('Invalid Airtable jobs response');
+      records.push(...page.records);
+      if (!page.offset) break;
+      if (typeof page.offset !== 'string' || seenOffsets.has(page.offset)) {
+        throw new Error('Invalid Airtable jobs pagination');
+      }
+      seenOffsets.add(page.offset);
+      offset = page.offset;
+      continue;
     }
 
     const details = await res.text();
     const unknownFieldName = parseUnknownFieldName(details);
     if (unknownFieldName && optionalFields.has(unknownFieldName) && requestedFields.includes(unknownFieldName)) {
+      // Restart the list so every page uses the same optional field selection.
+      records.length = 0;
+      offset = undefined;
+      seenOffsets.clear();
       skippedOptionalFields.add(unknownFieldName);
       requestedFields = requestedFields.filter((fieldName) => fieldName !== unknownFieldName);
       console.warn('Airtable jobs query skipped missing optional field', {
@@ -246,11 +261,7 @@ export async function getJobs() {
     });
   }
 
-  if (!data) {
-    throw new Error('Airtable jobs request completed without data');
-  }
-
-  const jobs = data.records.map((r) => {
+  const jobs = records.map((r) => {
     const durationMonths = parseDurationMonths(r.fields["Duration (Months)"]);
     const durationCategory =
       r.fields["Duration Categories"] ?? bucketFromMonths(durationMonths);

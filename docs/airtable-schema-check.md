@@ -46,6 +46,37 @@ while displaying “Male” / “Female”. `Non-Binary` and `Prefer not to shar
 their existing casing. The case-sensitive schema check detects future changes;
 no Airtable schema modification is needed.
 
+## Staff review of saved fallback answers
+
+If a new person's optional demographic field cannot be saved, the same People
+create request writes a note into the existing **Notes RE: Candidate** field:
+
+```text
+[Opportunity Board: DATA REVIEW REQUIRED]
+...
+Country of Birth: United States
+Country of Living (Current Location): United States
+```
+
+When a refused value matches several fields, all matching fields must be on the
+permitted demographic list; otherwise submission still fails. Age, Candidate
+Status, identity/contact fields, application answers, and CV are not dropped.
+The record-ID compatibility fallback for linked Current Country/Jurisdiction
+also preserves original answers in this note. No new field is created.
+
+Staff can filter **People → Notes RE: Candidate contains
+`[Opportunity Board: DATA REVIEW REQUIRED]`**, or open the linked People record
+from Applications. After correcting the options or linked-record mapping and
+restoring the structured answers, change the note's header to
+`[Opportunity Board: REVIEW RESOLVED]`. The note retains the original answers.
+This does not send an email or create a view automatically.
+
+The notes field is required by the schema contract. If writing it fails, the
+fallback must not return success. It is written only when creating a new People
+record, so returning applicants' existing staff notes are never overwritten.
+Submitted values stay in Airtable; diagnostic logs and Sentry contain field
+names and error types/statuses, not the original answers.
+
 ## Limits and release checks
 
 Metadata checks do not verify formula results, field contents, write permissions,

@@ -85,6 +85,7 @@ describe('airtable schema comparison', () => {
           name: 'People',
           fields: [
             { id: 'fldFullName', name: 'Full Name', type: 'singleLineText' },
+            { id: 'fldCandidateNotes', name: 'Notes RE: Candidate', type: 'multilineText' },
             { id: 'fldCandidateStatus', name: 'Candidate Status', type: 'singleSelect', options: { choices: [{ name: APPLICANT_STATUS }] } },
             { id: 'fldEmailAddress', name: 'Email Address', type: 'email' },
             { id: 'fldPhone', name: 'Phone Number (incl. Country Code)', type: 'phoneNumber' },
@@ -131,6 +132,7 @@ describe('airtable schema comparison', () => {
           name: 'People',
           fields: [
             { id: 'fldFullName', name: 'Full Name', type: 'singleLineText' },
+            { id: 'fldCandidateNotes', name: 'Notes RE: Candidate', type: 'multilineText' },
             { id: 'fldCandidateStatus', name: 'Candidate Status', type: 'singleSelect', options: { choices: [{ name: APPLICANT_STATUS }] } },
             { id: 'fldEmailAddress', name: 'Email Address', type: 'email' },
             { id: 'fldPhone', name: 'Phone Number (incl. Country Code)', type: 'phoneNumber' },
@@ -232,6 +234,7 @@ describe('airtable schema comparison', () => {
           name: 'People',
           fields: [
             { id: 'fldFullName', name: 'Full Name', type: 'singleLineText' },
+            { id: 'fldCandidateNotes', name: 'Notes RE: Candidate', type: 'multilineText' },
             { id: 'fldCandidateStatus', name: 'Candidate Status', type: 'singleSelect', options: { choices: [{ name: APPLICANT_STATUS }] } },
             { id: 'fldEmailAddress', name: 'Email Address', type: 'email' },
             { id: 'fldPhone', name: 'Phone Number (incl. Country Code)', type: 'phoneNumber' },
@@ -330,6 +333,7 @@ describe('airtable schema comparison', () => {
           name: 'People',
           fields: [
             { id: 'fldFullName', name: 'Full Name', type: 'singleLineText' },
+            { id: 'fldCandidateNotes', name: 'Notes RE: Candidate', type: 'multilineText' },
             { id: 'fldCandidateStatus', name: 'Candidate Status', type: 'singleSelect', options: { choices: [{ name: APPLICANT_STATUS }] } },
             { id: 'fldEmailAddress', name: 'Email Address', type: 'email' },
             { id: 'fldPhone', name: 'Phone Number (incl. Country Code)', type: 'phoneNumber' },

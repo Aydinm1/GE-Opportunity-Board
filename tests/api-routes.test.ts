@@ -596,6 +596,7 @@ describe('POST /api/applications', () => {
     });
     expect(retryCreateBody.records[0].fields).not.toHaveProperty('Country of Living (Current Location)');
     expect(retryCreateBody.records[0].fields).not.toHaveProperty('Jurisdiction');
+    expect(retryCreateBody.records[0].fields['Notes RE: Candidate']).toContain('Country of Living (Current Location): United States');
   });
 
   it('creates the person without a select field whose option Airtable refuses', async () => {
@@ -750,7 +751,7 @@ describe('application option and fallback regressions', () => {
 
   function mockSubmission(personResponses: Response[], returning = false) {
     const queue = returning
-      ? [jsonResponse({ records: [{ id: 'recPerson', fields: {} }] })]
+      ? [jsonResponse({ records: [{ id: 'recPerson', fields: { 'Notes RE: Candidate': 'Existing staff notes' } }] })]
       : [jsonResponse({ records: [] }), jsonResponse({ records: [] }), ...personResponses];
     queue.push(
       jsonResponse({ records: [{ id: 'recApplication', fields: {} }] }),
@@ -815,6 +816,10 @@ describe('application option and fallback regressions', () => {
     const retried = JSON.parse(String(calls[3][1].body)).records[0].fields;
     const field = { female: 'Gender', Canada: 'Country of Birth', 'United States': 'Country of Living (Current Location)' }[value]!;
     delete original[field];
+    const reviewNote = retried['Notes RE: Candidate'];
+    expect(reviewNote).toContain('[Opportunity Board: DATA REVIEW REQUIRED]');
+    expect(reviewNote).toContain(`${field}: ${value}`);
+    delete retried['Notes RE: Candidate'];
     expect(retried).toEqual(original);
     expect(captureServerException).toHaveBeenCalled();
     const diagnostics = JSON.stringify([vi.mocked(console.warn).mock.calls, vi.mocked(captureServerException).mock.calls]);
@@ -825,7 +830,6 @@ describe('application option and fallback regressions', () => {
   it.each([
     ['25-34', {}],
     ['1a - Applicant', {}],
-    ['United States', { countryOfOrigin: 'United States' }],
     ['Prefer not to share', { age: 'Prefer not to share', gender: 'Prefer not to share' }],
     ['unknown-option', {}],
   ] as Array<[string, Record<string, string>]>)('does not guess or remove protected fields for %s', async (value, fields) => {
@@ -833,6 +837,52 @@ describe('application option and fallback regressions', () => {
     expect((await submit(fields)).status).toBe(400);
     expect(mock).toHaveBeenCalledTimes(3);
     expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain('Insufficient permissions');
+  });
+
+  it('accepts matching countries while preserving both answers in staff review notes', async () => {
+    const mock = mockSubmission([refusedSelectOptionResponse('United States'), jsonResponse({ records: [{ id: 'recPerson', fields: {} }] })]);
+    expect((await submit({ countryOfOrigin: 'United States' })).status).toBe(200);
+    const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
+    const fields = JSON.parse(String(calls[3][1].body)).records[0].fields;
+    expect(fields).not.toHaveProperty('Country of Birth');
+    expect(fields).not.toHaveProperty('Country of Living (Current Location)');
+    expect(fields).toMatchObject({ Age: '25-34', Gender: 'female', 'Candidate Status': '1a - Applicant', 'Email Address': validApplicationFields().emailAddress });
+    expect(fields['Notes RE: Candidate']).toContain('Country of Birth: United States');
+    expect(fields['Notes RE: Candidate']).toContain('Country of Living (Current Location): United States');
+    expect(JSON.parse(String(calls[4][1].body)).records[0].fields[WHY_FIELD]).toBe(validApplicationFields().whyText);
+    expect(JSON.parse(String(calls[5][1].body)).filename).toBe('resume.pdf');
+    const diagnostics = JSON.stringify([vi.mocked(console.warn).mock.calls, vi.mocked(captureServerException).mock.calls]);
+    expect(diagnostics).not.toContain('United States');
+    expect(diagnostics).not.toContain('[Opportunity Board: DATA REVIEW REQUIRED]');
+  });
+
+  it('preserves all omitted answers across successive retries', async () => {
+    const mock = mockSubmission([refusedSelectOptionResponse('female'), refusedSelectOptionResponse('Canada'), jsonResponse({ records: [{ id: 'recPerson', fields: {} }] })]);
+    expect((await submit()).status).toBe(200);
+    const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
+    const fields = JSON.parse(String(calls[4][1].body)).records[0].fields;
+    expect(fields['Notes RE: Candidate']).toContain('Gender: female');
+    expect(fields['Notes RE: Candidate']).toContain('Country of Birth: Canada');
+    expect(fields).not.toHaveProperty('Gender');
+    expect(fields).not.toHaveProperty('Country of Birth');
+    expect(fields['Country of Living (Current Location)']).toBe('United States');
+  });
+
+  it('does not report success or create an application if review notes cannot be saved', async () => {
+    const mock = mockSubmission([
+      refusedSelectOptionResponse('female'),
+      jsonResponse({ error: { type: 'UNKNOWN_FIELD_NAME', message: 'Unknown field name: "Notes RE: Candidate"' } }, { status: 422 }),
+    ]);
+    expect((await submit()).status).toBe(500);
+    expect(mock).toHaveBeenCalledTimes(4);
+    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_select_option_fallback' }));
+  });
+
+  it('does not report an accepted fallback when Airtable returns no created person', async () => {
+    const mock = mockSubmission([refusedSelectOptionResponse('female'), jsonResponse({ records: [] })]);
+    expect((await submit()).status).toBe(500);
+    expect(mock).toHaveBeenCalledTimes(4);
+    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_select_option_fallback' }));
   });
 
   it('stops after three retries even when a fourth optional field could be removed', async () => {

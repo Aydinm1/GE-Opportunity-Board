@@ -56,6 +56,7 @@ export const AIRTABLE_SCHEMA_CONTRACT: Record<'jobs' | 'people' | 'applications'
     fallbackName: 'People',
     fields: [
       { name: 'Full Name', expectedTypes: ['singleLineText'], usage: 'write' },
+      { name: 'Notes RE: Candidate', expectedTypes: ['multilineText'], usage: 'write' },
       {
         name: 'Candidate Status',
         expectedTypes: ['singleSelect', 'singleLineText'],

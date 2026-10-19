@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import ApplyView from '../components/ApplyView';
 import { AIRTABLE_SCHEMA_CONTRACT } from '../lib/airtable-schema-contract';
-import type { Job } from '../types';
+import type { Job } from '../lib/types';
 
 const job: Job = {
   id: 'recJob123', roleTitle: 'Test role', programmeArea: null, teamVertical: null,
@@ -22,6 +22,7 @@ describe('rendered application dropdown contract', () => {
     { isMobile: true, isEmbedded: true },
   ])('maps every visible dropdown to the schema ($isMobile mobile, $isEmbedded embedded)', props => {
     const html = renderToStaticMarkup(<ApplyView job={job} onBackToDetails={() => {}} {...props} />);
+    expect(html).toContain('Accepted: PDF, DOC, DOCX, TXT up to 4MB.');
     expect(html).toContain('value="female">Female</option>');
     expect(html).toContain('value="male">Male</option>');
     const selects = [...html.matchAll(/<select\b[^>]*>([\s\S]*?)<\/select>/g)];

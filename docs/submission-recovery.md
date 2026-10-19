@@ -34,8 +34,10 @@ best-effort PATCH is removed so a stale array cannot overwrite uploaded files.
 
 All application fields currently written are required: person/role links,
 submission key when provided, Status, Source, and the application answer. An
-unknown-field error fails visibly; no field is stripped and retried. PR #3's
-People demographic fallback and its staff review note remain unchanged.
+unknown-field error fails visibly; no field is stripped and retried. The existing
+People demographic review-note fallback, linked-country resolution, and
+`create_person_review_fallback` diagnostics are preserved. Published-role and CV
+validation still run before submission recovery.
 
 Airtable diagnostics retain operation, HTTP status, safe error type, and a known
 field name where identifiable. Raw response bodies, transport causes containing

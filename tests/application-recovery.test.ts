@@ -14,6 +14,8 @@ beforeEach(() => {
   vi.mocked(captureServerException).mockClear();
   process.env.AIRTABLE_TOKEN = 'test-token';
   process.env.AIRTABLE_BASE_ID = 'appTest';
+  process.env.AIRTABLE_GEROLES_TABLE = 'Roles';
+  process.env.AIRTABLE_COUNTRIES_TABLE = 'Countries';
   process.env.AIRTABLE_PEOPLE_TABLE = 'People';
   process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -57,6 +59,8 @@ function airtable() {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
     const method = init?.method ?? 'GET';
+    if (url.pathname.endsWith('/Roles') && method === 'GET') return json({ records: ['recRole', 'recOtherRole'].map(id => ({ id, fields: { 'Published?': true, 'Role Title': 'Synthetic role' } })) });
+    if (url.pathname.endsWith('/Countries') && method === 'GET') return json({ records: [{ id: 'recUS', fields: { Name: 'United States', Jurisdiction: 'USA' } }] });
     const endpoint = url.hostname === 'content.airtable.com' ? 'upload' : url.pathname.endsWith('/People') ? 'people' : 'applications';
     if (state.failAt === `${endpoint}:${method}`) return json({ error: { type: 'INVALID_VALUE_FOR_COLUMN', message: `Rejected applicant value "${PRIVATE}"` } }, 422);
     if (endpoint === 'people' && method === 'GET') {
@@ -177,7 +181,8 @@ describe('application recovery and privacy', () => {
     const calls = fetchMock.mock.calls.length;
     expect((await submit('submission-key', overrides)).status).toBe(409);
     expect(state.creates).toBe(1);
-    expect(fetchMock.mock.calls).toHaveLength(calls);
+    expect(fetchMock.mock.calls.slice(calls)).toHaveLength(1);
+    expect(new URL(String(fetchMock.mock.calls[calls][0])).pathname).toMatch(/\/Roles$/);
   });
 
   it('creates a new person and application normally', async () => {
@@ -309,7 +314,15 @@ describe('application recovery and privacy', () => {
 
   it('only uses the legacy email lookup when the normalized field is actually missing', async () => {
     const { state, fetchMock } = airtable();
-    fetchMock.mockResolvedValueOnce(json({ error: { type: 'INVALID_FILTER_BY_FORMULA', message: 'Unknown field names: normalized email' } }, 422));
+    const originalFetch = fetchMock.getMockImplementation()!;
+    let refused = false;
+    fetchMock.mockImplementation(async (input, init) => {
+      if (!refused && String(input).includes('/People?')) {
+        refused = true;
+        return json({ error: { type: 'INVALID_FILTER_BY_FORMULA', message: 'Unknown field names: normalized email' } }, 422);
+      }
+      return originalFetch(input, init);
+    });
     expect((await submit()).status).toBe(200);
     expect(state.people.size).toBe(1);
   });
@@ -318,7 +331,7 @@ describe('application recovery and privacy', () => {
     const { state, fetchMock } = airtable();
     state.failAt = 'people:GET';
     expect((await submit()).status).toBeGreaterThanOrEqual(400);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2); // role eligibility, then failed People lookup
     expect(state.creates).toBe(0);
   });
 

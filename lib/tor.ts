@@ -1,4 +1,4 @@
-import type { TorDocument } from '../types';
+import type { TorDocument } from './types';
 
 export function normalizeDocumentUrl(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim()) return null;

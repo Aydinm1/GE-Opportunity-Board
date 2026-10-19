@@ -9,7 +9,9 @@ permissions:
 jobs:
   schema:
     runs-on: ubuntu-latest
-    # Only trusted code from the default branch receives the schema credential.
+    # The environment's main-only branch policy enforces credential access.
+    environment: airtable-schema
+    # Skip accidental non-main dispatches; this condition is not a security boundary.
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4

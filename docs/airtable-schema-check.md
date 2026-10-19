@@ -14,12 +14,22 @@ where the contract uses `contains`. Unrelated fields are ignored.
 ## GitHub manual check
 
 After this workflow reaches `main`, open Actions → Airtable schema check → Run
-workflow, selecting `main`. Other branches do not receive credentials through
-this workflow. Configure:
+workflow, selecting `main`. Configure the credential boundary in GitHub Settings
+→ Environments, not just in the workflow YAML:
 
-- Repository secret `AIRTABLE_SCHEMA_TOKEN`: a dedicated PAT with
+- Create the `airtable-schema` environment. Under deployment branches and tags,
+  choose **Selected branches and tags**, add only the **branch** `main`, and add
+  no tag rules. The job references this environment; GitHub enforces its branch
+  restriction before making environment secrets available.
+- The workflow's `github.ref` condition only avoids accidental runs. A branch
+  can edit its own YAML, so that condition alone does not protect a repository
+  secret.
+
+- **Environment secret** `AIRTABLE_SCHEMA_TOKEN` in `airtable-schema`: a dedicated PAT with
   `schema.bases:read` scope and access only to the configured base. Do not reuse
-  the production write token.
+  the production write token. Do not also store this credential as a repository
+  or organization secret; those copies would bypass the environment boundary.
+  If migrating an existing repository secret, remove that copy before use.
 - Repository variables `AIRTABLE_BASE_ID`, `AIRTABLE_GEROLES_TABLE`,
   `AIRTABLE_PEOPLE_TABLE`, and `AIRTABLE_APPLICATIONS_TABLE`: match deployment
   configuration; table names or IDs are supported.

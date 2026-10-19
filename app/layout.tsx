@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import Script from 'next/script';
+import { HOST_ORIGIN } from '../lib/host-config';
 import './globals.css';
 export const metadata: Metadata = {
   title: 'GE Opportunity Board',
@@ -43,7 +44,7 @@ export default function RootLayout({
             `,
           }}
         />
-        <Script src="/resize-child.js" strategy="afterInteractive" />
+        <Script src="/resize-child.js" data-parent-origin={HOST_ORIGIN} strategy="afterInteractive" />
       </head>
       <body suppressHydrationWarning className="bg-background-light dark:bg-background-dark text-black dark:text-white font-body antialiased transition-colors duration-200">
         {children}

@@ -41,19 +41,23 @@ let resizeFrame = null;
 let lastSentHeight = 0;
 const TARGET_PARENT_ORIGIN = (() => {
   try {
-    return document.referrer ? new URL(document.referrer).origin : '*';
+    const configuredOrigin = document.currentScript?.getAttribute('data-parent-origin');
+    if (!configuredOrigin) return null;
+    const parsed = new URL(configuredOrigin);
+    return parsed.protocol === 'https:' && parsed.origin === configuredOrigin ? parsed.origin : null;
   } catch (e) {
-    return '*';
+    return null;
   }
 })();
 
 function postHeightToParent() {
+  if (window.parent === window || !TARGET_PARENT_ORIGIN) return;
   const height = computeFullHeight();
   if (height <= 0) return;
   if (Math.abs(height - lastSentHeight) < HEIGHT_CHANGE_EPSILON) return;
 
   lastSentHeight = height;
-  try { parent.postMessage({ type: 'resize-iframe', height }, TARGET_PARENT_ORIGIN); } catch (e) {}
+  try { window.parent.postMessage({ type: 'resize-iframe', height }, TARGET_PARENT_ORIGIN); } catch (e) {}
 }
 
 function sendHeightToParentDebounced(trigger = 'unknown') {

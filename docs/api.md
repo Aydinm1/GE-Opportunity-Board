@@ -68,7 +68,7 @@ Possible underlying causes:
 
 ## 2) `POST /api/applications`
 
-Submits candidate application, creating/updating People and Applications records in Airtable.
+Submits a candidate application to Airtable, reusing an existing Person by normalized email or creating one. Returning applicants' People profiles are not updated.
 
 ### Request body
 
@@ -103,15 +103,11 @@ Required file field:
 
 ```json
 {
-  "ok": true,
-  "result": {
-    "personRecordId": "recPerson123",
-    "applicationRecord": {
-      "id": "recApp123"
-    }
-  }
+  "ok": true
 }
 ```
+
+Success returns no record IDs, Airtable records, or attachment URLs. Consumers of the former `result` property must adapt.
 
 ### Validation behavior
 
@@ -132,24 +128,30 @@ Server-side validation is strict and enforced in `lib/validation.ts`:
 
 ### Write behavior
 
-- Upsert person by normalized email
+- Find the person by normalized email, creating one only when absent; lookup failures fail the request
 - Create application record with:
   - `Status = 1a - Applicant`
   - `Source = Opportunity Board`
-- Attach CV/Resume using Airtable content API
-- Retry logic for unknown Airtable field name errors in create application path
+- Attach CV/Resume to the **application** using the Airtable content API and verify that it was saved
+- Unknown application field names fail the request; application answers and other fields are never silently dropped
 - Idempotency support:
   - optional request header: `X-Idempotency-Key: <unique-key>`
   - optional form field: `idempotencyKey`
   - header takes precedence when both are present
   - accepted key format: `A-Z a-z 0-9 . _ : -` (max 128 chars)
   - invalid key formats are rejected with `400`
-  - repeated submissions with the same key return the same application result (prevents duplicate records from double-click/retry)
+  - an existing key must match the applicant, role, and normalized application answer; conflicts return `409`
+  - matching retries reuse the saved application and upload its CV if missing; success requires a saved CV
+  - completed and in-flight requests in the same process also compare a fingerprint of the submitted fields and CV bytes
+  - across cold starts, existing CV bytes are not compared; duplicate prevention across instances is not guaranteed
+
+See [submission recovery](submission-recovery.md) for verification behavior and remaining concurrency limits.
 
 ### Errors
 
 Common error status codes:
 - `400` validation/payload errors
+- `409` submission key conflicts
 - `429` rate limit exceeded
 - `500` unexpected server/integration errors
 

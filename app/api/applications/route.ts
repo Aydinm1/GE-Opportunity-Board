@@ -39,11 +39,11 @@ export async function POST(req: Request) {
     const idempotencyKey = validateIdempotencyKey(
       headerIdempotencyKey || (typeof bodyIdempotencyKey === 'string' ? bodyIdempotencyKey : null)
     );
-    const result = await submitApplication({
+    await submitApplication({
       ...payload,
       idempotencyKey,
     });
-    return jsonOk({ ok: true, result }, 200, limit.headers);
+    return jsonOk({ ok: true }, 200, limit.headers);
   } catch (err) {
     return jsonError(err, {
       context: '/api/applications',

@@ -327,13 +327,7 @@ describe('POST /api/applications', () => {
     expect(res.headers.get('x-ratelimit-remaining')).toBe('7');
 
     const body = await res.json();
-    expect(body).toMatchObject({
-      ok: true,
-      result: {
-        personRecordId: 'recPerson1',
-        applicationRecord: { id: 'recApp1' },
-      },
-    });
+    expect(body).toEqual({ ok: true });
     const calledUrls = fetchMock.mock.calls.map((call) => decodeURIComponent(String(call[0])));
     expect(calledUrls.some((url) => url.includes('jane@example.com'))).toBe(true);
     expect(calledUrls.some((url) => url.includes('idem-key-1'))).toBe(true);
@@ -388,8 +382,10 @@ describe('POST /api/applications', () => {
     expect(secondRes.status).toBe(200);
     const firstBody = await firstRes.json();
     const secondBody = await secondRes.json();
-    expect(firstBody.result.applicationRecord.id).toBe('recApp1');
-    expect(secondBody.result.applicationRecord.id).toBe('recApp1');
+    expect(firstBody).toEqual({ ok: true });
+    expect(secondBody).toEqual({ ok: true });
+    const applicationCreates = fetchMock.mock.calls.filter(call => String(call[0]).endsWith('/Applications') && (call[1] as RequestInit | undefined)?.method === 'POST');
+    expect(applicationCreates).toHaveLength(1);
     expect(fetchMock.mock.calls.length).toBe(callsAfterFirst);
   });
 
@@ -442,8 +438,10 @@ describe('POST /api/applications', () => {
     expect(secondRes.status).toBe(200);
     const firstBody = await firstRes.json();
     const secondBody = await secondRes.json();
-    expect(firstBody.result.applicationRecord.id).toBe('recApp1');
-    expect(secondBody.result.applicationRecord.id).toBe('recApp1');
+    expect(firstBody).toEqual({ ok: true });
+    expect(secondBody).toEqual({ ok: true });
+    const applicationCreates = fetchMock.mock.calls.filter(call => String(call[0]).endsWith('/Applications') && (call[1] as RequestInit | undefined)?.method === 'POST');
+    expect(applicationCreates).toHaveLength(1);
     expect(fetchMock.mock.calls.length).toBeGreaterThan(0);
   });
 
@@ -587,7 +585,9 @@ describe('POST /api/applications', () => {
     const res = await postApplication(req);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.result.personRecordId).toBe('recPerson1');
+    expect(body).toEqual({ ok: true });
+    const applicationBody = JSON.parse(String((fetchMock.mock.calls[4][1] as RequestInit).body));
+    expect(applicationBody.records[0].fields.People).toEqual(['recPerson1']);
 
     const firstCreateBody = JSON.parse(String((fetchMock.mock.calls[2][1] as RequestInit).body));
     const retryCreateBody = JSON.parse(String((fetchMock.mock.calls[3][1] as RequestInit).body));

@@ -464,7 +464,7 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
     if (res.ok) {
       const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;
       const created = json.records?.[0] ?? null;
-      if (created && omissions.length > 0) reportRefusedPersonSelectFields(omissions);
+      if (created && omissions.length > 0) reportPersonReviewFallback(omissions);
       return created;
     }
 
@@ -494,10 +494,10 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
   }
 }
 
-function reportRefusedPersonSelectFields(omissions: Array<{ field: string; airtableErrorType: string; status?: number }>) {
+function reportPersonReviewFallback(omissions: Array<{ field: string; airtableErrorType: string; status?: number }>) {
   const meta = {
     context: '/api/applications',
-    operation: 'create_person_select_option_fallback',
+    operation: 'create_person_review_fallback',
     // Flat primitive arrays survive Sentry's default context normalization depth.
     omittedFields: omissions.map(item => item.field),
     airtableErrorTypes: omissions.map(item => item.airtableErrorType),

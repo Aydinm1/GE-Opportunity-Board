@@ -43,7 +43,8 @@ reference data. Metadata compatibility alone did not catch the old write-shape
 mismatch. The live check needs both metadata and reference-record read permissions;
 see [schema check setup](airtable-schema-check.md). No write scopes are needed.
 
-Staff-review diagnostics use flat primitive arrays: `omittedFields`,
+Staff-review diagnostics use operation `create_person_review_fallback` for both
+country-mapping and refused-select fallbacks, with flat primitive arrays: `omittedFields`,
 `airtableErrorTypes`, and `omissionStatuses`. This avoids nested objects becoming
 `[Object]` in Sentry. Names, email addresses and submitted demographic values remain
 in Airtable, not diagnostic metadata. Alerts describe a profile requiring review,

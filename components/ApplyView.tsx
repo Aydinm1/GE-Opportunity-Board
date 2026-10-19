@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Person, Job } from '../types';
-import { COUNTRY_OPTIONS, PERSON_AGE_OPTIONS, PERSON_GENDER_OPTIONS } from '../lib/application-select-options';
+import { COUNTRY_OPTIONS, PERSON_AGE_OPTIONS, PERSON_GENDER_OPTIONS, PERSON_GENDER_LABELS } from '../lib/application-select-options';
 import { MAX_APPLICATION_ATTACHMENT_BYTES, MAX_APPLICATION_ATTACHMENT_LABEL } from '../lib/application-constraints';
 import { captureClientException } from '../lib/monitoring';
 import { requestIframeResize } from '../lib/request-iframe-resize';
@@ -359,7 +359,7 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
                   <label className="block text-sm font-semibold text-gray-600 mb-2">Gender<span className="text-red-600 ml-1">*</span></label>
                   <select required aria-required value={person.gender || ''} onChange={(e) => update('gender', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
                     <option value="">Select gender</option>
-                    {PERSON_GENDER_OPTIONS.map((g) => (<option key={g} value={g}>{g}</option>))}
+                    {PERSON_GENDER_OPTIONS.map((g) => (<option key={g} value={g}>{PERSON_GENDER_LABELS[g]}</option>))}
                   </select>
                 </div>
                 <div className="md:col-span-2">

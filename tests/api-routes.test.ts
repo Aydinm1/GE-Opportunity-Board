@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST as postApplication } from '../app/api/applications/route';
 import { GET as getJobs } from '../app/api/jobs/route';
+import { COUNTRY_OPTIONS, PERSON_AGE_OPTIONS, PERSON_GENDER_OPTIONS } from '../lib/application-select-options';
+import { captureServerException } from '../lib/monitoring';
+import { submitApplication } from '../lib/airtable';
+import { validateApplicationFormData } from '../lib/validation';
+import { AIRTABLE_SCHEMA_CONTRACT } from '../lib/airtable-schema-contract';
+
+vi.mock('../lib/monitoring', () => ({ captureServerException: vi.fn() }));
 
 const WHY_FIELD = 'Why are you interested in or qualified for this job?';
 const ORIGINAL_ENV = { ...process.env };
@@ -30,6 +37,21 @@ function jsonResponse(body: unknown, init: ResponseInit = {}) {
   });
 }
 
+const AIRTABLE_SELECT_OPTION_ERROR =
+  'We couldn\'t submit your application because one of your selected answers could not be saved. Your answers are still on this page. Please try again later, and let the Global Encounters team know if this keeps happening.';
+
+function refusedSelectOptionResponse(option: string) {
+  return jsonResponse(
+    {
+      error: {
+        type: 'INVALID_MULTIPLE_CHOICE_OPTIONS',
+        message: `Insufficient permissions to create new select option ""${option}""`,
+      },
+    },
+    { status: 422 }
+  );
+}
+
 function validApplicationFields() {
   return {
     fullName: 'Jane Doe',
@@ -37,7 +59,7 @@ function validApplicationFields() {
     phoneNumber: '+1 555 0100',
     linkedIn: '',
     age: '25-34',
-    gender: 'Female',
+    gender: 'female',
     countryOfOrigin: 'Canada',
     countryOfLiving: 'United States',
     education: 'Bachelor degree in project management.',
@@ -257,6 +279,19 @@ describe('GET /api/jobs', () => {
     const secondUrl = new URL(String(fetchMock.mock.calls[1][0]));
     expect(firstUrl.searchParams.getAll('fields[]')).toContain('Point form of essential skills, education & experience');
     expect(secondUrl.searchParams.getAll('fields[]')).not.toContain('Point form of essential skills, education & experience');
+  });
+});
+
+describe('Airtable query contract coverage', () => {
+  it('maps every requested role field into the schema contract', async () => {
+    process.env.AIRTABLE_TOKEN = 'test-token';
+    process.env.AIRTABLE_BASE_ID = 'appTestBase';
+    process.env.AIRTABLE_GEROLES_TABLE = 'GE Roles';
+    const mock = vi.fn().mockResolvedValue(jsonResponse({ records: [] }));
+    vi.stubGlobal('fetch', mock);
+    expect((await getJobs()).status).toBe(200);
+    const requested = new URL(String(mock.mock.calls[0][0])).searchParams.getAll('fields[]');
+    expect(new Set(requested)).toEqual(new Set(AIRTABLE_SCHEMA_CONTRACT.jobs.fields.map(field => field.name)));
   });
 });
 
@@ -508,7 +543,7 @@ describe('POST /api/applications', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body).toEqual({
-      error: 'We couldn\'t submit your application because one of the selected options is temporarily unavailable. Please refresh the page and try again.',
+      error: AIRTABLE_SELECT_OPTION_ERROR,
       code: 'INVALID_SELECT_OPTION',
     });
     expect(console.warn).toHaveBeenCalled();
@@ -561,6 +596,100 @@ describe('POST /api/applications', () => {
     });
     expect(retryCreateBody.records[0].fields).not.toHaveProperty('Country of Living (Current Location)');
     expect(retryCreateBody.records[0].fields).not.toHaveProperty('Jurisdiction');
+    expect(retryCreateBody.records[0].fields['Notes RE: Candidate']).toContain('Country of Living (Current Location): United States');
+  });
+
+  it('creates the person without a select field whose option Airtable refuses', async () => {
+    process.env.AIRTABLE_TOKEN = 'test-token';
+    process.env.AIRTABLE_BASE_ID = 'appTestBase';
+    process.env.AIRTABLE_PEOPLE_TABLE = 'People';
+    process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ records: [] }))
+      .mockResolvedValueOnce(jsonResponse({ records: [] }))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('female'))
+      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recPerson1', fields: {} }] }))
+      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recApp1', fields: {} }] }))
+      .mockResolvedValueOnce(jsonResponse({ attachment: { id: 'att1', url: 'https://cdn.test/file.pdf' } }))
+      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recApp1', fields: {} }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await postApplication(new Request('http://localhost/api/applications', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': nextIp('198.51.113') },
+      body: buildApplicationFormData(),
+    }));
+
+    expect(res.status).toBe(200);
+    const retryCreateBody = JSON.parse(String((fetchMock.mock.calls[3][1] as RequestInit).body));
+    expect(retryCreateBody.records[0].fields).not.toHaveProperty('Gender');
+    expect(retryCreateBody.records[0].fields).toMatchObject({
+      'Full Name': 'Jane Doe',
+      'Country of Living (Current Location)': 'United States',
+    });
+    expect(console.warn).toHaveBeenCalledWith(
+      'Airtable refused People select options; person created without them',
+      expect.objectContaining({ omissions: [{ field: 'Gender', airtableErrorType: 'INVALID_MULTIPLE_CHOICE_OPTIONS', status: 422 }] })
+    );
+  });
+
+  it('stops retrying person creation after repeated refused select options', async () => {
+    process.env.AIRTABLE_TOKEN = 'test-token';
+    process.env.AIRTABLE_BASE_ID = 'appTestBase';
+    process.env.AIRTABLE_PEOPLE_TABLE = 'People';
+    process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ records: [] }))
+      .mockResolvedValueOnce(jsonResponse({ records: [] }))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('female'))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('United States'))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('Canada'))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('25-34'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await postApplication(new Request('http://localhost/api/applications', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': nextIp('198.51.114') },
+      body: buildApplicationFormData(),
+    }));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: AIRTABLE_SELECT_OPTION_ERROR, code: 'INVALID_SELECT_OPTION' });
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(console.warn).toHaveBeenCalledWith(
+      'API request rejected',
+      expect.objectContaining({
+        details: expect.objectContaining({
+          cause: { operation: 'Airtable create person failed', airtableErrorType: 'INVALID_MULTIPLE_CHOICE_OPTIONS', status: 422 },
+        }),
+      })
+    );
+  });
+
+  it('returns a friendly 400 when Airtable rejects a select option during application creation', async () => {
+    process.env.AIRTABLE_TOKEN = 'test-token';
+    process.env.AIRTABLE_BASE_ID = 'appTestBase';
+    process.env.AIRTABLE_PEOPLE_TABLE = 'People';
+    process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recPerson1', fields: {} }] }))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('1a - Applicant'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await postApplication(new Request('http://localhost/api/applications', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': nextIp('198.51.115') },
+      body: buildApplicationFormData(),
+    }));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: AIRTABLE_SELECT_OPTION_ERROR, code: 'INVALID_SELECT_OPTION' });
   });
 
   it('returns 400 when the resume file is missing', async () => {
@@ -605,5 +734,187 @@ describe('POST /api/applications', () => {
     const body = await res!.json();
     expect(body).toEqual({ error: 'Too many requests. Please try again shortly.' });
     expect(console.warn).toHaveBeenCalled();
+  });
+});
+
+
+// Exercise values through the real request validator AND Airtable payload mapping.
+// Live metadata checks independently establish that these values exist in Airtable.
+describe('application option and fallback regressions', () => {
+  beforeEach(() => {
+    process.env.AIRTABLE_TOKEN = 'test-token';
+    process.env.AIRTABLE_BASE_ID = 'appTestBase';
+    process.env.AIRTABLE_PEOPLE_TABLE = 'People';
+    process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
+    vi.mocked(captureServerException).mockClear();
+  });
+
+  function mockSubmission(personResponses: Response[], returning = false) {
+    const queue = returning
+      ? [jsonResponse({ records: [{ id: 'recPerson', fields: { 'Notes RE: Candidate': 'Existing staff notes' } }] })]
+      : [jsonResponse({ records: [] }), jsonResponse({ records: [] }), ...personResponses];
+    queue.push(
+      jsonResponse({ records: [{ id: 'recApplication', fields: {} }] }),
+      jsonResponse({ attachment: { id: 'attResume', url: 'https://cdn.test/resume.pdf' } }),
+      jsonResponse({ records: [{ id: 'recApplication', fields: {} }] })
+    );
+    const mock = vi.fn(async () => {
+      const response = queue.shift();
+      if (!response) throw new Error('Unexpected Airtable request');
+      return response;
+    });
+    vi.stubGlobal('fetch', mock);
+    return mock;
+  }
+
+  function submit(fieldOverrides: Record<string, string> = {}) {
+    return postApplication(new Request('http://localhost/api/applications', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': nextIp('203.0.113') },
+      body: buildApplicationFormData({ fieldOverrides }),
+    }));
+  }
+
+  const cases = [
+    ...PERSON_AGE_OPTIONS.map(value => ['age', 'Age', value]),
+    ...PERSON_GENDER_OPTIONS.map(value => ['gender', 'Gender', value]),
+    ...COUNTRY_OPTIONS.map(value => ['countryOfOrigin', 'Country of Birth', value]),
+    ...COUNTRY_OPTIONS.map(value => ['countryOfLiving', 'Country of Living (Current Location)', value]),
+  ];
+  it.each(cases)('saves %s=%s (%s) without changing its value', async (input, field, value) => {
+    const mock = mockSubmission([jsonResponse({ records: [{ id: 'recPerson', fields: {} }] })]);
+    expect((await submit({ [input]: value })).status, JSON.stringify(vi.mocked(console.error).mock.calls)).toBe(200);
+    const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
+    const person = JSON.parse(String(calls[2][1].body)).records[0].fields;
+    expect(person[field]).toBe(value);
+    for (const name of Object.keys(person)) {
+      expect(AIRTABLE_SCHEMA_CONTRACT.people.fields.some(field => field.name === name), `Unmapped People field: ${name}`).toBe(true);
+    }
+    expect(person['Candidate Status']).toBe('1a - Applicant');
+    const application = JSON.parse(String(calls[3][1].body)).records[0].fields;
+    for (const name of Object.keys(application)) {
+      expect(AIRTABLE_SCHEMA_CONTRACT.applications.fields.some(field => field.name === name), `Unmapped Applications field: ${name}`).toBe(true);
+    }
+    expect(application).toMatchObject({ Status: '1a - Applicant', Source: 'Opportunity Board', [WHY_FIELD]: validApplicationFields().whyText, People: ['recPerson'], 'GE Roles': ['recJob123'] });
+    expect(JSON.parse(String(calls[4][1].body))).toMatchObject({ filename: 'resume.pdf' });
+  });
+
+  it.each([false, true])('accepts the reported Female/US combination (returning=%s)', async returning => {
+    const mock = mockSubmission([jsonResponse({ records: [{ id: 'recPerson', fields: {} }] })], returning);
+    expect((await submit({ age: '18-24', countryOfOrigin: 'United States', countryOfLiving: 'United States' })).status).toBe(200);
+    const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
+    const creates = calls.filter(([url, init]) => url.endsWith('/People') && init?.method === 'POST');
+    expect(creates).toHaveLength(returning ? 0 : 1);
+    if (!returning) expect(JSON.parse(String(creates[0][1].body)).records[0].fields).toMatchObject({ Age: '18-24', Gender: 'female', 'Country of Birth': 'United States', 'Country of Living (Current Location)': 'United States' });
+  });
+
+  it.each(['female', 'Canada', 'United States'])('omits only the unambiguous permitted field for %s', async value => {
+    const mock = mockSubmission([refusedSelectOptionResponse(value), jsonResponse({ records: [{ id: 'recPerson', fields: {} }] })]);
+    expect((await submit()).status).toBe(200);
+    const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
+    const original = JSON.parse(String(calls[2][1].body)).records[0].fields;
+    const retried = JSON.parse(String(calls[3][1].body)).records[0].fields;
+    const field = { female: 'Gender', Canada: 'Country of Birth', 'United States': 'Country of Living (Current Location)' }[value]!;
+    delete original[field];
+    const reviewNote = retried['Notes RE: Candidate'];
+    expect(reviewNote).toContain('[Opportunity Board: DATA REVIEW REQUIRED]');
+    expect(reviewNote).toContain(`${field}: ${value}`);
+    delete retried['Notes RE: Candidate'];
+    expect(retried).toEqual(original);
+    expect(captureServerException).toHaveBeenCalled();
+    const diagnostics = JSON.stringify([vi.mocked(console.warn).mock.calls, vi.mocked(captureServerException).mock.calls]);
+    for (const privateValue of [value, 'Jane Doe', 'JANE@EXAMPLE.COM', 'Insufficient permissions']) expect(diagnostics).not.toContain(privateValue);
+    expect(diagnostics).toContain(field);
+  });
+
+  it.each([
+    ['25-34', {}],
+    ['1a - Applicant', {}],
+    ['Prefer not to share', { age: 'Prefer not to share', gender: 'Prefer not to share' }],
+    ['unknown-option', {}],
+  ] as Array<[string, Record<string, string>]>)('does not guess or remove protected fields for %s', async (value, fields) => {
+    const mock = mockSubmission([refusedSelectOptionResponse(value)]);
+    expect((await submit(fields)).status).toBe(400);
+    expect(mock).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain('Insufficient permissions');
+  });
+
+  it('accepts matching countries while preserving both answers in staff review notes', async () => {
+    const mock = mockSubmission([refusedSelectOptionResponse('United States'), jsonResponse({ records: [{ id: 'recPerson', fields: {} }] })]);
+    expect((await submit({ countryOfOrigin: 'United States' })).status).toBe(200);
+    const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
+    const fields = JSON.parse(String(calls[3][1].body)).records[0].fields;
+    expect(fields).not.toHaveProperty('Country of Birth');
+    expect(fields).not.toHaveProperty('Country of Living (Current Location)');
+    expect(fields).toMatchObject({ Age: '25-34', Gender: 'female', 'Candidate Status': '1a - Applicant', 'Email Address': validApplicationFields().emailAddress });
+    expect(fields['Notes RE: Candidate']).toContain('Country of Birth: United States');
+    expect(fields['Notes RE: Candidate']).toContain('Country of Living (Current Location): United States');
+    expect(JSON.parse(String(calls[4][1].body)).records[0].fields[WHY_FIELD]).toBe(validApplicationFields().whyText);
+    expect(JSON.parse(String(calls[5][1].body)).filename).toBe('resume.pdf');
+    const diagnostics = JSON.stringify([vi.mocked(console.warn).mock.calls, vi.mocked(captureServerException).mock.calls]);
+    expect(diagnostics).not.toContain('United States');
+    expect(diagnostics).not.toContain('[Opportunity Board: DATA REVIEW REQUIRED]');
+  });
+
+  it('preserves all omitted answers across successive retries', async () => {
+    const mock = mockSubmission([refusedSelectOptionResponse('female'), refusedSelectOptionResponse('Canada'), jsonResponse({ records: [{ id: 'recPerson', fields: {} }] })]);
+    expect((await submit()).status).toBe(200);
+    const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
+    const fields = JSON.parse(String(calls[4][1].body)).records[0].fields;
+    expect(fields['Notes RE: Candidate']).toContain('Gender: female');
+    expect(fields['Notes RE: Candidate']).toContain('Country of Birth: Canada');
+    expect(fields).not.toHaveProperty('Gender');
+    expect(fields).not.toHaveProperty('Country of Birth');
+    expect(fields['Country of Living (Current Location)']).toBe('United States');
+  });
+
+  it('does not report success or create an application if review notes cannot be saved', async () => {
+    const mock = mockSubmission([
+      refusedSelectOptionResponse('female'),
+      jsonResponse({ error: { type: 'UNKNOWN_FIELD_NAME', message: 'Unknown field name: "Notes RE: Candidate"' } }, { status: 422 }),
+    ]);
+    expect((await submit()).status).toBe(500);
+    expect(mock).toHaveBeenCalledTimes(4);
+    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_select_option_fallback' }));
+  });
+
+  it('does not report an accepted fallback when Airtable returns no created person', async () => {
+    const mock = mockSubmission([refusedSelectOptionResponse('female'), jsonResponse({ records: [] })]);
+    expect((await submit()).status).toBe(500);
+    expect(mock).toHaveBeenCalledTimes(4);
+    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_select_option_fallback' }));
+  });
+
+  it('stops after three retries even when a fourth optional field could be removed', async () => {
+    const mock = mockSubmission([
+      refusedSelectOptionResponse('female'),
+      refusedSelectOptionResponse('Canada'),
+      refusedSelectOptionResponse('United States'),
+      refusedSelectOptionResponse('Test Jurisdiction'),
+    ]);
+    const payload = await validateApplicationFormData(buildApplicationFormData());
+    payload.person.jurisdiction = 'Test Jurisdiction';
+    await expect(submitApplication(payload)).rejects.toMatchObject({ status: 400, code: 'INVALID_SELECT_OPTION' });
+    expect(mock).toHaveBeenCalledTimes(6); // two lookups, initial create, three retries
+  });
+
+  it('does not repeatedly retry an already omitted field', async () => {
+    const mock = mockSubmission([refusedSelectOptionResponse('female'), refusedSelectOptionResponse('female')]);
+    expect((await submit()).status).toBe(400);
+    expect(mock).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not interpret arbitrary errors mentioning a country field as permission to discard it', async () => {
+    const mock = mockSubmission([jsonResponse({ error: { type: 'SERVER_ERROR', message: 'Country of Living (Current Location): private applicant value' } }, { status: 500 })]);
+    expect((await submit()).status).toBe(500);
+    expect(mock).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain('private applicant value');
+  });
+
+  it('handles malformed Airtable error bodies without retrying or logging their contents', async () => {
+    const mock = mockSubmission([new Response('private response body', { status: 502 })]);
+    expect((await submit()).status).toBe(500);
+    expect(mock).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain('private response body');
   });
 });

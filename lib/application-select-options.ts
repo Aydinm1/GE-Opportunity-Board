@@ -13,11 +13,18 @@ export const PERSON_AGE_OPTIONS = [
 ] as const;
 
 export const PERSON_GENDER_OPTIONS = [
-  'Female',
-  'Male',
+  'female',
+  'male',
   'Non-Binary',
   'Prefer not to share',
 ] as const;
+
+export const PERSON_GENDER_LABELS: Record<typeof PERSON_GENDER_OPTIONS[number], string> = {
+  female: 'Female',
+  male: 'Male',
+  'Non-Binary': 'Non-Binary',
+  'Prefer not to share': 'Prefer not to share',
+};
 
 export const COUNTRY_OPTIONS = [
   'Afghanistan',

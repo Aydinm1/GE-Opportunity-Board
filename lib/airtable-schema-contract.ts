@@ -68,7 +68,7 @@ export const AIRTABLE_SCHEMA_CONTRACT: Record<'jobs' | 'people' | 'applications'
       { name: 'Phone Number (incl. Country Code)', expectedTypes: ['phoneNumber', 'singleLineText'], usage: 'write' },
       { name: 'LinkedIn Profile Link (if available)', expectedTypes: ['url', 'singleLineText'], usage: 'write' },
       { name: 'Age', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: PERSON_AGE_OPTIONS, optionsOnlyWhenSelect: true, optionValidation: 'exact' },
-      // Airtable matches select options exactly, so a casing difference ("female" vs "Female") rejects writes.
+      // Match the configured Airtable values exactly; visible labels may use different casing.
       { name: 'Gender', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: PERSON_GENDER_OPTIONS, optionsOnlyWhenSelect: true, optionValidation: 'exact' },
       { name: 'Country of Birth', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: COUNTRY_OPTIONS, optionsOnlyWhenSelect: true, optionValidation: 'exact' },
       {

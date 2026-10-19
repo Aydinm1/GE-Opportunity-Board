@@ -74,7 +74,7 @@ describe('coverage for every app-dependent Airtable field', () => {
 
   it('requires the actual form and workflow choices, independently of generated fixtures', () => {
     const people = AIRTABLE_SCHEMA_CONTRACT.people.fields;
-    expect(people.find(f => f.name === 'Gender')?.expectedOptions).toEqual(['Female', 'Male', 'Non-Binary', 'Prefer not to share']);
+    expect(people.find(f => f.name === 'Gender')?.expectedOptions).toEqual(['female', 'male', 'Non-Binary', 'Prefer not to share']);
     expect(people.find(f => f.name === 'Age')?.expectedOptions).toEqual(['13-17', '18-24', '25-34', '35-44', '45-54', '55-64', 'Above 64', 'Prefer not to share']);
     for (const name of ['Country of Birth', 'Country of Living (Current Location)']) {
       expect(people.find(f => f.name === name)?.expectedOptions).toEqual(expect.arrayContaining(['Canada', 'United States']));

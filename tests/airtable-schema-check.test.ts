@@ -277,7 +277,7 @@ describe('airtable schema comparison', () => {
           id: 'tblPeople',
           name: 'People',
           fields: [
-            { id: 'fldGender', name: 'Gender', type: 'singleSelect', options: { choices: ['female', 'male', 'Non-Binary', 'Prefer not to share'].map((name) => ({ name })) } },
+            { id: 'fldGender', name: 'Gender', type: 'singleSelect', options: { choices: ['Female', 'Male', 'Non-Binary', 'Prefer not to share'].map((name) => ({ name })) } },
             {
               id: 'fldLivingCountry',
               name: 'Country of Living (Current Location)',
@@ -289,8 +289,8 @@ describe('airtable schema comparison', () => {
       ],
     });
 
-    expect(failures).toContain('People.Gender: missing Airtable options [Female, Male].');
-    expect(failures).toContain('People.Gender: unexpected Airtable options [female, male].');
+    expect(failures).toContain('People.Gender: missing Airtable options [female, male].');
+    expect(failures).toContain('People.Gender: unexpected Airtable options [Female, Male].');
     expect(failures).toContain('People.Country of Living (Current Location): missing Airtable options [United States].');
   });
 

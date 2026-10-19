@@ -29,13 +29,12 @@ change made directly in Airtable is detected the next time it runs. Normal PR CI
 runs deterministic schema-comparison, rendered-dropdown, validation, and API
 payload tests without access to Airtable credentials.
 
-## Current remediation
+## Gender casing
 
-The configured base check on October 19, 2026 reports `People.Gender` choices
-`male` / `female`, while the form submits `Male` / `Female`. An authorized base
-maintainer should rename those choices to match, then rerun the check. No base
-changes were made as part of this PR. Until corrected, the bounded demographic
-fallback can save a new applicant without Gender and emits field-only diagnostics.
+The configured base uses `male` / `female`. The app submits those exact values
+while displaying “Male” / “Female”. `Non-Binary` and `Prefer not to share` retain
+their existing casing. The case-sensitive schema check detects future changes;
+no Airtable schema modification is needed.
 
 ## Limits and release checks
 

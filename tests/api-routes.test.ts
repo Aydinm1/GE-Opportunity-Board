@@ -59,7 +59,7 @@ function validApplicationFields() {
     phoneNumber: '+1 555 0100',
     linkedIn: '',
     age: '25-34',
-    gender: 'Female',
+    gender: 'female',
     countryOfOrigin: 'Canada',
     countryOfLiving: 'United States',
     education: 'Bachelor degree in project management.',
@@ -608,7 +608,7 @@ describe('POST /api/applications', () => {
       .fn()
       .mockResolvedValueOnce(jsonResponse({ records: [] }))
       .mockResolvedValueOnce(jsonResponse({ records: [] }))
-      .mockResolvedValueOnce(refusedSelectOptionResponse('Female'))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('female'))
       .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recPerson1', fields: {} }] }))
       .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recApp1', fields: {} }] }))
       .mockResolvedValueOnce(jsonResponse({ attachment: { id: 'att1', url: 'https://cdn.test/file.pdf' } }))
@@ -644,7 +644,7 @@ describe('POST /api/applications', () => {
       .fn()
       .mockResolvedValueOnce(jsonResponse({ records: [] }))
       .mockResolvedValueOnce(jsonResponse({ records: [] }))
-      .mockResolvedValueOnce(refusedSelectOptionResponse('Female'))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('female'))
       .mockResolvedValueOnce(refusedSelectOptionResponse('United States'))
       .mockResolvedValueOnce(refusedSelectOptionResponse('Canada'))
       .mockResolvedValueOnce(refusedSelectOptionResponse('25-34'));
@@ -804,16 +804,16 @@ describe('application option and fallback regressions', () => {
     const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
     const creates = calls.filter(([url, init]) => url.endsWith('/People') && init?.method === 'POST');
     expect(creates).toHaveLength(returning ? 0 : 1);
-    if (!returning) expect(JSON.parse(String(creates[0][1].body)).records[0].fields).toMatchObject({ Age: '18-24', Gender: 'Female', 'Country of Birth': 'United States', 'Country of Living (Current Location)': 'United States' });
+    if (!returning) expect(JSON.parse(String(creates[0][1].body)).records[0].fields).toMatchObject({ Age: '18-24', Gender: 'female', 'Country of Birth': 'United States', 'Country of Living (Current Location)': 'United States' });
   });
 
-  it.each(['Female', 'Canada', 'United States'])('omits only the unambiguous permitted field for %s', async value => {
+  it.each(['female', 'Canada', 'United States'])('omits only the unambiguous permitted field for %s', async value => {
     const mock = mockSubmission([refusedSelectOptionResponse(value), jsonResponse({ records: [{ id: 'recPerson', fields: {} }] })]);
     expect((await submit()).status).toBe(200);
     const calls = mock.mock.calls as unknown as Array<[string, RequestInit]>;
     const original = JSON.parse(String(calls[2][1].body)).records[0].fields;
     const retried = JSON.parse(String(calls[3][1].body)).records[0].fields;
-    const field = { Female: 'Gender', Canada: 'Country of Birth', 'United States': 'Country of Living (Current Location)' }[value]!;
+    const field = { female: 'Gender', Canada: 'Country of Birth', 'United States': 'Country of Living (Current Location)' }[value]!;
     delete original[field];
     expect(retried).toEqual(original);
     expect(captureServerException).toHaveBeenCalled();
@@ -837,7 +837,7 @@ describe('application option and fallback regressions', () => {
 
   it('stops after three retries even when a fourth optional field could be removed', async () => {
     const mock = mockSubmission([
-      refusedSelectOptionResponse('Female'),
+      refusedSelectOptionResponse('female'),
       refusedSelectOptionResponse('Canada'),
       refusedSelectOptionResponse('United States'),
       refusedSelectOptionResponse('Test Jurisdiction'),
@@ -849,7 +849,7 @@ describe('application option and fallback regressions', () => {
   });
 
   it('does not repeatedly retry an already omitted field', async () => {
-    const mock = mockSubmission([refusedSelectOptionResponse('Female'), refusedSelectOptionResponse('Female')]);
+    const mock = mockSubmission([refusedSelectOptionResponse('female'), refusedSelectOptionResponse('female')]);
     expect((await submit()).status).toBe(400);
     expect(mock).toHaveBeenCalledTimes(4);
   });

@@ -8,7 +8,7 @@ function buildApplicationFormData(file: File) {
   formData.append('emailAddress', 'jane@example.com');
   formData.append('phoneNumber', '+1 555 0100');
   formData.append('age', '25-34');
-  formData.append('gender', 'Female');
+  formData.append('gender', 'female');
   formData.append('countryOfOrigin', 'Canada');
   formData.append('countryOfLiving', 'United States');
   formData.append('education', 'Bachelor degree in project management.');

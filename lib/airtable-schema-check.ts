@@ -98,6 +98,7 @@ function compareSelectOptions(
   }
 
   if (actualField.type !== 'singleSelect' && actualField.type !== 'multipleSelects') {
+    if (expectedField.optionsOnlyWhenSelect) return [];
     return [
       `${tableName}.${expectedField.name}: expected selectable options ${formatOptionList(expectedField.expectedOptions)}, but field type is ${actualField.type}.`,
     ];

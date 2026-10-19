@@ -13,6 +13,8 @@ export type AirtableFieldContract = {
   required?: boolean;
   expectedOptions?: readonly string[];
   optionValidation?: 'contains' | 'exact' | 'caseInsensitiveExact';
+  // Check expectedOptions only when Airtable has the field as a select; other allowed types are accepted as-is.
+  optionsOnlyWhenSelect?: boolean;
 };
 
 export type AirtableTableContract = {
@@ -65,12 +67,16 @@ export const AIRTABLE_SCHEMA_CONTRACT: Record<'jobs' | 'people' | 'applications'
       { name: 'Phone Number (incl. Country Code)', expectedTypes: ['phoneNumber', 'singleLineText'], usage: 'write' },
       { name: 'LinkedIn Profile Link (if available)', expectedTypes: ['url', 'singleLineText'], usage: 'write' },
       { name: 'Age', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: PERSON_AGE_OPTIONS, optionValidation: 'exact' },
-      { name: 'Gender', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: PERSON_GENDER_OPTIONS, optionValidation: 'caseInsensitiveExact' },
+      // Airtable matches select options exactly, so a casing difference ("female" vs "Female") rejects writes.
+      { name: 'Gender', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: PERSON_GENDER_OPTIONS, optionValidation: 'exact' },
       { name: 'Country of Birth', expectedTypes: ['singleSelect', 'singleLineText'], usage: 'write', expectedOptions: COUNTRY_OPTIONS, optionValidation: 'exact' },
       {
         name: 'Country of Living (Current Location)',
         expectedTypes: ['singleSelect', 'singleLineText', 'multipleSelects', 'multipleRecordLinks'],
         usage: 'write',
+        expectedOptions: COUNTRY_OPTIONS,
+        optionValidation: 'contains',
+        optionsOnlyWhenSelect: true,
       },
       { name: 'Jurisdiction', expectedTypes: ['singleSelect', 'singleLineText', 'multipleSelects', 'multipleRecordLinks', 'multipleLookupValues'], usage: 'write' },
       { name: 'Academic / Professional Education', expectedTypes: ['multilineText'], usage: 'write' },

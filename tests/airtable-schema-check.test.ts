@@ -195,7 +195,7 @@ describe('airtable schema comparison', () => {
     expect(failures).toContain('People.Age: missing Airtable options [35-44].');
   });
 
-  it('allows current People field variants for gender, living country, and jurisdiction', () => {
+  it('allows current People field variants for living country and jurisdiction', () => {
     process.env.AIRTABLE_GEROLES_TABLE = 'GE Roles';
     process.env.AIRTABLE_PEOPLE_TABLE = 'People';
     process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
@@ -237,7 +237,7 @@ describe('airtable schema comparison', () => {
             { id: 'fldPhone', name: 'Phone Number (incl. Country Code)', type: 'phoneNumber' },
             { id: 'fldLinkedIn', name: 'LinkedIn Profile Link (if available)', type: 'url' },
             { id: 'fldAge', name: 'Age', type: 'singleSelect', options: { choices: PERSON_AGE_OPTIONS.map((name) => ({ name })) } },
-            { id: 'fldGender', name: 'Gender', type: 'singleSelect', options: { choices: ['female', 'male', 'Non-Binary', 'Prefer not to share'].map((name) => ({ name })) } },
+            { id: 'fldGender', name: 'Gender', type: 'singleSelect', options: { choices: PERSON_GENDER_OPTIONS.map((name) => ({ name })) } },
             { id: 'fldBirthCountry', name: 'Country of Birth', type: 'singleSelect', options: { choices: COUNTRY_OPTIONS.map((name) => ({ name })) } },
             { id: 'fldLivingCountry', name: 'Country of Living (Current Location)', type: 'multipleRecordLinks' },
             { id: 'fldJurisdiction', name: 'Jurisdiction', type: 'multipleLookupValues' },
@@ -264,6 +264,34 @@ describe('airtable schema comparison', () => {
     });
 
     expect(failures).toEqual([]);
+  });
+
+  it('reports People select drift that Airtable would refuse on write', () => {
+    process.env.AIRTABLE_GEROLES_TABLE = 'GE Roles';
+    process.env.AIRTABLE_PEOPLE_TABLE = 'People';
+    process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
+
+    const failures = compareAirtableSchema({
+      tables: [
+        {
+          id: 'tblPeople',
+          name: 'People',
+          fields: [
+            { id: 'fldGender', name: 'Gender', type: 'singleSelect', options: { choices: ['female', 'male', 'Non-Binary', 'Prefer not to share'].map((name) => ({ name })) } },
+            {
+              id: 'fldLivingCountry',
+              name: 'Country of Living (Current Location)',
+              type: 'singleSelect',
+              options: { choices: COUNTRY_OPTIONS.filter((name) => name !== 'United States').map((name) => ({ name })) },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(failures).toContain('People.Gender: missing Airtable options [Female, Male].');
+    expect(failures).toContain('People.Gender: unexpected Airtable options [female, male].');
+    expect(failures).toContain('People.Country of Living (Current Location): missing Airtable options [United States].');
   });
 
   it('allows missing optional read fields on jobs schema', () => {

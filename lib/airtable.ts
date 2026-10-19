@@ -1,6 +1,7 @@
 import type { Person } from '../types';
 import { APPLICANT_STATUS, OPPORTUNITY_BOARD_SOURCE } from './application-select-options';
 import { AppError } from './errors';
+import { captureServerException } from './monitoring';
 import { normalizeDocumentUrl, normalizeTorDocuments } from './tor';
 import { splitBullets, parseDurationMonths, bucketFromMonths, asStringArray, asOptionalTrimmedString } from './utils';
 
@@ -45,8 +46,11 @@ const APPLICATION_PERSON_LINK_FIELD = 'People';
 const APPLICATION_JOB_LINK_FIELD = 'GE Roles';
 const APPLICATION_ATTACHMENT_FIELD = 'CV / Resume';
 const APPLICATION_IDEMPOTENCY_FIELD = 'Idempotency Key';
-const FRIENDLY_SELECT_OPTION_ERROR = 'We couldn\'t submit your application because one of the selected options is temporarily unavailable. Please refresh the page and try again.';
+// Refreshing cannot fix an option Airtable refuses, and it would clear the form, so this copy never suggests it.
+const FRIENDLY_SELECT_OPTION_ERROR = 'We couldn\'t submit your application because one of your selected answers could not be saved. Your answers are still on this page. Please try again later, and let the Global Encounters team know if this keeps happening.';
 const SCHEMA_VARIABLE_PERSON_FIELDS = ['Country of Living (Current Location)', 'Jurisdiction'] as const;
+const PERSON_SELECT_FIELDS = ['Candidate Status', 'Age', 'Gender', 'Country of Birth', ...SCHEMA_VARIABLE_PERSON_FIELDS] as const;
+const MAX_PERSON_CREATE_RETRIES = 3;
 const inFlightIdempotency = new Map<string, Promise<SubmitApplicationResult>>();
 const completedIdempotency = new Map<string, { result: SubmitApplicationResult; expiresAt: number }>();
 
@@ -320,22 +324,48 @@ function airtableBaseUrl(baseId: string, tableName: string) {
   return `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}`;
 }
 
-function toAirtableWriteError(prefix: string, details: string): Error {
+function parseAirtableError(details: string): { type?: string; message?: string } | null {
   try {
     const parsed = JSON.parse(details) as {
       error?: { type?: string; message?: string };
     };
-    if (parsed.error?.type === 'INVALID_MULTIPLE_CHOICE_OPTIONS') {
-      return new AppError(FRIENDLY_SELECT_OPTION_ERROR, {
-        status: 400,
-        code: 'INVALID_SELECT_OPTION',
-      });
-    }
+    return parsed.error && typeof parsed.error === 'object' ? parsed.error : null;
   } catch {
-    // Fall back to the raw Airtable error text below.
+    return null;
+  }
+}
+
+// Airtable names the refused value, not the field: `... create new select option ""Female""`.
+function parseRefusedSelectOption(details: string): string | null {
+  const error = parseAirtableError(details);
+  if (error?.type !== 'INVALID_MULTIPLE_CHOICE_OPTIONS' || typeof error.message !== 'string') return null;
+  const match = error.message.match(/select option\s+"+([^"]+)"+/i);
+  return match?.[1] ?? null;
+}
+
+function toAirtableWriteError(prefix: string, details: string): Error {
+  const error = parseAirtableError(details);
+  if (error?.type === 'INVALID_MULTIPLE_CHOICE_OPTIONS') {
+    const appError = new AppError(FRIENDLY_SELECT_OPTION_ERROR, {
+      status: 400,
+      code: 'INVALID_SELECT_OPTION',
+    });
+    // jsonError logs `cause`, so the refused value reaches the logs while the user sees the friendly copy.
+    appError.cause = {
+      operation: prefix,
+      airtableErrorType: error.type,
+      airtableMessage: error.message,
+    };
+    return appError;
   }
 
   return new Error(`${prefix}: ${details}`);
+}
+
+function selectFieldsHoldingRefusedOption(details: string, fields: Record<string, unknown>): string[] {
+  const refused = parseRefusedSelectOption(details);
+  if (!refused) return [];
+  return PERSON_SELECT_FIELDS.filter((field) => typeof fields[field] === 'string' && (fields[field] as string).trim() === refused.trim());
 }
 
 function shouldRetryPersonCreateWithoutSchemaVariableFields(details: string, fields: Record<string, unknown>) {
@@ -419,39 +449,60 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
   if (person.jamatiExperience && person.jamatiExperience.trim() !== '') fields['Jamati Experience'] = person.jamatiExperience.trim();
 
   const url = airtableBaseUrl(baseId, peopleTable);
-  let res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ records: [{ fields }] }),
-  });
+  let attemptFields: Record<string, unknown> = fields;
+  const refusedSelectFields: string[] = [];
 
-  if (!res.ok) {
-    const d = await res.text();
-    if (shouldRetryPersonCreateWithoutSchemaVariableFields(d, fields)) {
-      const retryFields = { ...fields };
-      for (const field of SCHEMA_VARIABLE_PERSON_FIELDS) delete retryFields[field];
-      res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ records: [{ fields: retryFields }] }),
-      });
-      if (res.ok) {
-        const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;
-        return json.records && json.records.length > 0 ? json.records[0] : null;
-      }
-      const retryDetails = await res.text();
-      throw toAirtableWriteError('Airtable create person failed', retryDetails);
+  for (let attempt = 0; ; attempt += 1) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ records: [{ fields: attemptFields }] }),
+    });
+
+    if (res.ok) {
+      if (refusedSelectFields.length > 0) reportRefusedPersonSelectFields(refusedSelectFields);
+      const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;
+      return json.records && json.records.length > 0 ? json.records[0] : null;
     }
-    throw toAirtableWriteError('Airtable create person failed', d);
+
+    const d = await res.text();
+    if (attempt >= MAX_PERSON_CREATE_RETRIES) {
+      throw toAirtableWriteError('Airtable create person failed', d);
+    }
+
+    // A refused select option (schema drift in Airtable) should not block the applicant:
+    // create the person without that field and report it so staff can fix the option.
+    const refusedFields = selectFieldsHoldingRefusedOption(d, attemptFields);
+    let dropFields: readonly string[] = refusedFields;
+    if (dropFields.length === 0 && shouldRetryPersonCreateWithoutSchemaVariableFields(d, attemptFields)) {
+      dropFields = SCHEMA_VARIABLE_PERSON_FIELDS;
+    }
+    if (dropFields.length === 0) {
+      throw toAirtableWriteError('Airtable create person failed', d);
+    }
+
+    for (const field of refusedFields) {
+      refusedSelectFields.push(`${field}=${String(attemptFields[field])}`);
+    }
+    attemptFields = { ...attemptFields };
+    for (const field of dropFields) delete attemptFields[field];
   }
-  const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;
-  return json.records && json.records.length > 0 ? json.records[0] : null;
+}
+
+function reportRefusedPersonSelectFields(refusedSelectFields: string[]) {
+  const meta = {
+    context: '/api/applications',
+    operation: 'create_person_select_option_fallback',
+    refusedSelectOptions: refusedSelectFields.join('; '),
+  };
+  console.warn('Airtable refused People select options; person created without them', meta);
+  captureServerException(
+    new Error('Airtable refused People select options; person created without them'),
+    meta
+  );
 }
 
 async function findApplicationByIdempotencyKey(idempotencyKey: string): Promise<AirtableRecord<AirtableApplicationFields> | null> {
@@ -533,6 +584,8 @@ async function createApplicationRecord(
       const json = await res.json() as AirtableListResponse<AirtableApplicationFields>;
       return json.records && json.records.length > 0 ? json.records[0] : null;
     } catch (err) {
+      // Keep friendly AppErrors (e.g. a refused select option) intact instead of turning them into a 500.
+      if (err instanceof AppError) throw err;
       lastError = err;
       break;
     }

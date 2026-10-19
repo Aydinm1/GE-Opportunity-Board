@@ -30,6 +30,21 @@ function jsonResponse(body: unknown, init: ResponseInit = {}) {
   });
 }
 
+const AIRTABLE_SELECT_OPTION_ERROR =
+  'We couldn\'t submit your application because one of your selected answers could not be saved. Your answers are still on this page. Please try again later, and let the Global Encounters team know if this keeps happening.';
+
+function refusedSelectOptionResponse(option: string) {
+  return jsonResponse(
+    {
+      error: {
+        type: 'INVALID_MULTIPLE_CHOICE_OPTIONS',
+        message: `Insufficient permissions to create new select option ""${option}""`,
+      },
+    },
+    { status: 422 }
+  );
+}
+
 function validApplicationFields() {
   return {
     fullName: 'Jane Doe',
@@ -508,7 +523,7 @@ describe('POST /api/applications', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body).toEqual({
-      error: 'We couldn\'t submit your application because one of the selected options is temporarily unavailable. Please refresh the page and try again.',
+      error: AIRTABLE_SELECT_OPTION_ERROR,
       code: 'INVALID_SELECT_OPTION',
     });
     expect(console.warn).toHaveBeenCalled();
@@ -561,6 +576,99 @@ describe('POST /api/applications', () => {
     });
     expect(retryCreateBody.records[0].fields).not.toHaveProperty('Country of Living (Current Location)');
     expect(retryCreateBody.records[0].fields).not.toHaveProperty('Jurisdiction');
+  });
+
+  it('creates the person without a select field whose option Airtable refuses', async () => {
+    process.env.AIRTABLE_TOKEN = 'test-token';
+    process.env.AIRTABLE_BASE_ID = 'appTestBase';
+    process.env.AIRTABLE_PEOPLE_TABLE = 'People';
+    process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ records: [] }))
+      .mockResolvedValueOnce(jsonResponse({ records: [] }))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('Female'))
+      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recPerson1', fields: {} }] }))
+      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recApp1', fields: {} }] }))
+      .mockResolvedValueOnce(jsonResponse({ attachment: { id: 'att1', url: 'https://cdn.test/file.pdf' } }))
+      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recApp1', fields: {} }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await postApplication(new Request('http://localhost/api/applications', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': nextIp('198.51.113') },
+      body: buildApplicationFormData(),
+    }));
+
+    expect(res.status).toBe(200);
+    const retryCreateBody = JSON.parse(String((fetchMock.mock.calls[3][1] as RequestInit).body));
+    expect(retryCreateBody.records[0].fields).not.toHaveProperty('Gender');
+    expect(retryCreateBody.records[0].fields).toMatchObject({
+      'Full Name': 'Jane Doe',
+      'Country of Living (Current Location)': 'United States',
+    });
+    expect(console.warn).toHaveBeenCalledWith(
+      'Airtable refused People select options; person created without them',
+      expect.objectContaining({ refusedSelectOptions: 'Gender=Female' })
+    );
+  });
+
+  it('stops retrying person creation after repeated refused select options', async () => {
+    process.env.AIRTABLE_TOKEN = 'test-token';
+    process.env.AIRTABLE_BASE_ID = 'appTestBase';
+    process.env.AIRTABLE_PEOPLE_TABLE = 'People';
+    process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ records: [] }))
+      .mockResolvedValueOnce(jsonResponse({ records: [] }))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('Female'))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('United States'))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('25-34'))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('Canada'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await postApplication(new Request('http://localhost/api/applications', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': nextIp('198.51.114') },
+      body: buildApplicationFormData(),
+    }));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: AIRTABLE_SELECT_OPTION_ERROR, code: 'INVALID_SELECT_OPTION' });
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(console.warn).toHaveBeenCalledWith(
+      'API request rejected',
+      expect.objectContaining({
+        details: expect.objectContaining({
+          cause: expect.objectContaining({ airtableMessage: 'Insufficient permissions to create new select option ""Canada""' }),
+        }),
+      })
+    );
+  });
+
+  it('returns a friendly 400 when Airtable rejects a select option during application creation', async () => {
+    process.env.AIRTABLE_TOKEN = 'test-token';
+    process.env.AIRTABLE_BASE_ID = 'appTestBase';
+    process.env.AIRTABLE_PEOPLE_TABLE = 'People';
+    process.env.AIRTABLE_APPLICATIONS_TABLE = 'Applications';
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ records: [{ id: 'recPerson1', fields: {} }] }))
+      .mockResolvedValueOnce(refusedSelectOptionResponse('1a - Applicant'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await postApplication(new Request('http://localhost/api/applications', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': nextIp('198.51.115') },
+      body: buildApplicationFormData(),
+    }));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: AIRTABLE_SELECT_OPTION_ERROR, code: 'INVALID_SELECT_OPTION' });
   });
 
   it('returns 400 when the resume file is missing', async () => {

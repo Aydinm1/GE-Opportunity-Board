@@ -54,7 +54,7 @@ npm test
 ## Iframe Integration Notes
 - This app is embedded as an iframe at `https://the.ismaili/globalencounters/opportunities`.
 - Parent-side reference script in this repo: `parent-script.txt`.
-- Child-side resize script used by this app/embedding flow: `public/resize-child-v2.js`.
+- Child-side resize script used by this app/embedding flow: `public/resize-child.js`.
 - When changing modal height, postMessage behavior, deep links, or share links, validate both:
   - Standalone app behavior
   - Embedded iframe behavior on the parent page

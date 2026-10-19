@@ -43,7 +43,7 @@ export default function RootLayout({
             `,
           }}
         />
-        <Script src="/resize-child-v2.js" strategy="afterInteractive" />
+        <Script src="/resize-child.js" strategy="afterInteractive" />
       </head>
       <body suppressHydrationWarning className="bg-background-light dark:bg-background-dark text-black dark:text-white font-body antialiased transition-colors duration-200">
         {children}

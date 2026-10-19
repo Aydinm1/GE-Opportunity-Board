@@ -9,7 +9,7 @@ import {
   OPPORTUNITY_BOARD_SOURCE,
   PERSON_SELECT_ALLOWLISTS,
 } from './application-select-options';
-import type { Person } from '../types';
+import type { Person } from './types';
 
 const WORD_LIMIT = 100;
 const WHY_FIELD = 'Why are you interested in or qualified for this job?';

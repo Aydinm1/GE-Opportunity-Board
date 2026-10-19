@@ -57,7 +57,7 @@ I owned this project across engineering and product:
 ## Architecture Overview
 
 ```text
-Client (App.tsx + components/*)
+Client (components/*)
   -> GET /api/jobs
       -> lib/airtable.ts (read role records from Airtable)
 
@@ -121,9 +121,10 @@ app/
 components/
 lib/
 public/
+config/
+integrations/iframe/
 tests/
 .github/workflows/
-App.tsx
 tailwind.config.js
 postcss.config.js
 ```
@@ -138,4 +139,4 @@ postcss.config.js
 
 ## Parent iframe script
 
-The canonical parent-side reference is [`parent-script.txt`](parent-script.txt), installed separately on `https://the.ismaili/globalencounters/opportunities`. It expects iframe ID `division-fixtures-iframe` and child origin `https://ge-opp-board.the.ismaili`. It handles resize, parent-URL requests, and share-copy requests, checking both origin and iframe source. Repository changes do not automatically update the script installed on the parent site.
+The canonical parent-side reference is [`integrations/iframe/parent-script.txt`](integrations/iframe/parent-script.txt), installed separately on `https://the.ismaili/globalencounters/opportunities`. It expects iframe ID `division-fixtures-iframe` and child origin `https://ge-opp-board.the.ismaili`. It handles resize, parent-URL requests, and share-copy requests, checking both origin and iframe source. Repository changes do not automatically update the script installed on the parent site.

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Job } from '../types';
+import type { Job } from '../lib/types';
 import { getTorLinks } from '../lib/tor';
 import { parseErrorResponseMessage } from '../lib/utils';
 

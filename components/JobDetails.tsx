@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Job } from '../types';
-import { DEFAULT_PARENT_PAGE_URL, HOST_ORIGIN } from '../constants';
+import { Job } from '../lib/types';
+import { DEFAULT_PARENT_PAGE_URL, HOST_ORIGIN } from '../lib/host-config';
 import { isTrustedParentMessage, parseTrustedRedirectUrl } from '../lib/message-security';
 import { requestIframeResize } from '../lib/request-iframe-resize';
 import { formatStartDate, statusVariant } from '../lib/utils';

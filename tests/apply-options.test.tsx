@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import ApplyView from '../components/ApplyView';
 import { AIRTABLE_SCHEMA_CONTRACT } from '../lib/airtable-schema-contract';
-import type { Job } from '../types';
+import type { Job } from '../lib/types';
 
 const job: Job = {
   id: 'recJob123', roleTitle: 'Test role', programmeArea: null, teamVertical: null,

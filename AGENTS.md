@@ -2,9 +2,11 @@
 
 ## Project Structure & Module Organization
 - `app/`: Next.js App Router entrypoints and API routes (`app/api/*`).
-- `components/`: Client UI components (`JobCard`, `JobDetails`, `ApplyModal`, `Filters`).
+- `components/`: Client UI components (`JobCard`, `JobDetails`, `ApplyView`, `Filters`).
 - `lib/`: Shared logic and integrations (`airtable.ts`, `utils.ts`, `api-response.ts`).
-- Root files: `App.tsx` (main client shell), `types.ts` (shared types), `constants.ts` (config constants).
+- `config/`: Shared configuration data (`host-origin.json`).
+- `integrations/iframe/`: Parent-site script reference; installed separately on the host.
+- `components/OpportunityBoard.tsx`: Main client shell. Shared types and host config exports live in `lib/types.ts` and `lib/host-config.ts`.
 - Static assets: `public/` (served files). Build output appears in `.next/`.
 
 ## Build, Test, and Development Commands
@@ -53,7 +55,7 @@ npm test
 
 ## Iframe Integration Notes
 - This app is embedded as an iframe at `https://the.ismaili/globalencounters/opportunities`.
-- Parent-side reference script in this repo: `parent-script.txt`.
+- Parent-side reference script in this repo: `integrations/iframe/parent-script.txt`.
 - Child-side resize script used by this app/embedding flow: `public/resize-child.js`.
 - When changing modal height, postMessage behavior, deep links, or share links, validate both:
   - Standalone app behavior

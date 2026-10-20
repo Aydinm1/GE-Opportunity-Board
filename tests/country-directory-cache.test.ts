@@ -91,6 +91,27 @@ describe('completed country-directory cache', () => {
     expect(results[0]).toEqual(results[1]); expect(results[0]).toHaveLength(2); expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('shares each configuration refresh when A, B and A overlap, including after B completes', async () => {
+    const releases: Array<{ config: string; finish: () => void }> = [];
+    const fetch = vi.fn((_input: string, init: RequestInit) => {
+      const config = (init.headers as Record<string, string>).Authorization;
+      return new Promise<Response>(resolve => {
+        releases.push({ config, finish: () => resolve(json({ records: [row(config === 'Bearer test-token' ? 'recA' : 'recB')] })) });
+      });
+    });
+    vi.stubGlobal('fetch', fetch);
+    const firstA = load();
+    vi.stubEnv('AIRTABLE_TOKEN', 'config-b'); const firstB = load();
+    vi.stubEnv('AIRTABLE_TOKEN', 'test-token'); const secondA = load();
+    releases.filter(release => release.config === 'Bearer config-b').forEach(release => release.finish());
+    expect((await firstB)[0].id).toBe('recB');
+    const thirdA = load();
+    releases.filter(release => release.config === 'Bearer test-token').forEach(release => release.finish());
+    const results = await Promise.all([firstA, secondA, thirdA]);
+    expect(results.map(records => records[0].id)).toEqual(['recA', 'recA', 'recA']);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('bypasses the snapshot for live schema checks without replacing it', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(json({ records: [row('recCached')] })).mockResolvedValueOnce(json({ records: [row('recLive')] }));
     vi.stubGlobal('fetch', fetch);

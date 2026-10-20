@@ -24,7 +24,7 @@ export function matchCountryRecord(name: string, records: readonly CountryRecord
 
 const DIRECTORY_CACHE_TTL_MS = 5 * 60 * 1000;
 let snapshot: { key: string; records: CountryRecord[]; expiresAt: number } | undefined;
-let pending: { key: string; request: Promise<CountryRecord[]> } | undefined;
+const pending = new Map<string, Promise<CountryRecord[]>>();
 
 export async function loadCountryRecords({ cache = true }: { cache?: boolean } = {}): Promise<CountryRecord[]> {
   const token = process.env.AIRTABLE_TOKEN;
@@ -38,14 +38,15 @@ export async function loadCountryRecords({ cache = true }: { cache?: boolean } =
   const key = createHash('sha256').update(JSON.stringify([token, baseId, table])).digest('hex');
   const copy = (records: CountryRecord[]) => records.map(record => ({ ...record }));
   if (snapshot?.key === key && snapshot.expiresAt > Date.now()) return copy(snapshot.records);
-  if (pending?.key === key) return copy(await pending.request);
+  const inFlight = pending.get(key);
+  if (inFlight) return copy(await inFlight);
   const request = readCountryRecords(token, baseId, table).then(records => {
     snapshot = { key, records, expiresAt: Date.now() + DIRECTORY_CACHE_TTL_MS };
     return records;
   }).finally(() => {
-    if (pending?.request === request) pending = undefined;
+    pending.delete(key);
   });
-  pending = { key, request };
+  pending.set(key, request);
   return copy(await request);
 }
 

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 export const COUNTRY_DIRECTORY_TABLE = 'Country / Jurisdiction Table';
 export const COUNTRY_DIRECTORY_NAME_FIELD = 'Name';
 export const COUNTRY_DIRECTORY_JURISDICTION_FIELD = 'Jurisdiction';
@@ -20,15 +22,39 @@ export function matchCountryRecord(name: string, records: readonly CountryRecord
   return assigned.length === 1 ? { kind: 'resolved', id: assigned[0].id } : { kind: 'ambiguous' };
 }
 
+const DIRECTORY_CACHE_TTL_MS = 5 * 60 * 1000;
+let snapshot: { key: string; records: CountryRecord[]; expiresAt: number } | undefined;
+let pending: { key: string; request: Promise<CountryRecord[]> } | undefined;
+
 export async function loadCountryRecords({ cache = true }: { cache?: boolean } = {}): Promise<CountryRecord[]> {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const table = process.env.AIRTABLE_COUNTRIES_TABLE || COUNTRY_DIRECTORY_TABLE;
   if (!token || !baseId) throw new Error('Missing Airtable country directory configuration');
+  if (!cache) return readCountryRecords(token, baseId, table);
+
+  // Cache a completed directory, never the page responses containing temporary cursors.
+  // Keep one snapshot per process; a cold start simply reads a fresh directory.
+  const key = createHash('sha256').update(JSON.stringify([token, baseId, table])).digest('hex');
+  const copy = (records: CountryRecord[]) => records.map(record => ({ ...record }));
+  if (snapshot?.key === key && snapshot.expiresAt > Date.now()) return copy(snapshot.records);
+  if (pending?.key === key) return copy(await pending.request);
+  const request = readCountryRecords(token, baseId, table).then(records => {
+    snapshot = { key, records, expiresAt: Date.now() + DIRECTORY_CACHE_TTL_MS };
+    return records;
+  }).finally(() => {
+    if (pending?.request === request) pending = undefined;
+  });
+  pending = { key, request };
+  return copy(await request);
+}
+
+async function readCountryRecords(token: string, baseId: string, table: string): Promise<CountryRecord[]> {
   const records: CountryRecord[] = [];
   const seen = new Set<string>();
   let offset: string | undefined;
-  do {
+  let cursorRestarts = 0;
+  while (true) {
     const query = new URLSearchParams({ pageSize: '100' });
     query.append('fields[]', COUNTRY_DIRECTORY_NAME_FIELD);
     query.append('fields[]', COUNTRY_DIRECTORY_JURISDICTION_FIELD);
@@ -37,15 +63,31 @@ export async function loadCountryRecords({ cache = true }: { cache?: boolean } =
     try {
       response = await fetch(`https://api.airtable.com/v0/${baseId}/${encodeURIComponent(table)}?${query}`, {
         headers: { Authorization: `Bearer ${token}` },
-        ...(cache ? { cache: 'force-cache' as const, next: { revalidate: 300, tags: ['country-directory'] } } : { cache: 'no-store' as const }),
+        cache: 'no-store',
       });
     } catch {
       throw new Error('Airtable country directory request failed');
     }
-    if (!response.ok) throw new Error(`Airtable country directory request failed (${response.status})`);
+    if (!response.ok) {
+      let airtableErrorType = 'UNKNOWN_ERROR';
+      try {
+        const type = (await response.json())?.error?.type;
+        if (typeof type === 'string' && /^[A-Z_]{1,80}$/.test(type)) airtableErrorType = type;
+      } catch { /* Never include private upstream response text. */ }
+      if (offset && response.status === 422 && airtableErrorType === 'LIST_RECORDS_ITERATOR_NOT_AVAILABLE' && cursorRestarts === 0) {
+        cursorRestarts++;
+        records.length = 0;
+        seen.clear();
+        offset = undefined;
+        continue;
+      }
+      const error = new Error(`Airtable country directory request failed (${response.status}; ${airtableErrorType})`);
+      error.cause = { operation: 'country_directory_read', status: response.status, airtableErrorType };
+      throw error;
+    }
     let page: { records: Array<{ id: string; fields: Record<string, unknown> }>; offset?: string };
     try { page = await response.json(); } catch { throw new Error('Invalid Airtable country directory response'); }
-    if (!Array.isArray(page.records)) throw new Error('Invalid Airtable country directory records');
+    if (!page || !Array.isArray(page.records)) throw new Error('Invalid Airtable country directory records');
     for (const record of page.records) {
       if (!record || typeof record !== 'object' || Array.isArray(record) || !record.fields || typeof record.fields !== 'object' || Array.isArray(record.fields)) {
         throw new Error('Invalid Airtable country directory record');
@@ -58,13 +100,11 @@ export async function loadCountryRecords({ cache = true }: { cache?: boolean } =
       if (jurisdiction !== undefined && typeof jurisdiction !== 'string') throw new Error('Invalid Airtable country jurisdiction');
       records.push({ id: record.id, name, jurisdiction: typeof jurisdiction === 'string' ? jurisdiction : undefined });
     }
+    if (page.offset === undefined) return records;
+    if (typeof page.offset !== 'string' || !page.offset || seen.has(page.offset)) throw new Error('Invalid Airtable country directory pagination');
     offset = page.offset;
-    if (offset) {
-      if (typeof offset !== 'string' || seen.has(offset)) throw new Error('Invalid Airtable country directory pagination');
-      seen.add(offset);
-    }
-  } while (offset);
-  return records;
+    seen.add(offset);
+  }
 }
 
 export async function resolveCountryRecord(name: string): Promise<CountryResolution> {

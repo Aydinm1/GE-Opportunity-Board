@@ -13,8 +13,9 @@ const malformedDirectoryRows = [
   { label: 'null record', record: null },
 ];
 let ip = 0;
+let config = 0;
 beforeEach(() => {
-  vi.stubEnv('AIRTABLE_TOKEN', 'test-token'); vi.stubEnv('AIRTABLE_BASE_ID', 'appTest');
+  vi.stubEnv('AIRTABLE_TOKEN', `test-token-${++config}`); vi.stubEnv('AIRTABLE_BASE_ID', 'appTest');
   vi.stubEnv('AIRTABLE_GEROLES_TABLE', 'Roles');
   vi.stubEnv('AIRTABLE_COUNTRIES_TABLE', 'Country / Jurisdiction Table');
   vi.stubEnv('AIRTABLE_PEOPLE_TABLE', 'People'); vi.stubEnv('AIRTABLE_APPLICATIONS_TABLE', 'Applications');
@@ -43,14 +44,15 @@ describe('country directory matching', () => {
 });
 
 describe('country directory reads', () => {
-  it('follows every page, requests both fields, and retains cache policy', async () => {
+  it('follows every page, requests both fields, and leaves temporary cursors uncached', async () => {
     const mock = vi.fn().mockResolvedValueOnce(json({ records: [row('recA', 'A')], offset: 'page+2' })).mockResolvedValueOnce(json({ records: [row('recB', 'B', 'Jurisdiction')] }));
     vi.stubGlobal('fetch', mock);
     expect(await loadCountryRecords()).toEqual([{ id: 'recA', name: 'A', jurisdiction: undefined }, { id: 'recB', name: 'B', jurisdiction: 'Jurisdiction' }]);
     expect(new URL(mock.mock.calls[1][0]).searchParams.get('offset')).toBe('page+2');
     for (const [url, options] of mock.mock.calls) {
       expect(new URL(url).searchParams.getAll('fields[]')).toEqual(['Name', 'Jurisdiction']);
-      expect(options).toMatchObject({ cache: 'force-cache', next: { revalidate: 300, tags: ['country-directory'] } });
+      expect(options.cache).toBe('no-store');
+      expect(options).not.toHaveProperty('next');
     }
   });
   it('disables caching for live mapping checks', async () => {
@@ -67,7 +69,7 @@ describe('country directory reads', () => {
   });
   it('does not return a partial directory after a later-page failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json({ records: [row('recA', 'A')], offset: 'next' })).mockResolvedValueOnce(json({}, 503)));
-    await expect(loadCountryRecords()).rejects.toThrow('(503)');
+    await expect(loadCountryRecords()).rejects.toThrow('(503;');
   });
   it('rejects repeated cursors', async () => {
     const mock = vi.fn().mockImplementation(async () => json({ records: [], offset: 'same' })); vi.stubGlobal('fetch', mock);
@@ -81,13 +83,18 @@ function request() {
   form.set('cvResume', new File(['Synthetic CV'], 'cv.txt', { type: 'text/plain' }));
   return new Request('http://localhost/api/applications', { method: 'POST', headers: { 'x-forwarded-for': `192.0.2.${++ip}` }, body: form });
 }
-function mockApplication(directoryRows: unknown[], options: { directoryStatus?: number; returning?: boolean; notesFail?: boolean } = {}) {
+function mockApplication(directoryRows: unknown[], options: { directoryStatus?: number; returning?: boolean; notesFail?: boolean; directoryPages?: Array<{ records?: unknown[]; offset?: string; error?: { type: string }; status?: number }> } = {}) {
   const writes: Array<{ path: string; body: any }> = []; const countryReads: string[] = [];
   const mock = vi.fn(async (input: string, init: RequestInit = {}) => {
     const url = new URL(input);
     if (url.pathname.endsWith('/Roles') && !init.method) return json({ records: [{ id: 'recRole', fields: { 'Published?': true, 'Role Title': 'Test role' } }] });
     if (url.pathname.endsWith('Country%20%2F%20Jurisdiction%20Table')) {
-      countryReads.push(input); return json({ records: directoryRows }, options.directoryStatus ?? 200);
+      countryReads.push(input);
+      if (options.directoryPages?.length) {
+        const { status = 200, ...body } = options.directoryPages.shift()!;
+        return json(body, status);
+      }
+      return json({ records: directoryRows }, options.directoryStatus ?? 200);
     }
     if (url.pathname.endsWith('/People') && !init.method) return json({ records: options.returning ? [{ id: 'recPerson', fields: { 'Notes RE: Candidate': 'Existing notes' } }] : [] });
     const body = JSON.parse(String(init.body)); writes.push({ path: url.pathname, body });
@@ -134,6 +141,33 @@ describe('country record mapping through the application API', () => {
     const { writes } = mockApplication([row('recValid', 'Canada'), record]);
     expect((await POST(request())).status).toBe(500);
     expect(writes).toHaveLength(0);
+    expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_review_fallback' }));
+  });
+  it('recovers an invalidated cursor before creating the correctly linked person and application', async () => {
+    const { writes, countryReads } = mockApplication([], { directoryPages: [
+      { records: [row('recAbandoned', 'Canada')], offset: 'expired' },
+      { error: { type: 'LIST_RECORDS_ITERATOR_NOT_AVAILABLE' }, status: 422 },
+      { records: [row('recFresh', 'CANADA', 'Canada')] },
+    ] });
+    expect((await POST(request())).status).toBe(200);
+    expect(countryReads.map(url => new URL(url).searchParams.get('offset'))).toEqual([null, 'expired', null]);
+    const people = writes.filter(write => write.path.endsWith('/People'));
+    expect(people).toHaveLength(1);
+    expect(people[0].body.records[0].fields['Country of Living (Current Location)']).toEqual(['recFresh']);
+    expect(people[0].body.records[0].fields).not.toHaveProperty('Notes RE: Candidate');
+    expect(writes.filter(write => write.path.endsWith('/Applications'))).toHaveLength(1);
+    expect(writes.filter(write => write.path.endsWith('/uploadAttachment'))).toHaveLength(1);
+    expect(captureServerException).not.toHaveBeenCalled();
+  });
+  it('makes no writes when both cursor traversals fail', async () => {
+    const { writes, countryReads } = mockApplication([], { directoryPages: [
+      { records: [row('recAbandoned', 'Canada')], offset: 'expired' },
+      { error: { type: 'LIST_RECORDS_ITERATOR_NOT_AVAILABLE' }, status: 422 },
+      { records: [row('recStillIncomplete', 'Canada')], offset: 'expiredAgain' },
+      { error: { type: 'LIST_RECORDS_ITERATOR_NOT_AVAILABLE' }, status: 422 },
+    ] });
+    expect((await POST(request())).status).toBe(500);
+    expect(countryReads).toHaveLength(4); expect(writes).toHaveLength(0);
     expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_review_fallback' }));
   });
   it('does not accept a fallback if its review note cannot be saved', async () => {

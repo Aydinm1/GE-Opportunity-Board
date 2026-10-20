@@ -1,3 +1,4 @@
+import { traceApplicationStep } from '../../../lib/application-tracing';
 import { getJobs, submitApplication } from '../../../lib/airtable';
 import { jsonError, jsonOk } from '../../../lib/api-response';
 import { applyRateLimit } from '../../../lib/rate-limit';
@@ -29,17 +30,17 @@ export async function POST(req: Request) {
 
     let formData: FormData;
     try {
-      formData = await req.formData();
+      formData = await traceApplicationStep('parse_form', () => req.formData());
     } catch {
       throw new AppError('Invalid form payload.', { status: 400 });
     }
-    const payload = await validateApplicationFormData(formData);
+    const payload = await traceApplicationStep('validate', () => validateApplicationFormData(formData));
     const bodyIdempotencyKey = formData.get('idempotencyKey');
     const headerIdempotencyKey = req.headers.get('x-idempotency-key');
     const idempotencyKey = validateIdempotencyKey(
       headerIdempotencyKey || (typeof bodyIdempotencyKey === 'string' ? bodyIdempotencyKey : null)
     );
-    const { jobs } = await getJobs();
+    const { jobs } = await traceApplicationStep('published_roles', () => getJobs());
     if (!jobs.some((job) => job.id === payload.jobId)) {
       throw new AppError('This role is no longer available. Please choose a current role.', { status: 400 });
     }

@@ -136,6 +136,7 @@ describe('country record mapping through the application API', () => {
   });
   it('fails before any writes if the directory cannot be read', async () => {
     const { writes } = mockApplication([], { directoryStatus: 403 }); expect((await POST(request())).status).toBe(500); expect(writes).toHaveLength(0);
+    expect(captureServerException).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ applicationStep: 'country_lookup' }));
   });
   it.each(malformedDirectoryRows)('fails before any writes for a malformed directory row ($label)', async ({ record }) => {
     const { writes } = mockApplication([row('recValid', 'Canada'), record]);

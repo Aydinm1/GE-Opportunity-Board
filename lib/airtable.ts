@@ -1,6 +1,9 @@
+import { createHash } from 'node:crypto';
+import { CURRENT_COUNTRY_FIELD, resolveCountryRecord } from './country-records';
 import type { Person } from './types';
 import { APPLICANT_STATUS, OPPORTUNITY_BOARD_SOURCE } from './application-select-options';
 import { AppError } from './errors';
+import { airtableRequestError, parseAirtableError } from './airtable-errors';
 import { captureServerException } from './monitoring';
 import { normalizeDocumentUrl, normalizeTorDocuments } from './tor';
 import { splitBullets, parseDurationMonths, bucketFromMonths, asStringArray, asOptionalTrimmedString } from './utils';
@@ -8,7 +11,7 @@ import { splitBullets, parseDurationMonths, bucketFromMonths, asStringArray, asO
 type AirtableRecord<T> = { id: string; fields: T; createdTime: string };
 type AirtableListResponse<T> = { records: AirtableRecord<T>[]; offset?: string };
 type AttachmentInput = { filename: string; contentType: string; bytes: Uint8Array };
-type SubmitApplicationResult = { personRecordId: string; applicationRecord: AirtableRecord<AirtableApplicationFields> | null };
+type SubmitApplicationResult = { personRecordId: string; applicationRecord: AirtableRecord<AirtableApplicationFields> };
 
 const IDEMPOTENCY_CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_IDEMPOTENCY_CACHE_KEYS = 5000;
@@ -48,14 +51,13 @@ const APPLICATION_ATTACHMENT_FIELD = 'CV / Resume';
 const APPLICATION_IDEMPOTENCY_FIELD = 'Idempotency Key';
 // Refreshing cannot fix an option Airtable refuses, and it would clear the form, so this copy never suggests it.
 const FRIENDLY_SELECT_OPTION_ERROR = 'We couldn\'t submit your application because one of your selected answers could not be saved. Your answers are still on this page. Please try again later, and let the Global Encounters team know if this keeps happening.';
-const SCHEMA_VARIABLE_PERSON_FIELDS = ['Country of Living (Current Location)', 'Jurisdiction'] as const;
-const PERSON_SELECT_FIELDS = ['Candidate Status', 'Age', 'Gender', 'Country of Birth', ...SCHEMA_VARIABLE_PERSON_FIELDS] as const;
-const OPTIONAL_PERSON_SELECT_FIELDS = new Set<string>(['Gender', 'Country of Birth', ...SCHEMA_VARIABLE_PERSON_FIELDS]);
+const PERSON_SELECT_FIELDS = ['Candidate Status', 'Age', 'Gender', 'Country of Birth'] as const;
+const OPTIONAL_PERSON_SELECT_FIELDS = new Set<string>(['Gender', 'Country of Birth']);
 const PERSON_REVIEW_NOTES_FIELD = 'Notes RE: Candidate';
 const PERSON_REVIEW_MARKER = '[Opportunity Board: DATA REVIEW REQUIRED]';
 const MAX_PERSON_CREATE_RETRIES = 3;
-const inFlightIdempotency = new Map<string, Promise<SubmitApplicationResult>>();
-const completedIdempotency = new Map<string, { result: SubmitApplicationResult; expiresAt: number }>();
+const inFlightIdempotency = new Map<string, { scope: string; request: Promise<SubmitApplicationResult> }>();
+const completedIdempotency = new Map<string, { scope: string; result: SubmitApplicationResult; expiresAt: number }>();
 
 type AirtableJobFields = {
   "TOR"?: string;
@@ -150,24 +152,26 @@ function pruneCompletedIdempotency(now = Date.now()) {
   }
 }
 
-function getCompletedIdempotencyResult(key: string): SubmitApplicationResult | null {
+function getCompletedIdempotencyResult(key: string, scope: string): SubmitApplicationResult | null {
   const entry = completedIdempotency.get(key);
   if (!entry) return null;
   if (entry.expiresAt <= Date.now()) {
     completedIdempotency.delete(key);
     return null;
   }
+  assertSameSubmissionScope(entry.scope, scope);
   return entry.result;
 }
 
-function setCompletedIdempotencyResult(key: string, result: SubmitApplicationResult) {
+function setCompletedIdempotencyResult(key: string, scope: string, result: SubmitApplicationResult) {
   pruneCompletedIdempotency();
-  completedIdempotency.set(key, { result, expiresAt: Date.now() + IDEMPOTENCY_CACHE_TTL_MS });
+  completedIdempotency.set(key, { scope, result, expiresAt: Date.now() + IDEMPOTENCY_CACHE_TTL_MS });
 }
 
-function buildJobsRequestUrl(baseId: string, table: string, view: string | undefined, fieldNames: readonly string[]) {
+function buildJobsRequestUrl(baseId: string, table: string, view: string | undefined, fieldNames: readonly string[], offset?: string) {
   const params = new URLSearchParams();
   params.set('pageSize', '100');
+  if (offset) params.set('offset', offset);
   params.set('filterByFormula', JOBS_PUBLISHED_FORMULA);
   if (view) {
     params.set('view', view);
@@ -212,23 +216,37 @@ export async function getJobs() {
   const optionalFields = new Set<string>(JOBS_OPTIONAL_QUERY_FIELDS);
   const skippedOptionalFields = new Set<string>();
   let requestedFields: string[] = [...JOBS_QUERY_FIELDS];
-  let data: AirtableListResponse<AirtableJobFields> | null = null;
+  const records: AirtableRecord<AirtableJobFields>[] = [];
+  let offset: string | undefined;
+  const seenOffsets = new Set<string>();
 
-  while (!data) {
-    const res = await fetch(buildJobsRequestUrl(baseId, table, view, requestedFields), {
+  while (true) {
+    const res = await fetchFromAirtable(buildJobsRequestUrl(baseId, table, view, requestedFields, offset), {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'force-cache',
       next: { revalidate: JOBS_CACHE_TTL_SECONDS, tags: [JOBS_CACHE_TAG] },
     });
 
     if (res.ok) {
-      data = (await res.json()) as AirtableListResponse<AirtableJobFields>;
-      break;
+      const page = (await readAirtableJson(res)) as AirtableListResponse<AirtableJobFields>;
+      if (!Array.isArray(page.records)) throw new Error('Invalid Airtable jobs response');
+      records.push(...page.records);
+      if (!page.offset) break;
+      if (typeof page.offset !== 'string' || seenOffsets.has(page.offset)) {
+        throw new Error('Invalid Airtable jobs pagination');
+      }
+      seenOffsets.add(page.offset);
+      offset = page.offset;
+      continue;
     }
 
     const details = await res.text();
     const unknownFieldName = parseUnknownFieldName(details);
     if (unknownFieldName && optionalFields.has(unknownFieldName) && requestedFields.includes(unknownFieldName)) {
+      // Restart the list so every page uses the same optional field selection.
+      records.length = 0;
+      offset = undefined;
+      seenOffsets.clear();
       skippedOptionalFields.add(unknownFieldName);
       requestedFields = requestedFields.filter((fieldName) => fieldName !== unknownFieldName);
       console.warn('Airtable jobs query skipped missing optional field', {
@@ -237,7 +255,7 @@ export async function getJobs() {
       continue;
     }
 
-    throw new Error(`Airtable request failed: ${details}`);
+    throw airtableRequestError('Airtable jobs request failed', res.status, details);
   }
 
   if (skippedOptionalFields.size > 0) {
@@ -246,11 +264,7 @@ export async function getJobs() {
     });
   }
 
-  if (!data) {
-    throw new Error('Airtable jobs request completed without data');
-  }
-
-  const jobs = data.records.map((r) => {
+  const jobs = records.map((r) => {
     const durationMonths = parseDurationMonths(r.fields["Duration (Months)"]);
     const durationCategory =
       r.fields["Duration Categories"] ?? bucketFromMonths(durationMonths);
@@ -303,7 +317,7 @@ export async function getTorAttachment(jobId: string, attachmentId: string): Pro
   const url = new URL(buildJobsRequestUrl(baseId, table, process.env.AIRTABLE_JOBS_VIEW, ['Published?', 'TOR Upload']));
   url.searchParams.set('filterByFormula', `AND(${JOBS_PUBLISHED_FORMULA},RECORD_ID()='${jobId}')`);
   url.searchParams.set('maxRecords', '1');
-  const response = await fetch(url.toString(), {
+  const response = await fetchFromAirtable(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   });
@@ -312,7 +326,7 @@ export async function getTorAttachment(jobId: string, attachmentId: string): Pro
     if (response.status === 404 || parseUnknownFieldName(details) === 'TOR Upload') throw unavailable();
     throw new Error(`Airtable TOR request failed (${response.status})`);
   }
-  const data = await response.json() as AirtableListResponse<AirtableJobFields>;
+  const data = await readAirtableJson(response) as AirtableListResponse<AirtableJobFields>;
   const role = data.records.find((record) => record.id === jobId && Boolean(record.fields['Published?']));
   const attachments = role?.fields['TOR Upload'];
   const attachment = Array.isArray(attachments) ? attachments.find((item) => item?.id === attachmentId) : undefined;
@@ -325,17 +339,6 @@ export async function getTorAttachment(jobId: string, attachmentId: string): Pro
 
 function airtableBaseUrl(baseId: string, tableName: string) {
   return `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}`;
-}
-
-function parseAirtableError(details: string): { type?: string; message?: string } | null {
-  try {
-    const parsed = JSON.parse(details) as {
-      error?: { type?: string; message?: string };
-    };
-    return parsed.error && typeof parsed.error === 'object' ? parsed.error : null;
-  } catch {
-    return null;
-  }
 }
 
 // Airtable names the refused value, not the field: `... create new select option ""Female""`.
@@ -362,7 +365,7 @@ function toAirtableWriteError(prefix: string, details: string, status?: number):
     return appError;
   }
 
-  return new Error(`${prefix} (${status ?? 'unknown status'}; ${typeof error?.type === 'string' && /^[A-Z_]+$/.test(error.type) ? error.type : 'UNKNOWN_ERROR'})`);
+  return airtableRequestError(prefix, status, details);
 }
 
 function selectFieldsHoldingRefusedOption(details: string, fields: Record<string, unknown>): string[] {
@@ -371,50 +374,34 @@ function selectFieldsHoldingRefusedOption(details: string, fields: Record<string
   return PERSON_SELECT_FIELDS.filter((field) => typeof fields[field] === 'string' && (fields[field] as string).trim() === refused.trim());
 }
 
-function shouldRetryPersonCreateWithoutSchemaVariableFields(details: string, fields: Record<string, unknown>) {
-  const hasSchemaVariableField = SCHEMA_VARIABLE_PERSON_FIELDS.some((field) => field in fields);
-  if (!hasSchemaVariableField) return false;
-
-  const error = parseAirtableError(details);
-  return error?.type === 'INVALID_VALUE_FOR_COLUMN' &&
-    error.message === 'Value is not an array of record IDs.';
-}
-
 async function findPersonByNormalizedEmail(normalizedEmail: string): Promise<AirtableRecord<AirtablePeopleFields> | null> {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const peopleTable = process.env.AIRTABLE_PEOPLE_TABLE;
   if (!token || !baseId || !peopleTable) throw new Error('Missing Airtable env vars for people');
 
-  // Try normalized email lookup first (if the field exists and is queryable).
-  try {
-    const formula = `({normalized email} = '${escapeFormulaValue(normalizedEmail)}')`;
-    const url = `${airtableBaseUrl(baseId, peopleTable)}?maxRecords=1&filterByFormula=${encodeURIComponent(formula)}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) {
-      const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;
-      if (json.records && json.records.length > 0) return json.records[0];
-    }
-    // if not ok or no records, fallthrough to email search
-  } catch (err) {
-    // ignore and try email fallback
+  const formula = `({normalized email} = '${escapeFormulaValue(normalizedEmail)}')`;
+  const url = `${airtableBaseUrl(baseId, peopleTable)}?maxRecords=1&filterByFormula=${encodeURIComponent(formula)}`;
+  const res = await fetchFromAirtable(url, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+  if (res.ok) {
+    const json = await readAirtableJson(res) as AirtableListResponse<AirtablePeopleFields>;
+    if (json.records?.length) return json.records[0];
+  } else {
+    const details = await res.text();
+    const error = parseAirtableError(details);
+    const missingNormalizedField = res.status === 422 &&
+      (error?.type === 'INVALID_FILTER_BY_FORMULA' || error?.type === 'UNKNOWN_FIELD_NAME') &&
+      /unknown field(?: names?)?:?\s*["']?normalized email["']?/i.test(error.message ?? '');
+    if (!missingNormalizedField) throw airtableRequestError('Airtable normalized email lookup failed', res.status, details);
   }
 
-  // Fallback: search by Email Address using lowercased comparison
-  try {
-    const emailFormula = `(LOWER({Email Address}) = '${escapeFormulaValue(normalizedEmail)}')`;
-    const emailUrl = `${airtableBaseUrl(baseId, peopleTable)}?maxRecords=1&filterByFormula=${encodeURIComponent(emailFormula)}`;
-    const r2 = await fetch(emailUrl, { headers: { Authorization: `Bearer ${token}` } });
-    if (!r2.ok) {
-      const d = await r2.text();
-      throw new Error(`Airtable people email query failed: ${d}`);
-    }
-    const json2 = await r2.json() as AirtableListResponse<AirtablePeopleFields>;
-    return json2.records && json2.records.length > 0 ? json2.records[0] : null;
-  } catch (err) {
-    // surface the original error
-    throw err;
-  }
+  // Support legacy records or a missing normalized-email field, not arbitrary lookup failures.
+  const emailFormula = `(LOWER({Email Address}) = '${escapeFormulaValue(normalizedEmail)}')`;
+  const emailUrl = `${airtableBaseUrl(baseId, peopleTable)}?maxRecords=1&filterByFormula=${encodeURIComponent(emailFormula)}`;
+  const fallback = await fetchFromAirtable(emailUrl, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+  if (!fallback.ok) throw airtableRequestError('Airtable email lookup failed', fallback.status, await fallback.text());
+  const json = await readAirtableJson(fallback) as AirtableListResponse<AirtablePeopleFields>;
+  return json.records?.[0] ?? null;
 }
 
 async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeopleFields> | null> {
@@ -434,17 +421,34 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
   if (person.gender && person.gender.trim() !== '') fields['Gender'] = person.gender.trim();
   if (person.countryOfOrigin && person.countryOfOrigin.trim() !== '') fields['Country of Birth'] = person.countryOfOrigin.trim();
   if (person.countryOfLiving && person.countryOfLiving.trim() !== '') fields['Country of Living (Current Location)'] = person.countryOfLiving.trim();
-  if (person.jurisdiction && person.jurisdiction.trim() !== '') fields['Jurisdiction'] = person.jurisdiction.trim();
   if (person.education && person.education.trim() !== '') fields['Academic / Professional Education'] = person.education.trim();
   if (person.profession && person.profession.trim() !== '') fields['Current Profession / Occupation'] = person.profession.trim();
   if (person.jamatiExperience && person.jamatiExperience.trim() !== '') fields['Jamati Experience'] = person.jamatiExperience.trim();
 
   const url = airtableBaseUrl(baseId, peopleTable);
-  let attemptFields: Record<string, unknown> = fields;
-  const omissions: Array<{ field: string; airtableErrorType: string; status: number }> = [];
+  const submittedFields = { ...fields };
+  const omissions: Array<{ field: string; airtableErrorType: string; status?: number }> = [];
+  if (typeof fields[CURRENT_COUNTRY_FIELD] === 'string') {
+    const country = await resolveCountryRecord(fields[CURRENT_COUNTRY_FIELD] as string);
+    if (country.kind === 'resolved') fields[CURRENT_COUNTRY_FIELD] = [country.id];
+    else {
+      delete fields[CURRENT_COUNTRY_FIELD];
+      omissions.push({ field: CURRENT_COUNTRY_FIELD, airtableErrorType: country.kind === 'missing' ? 'COUNTRY_RECORD_MISSING' : 'COUNTRY_RECORD_AMBIGUOUS' });
+    }
+  }
+  const withReviewNotes = (values: Record<string, unknown>) => omissions.length ? {
+    ...values,
+    [PERSON_REVIEW_NOTES_FIELD]: [
+      PERSON_REVIEW_MARKER,
+      'The following submitted answers could not be saved in their structured fields.',
+      'Staff: correct the configuration or linked-record mapping, restore these answers, then change the header to [Opportunity Board: REVIEW RESOLVED].',
+      ...omissions.map(({ field }) => `${field}: ${String(submittedFields[field])}`),
+    ].join('\n'),
+  } : values;
+  let attemptFields: Record<string, unknown> = withReviewNotes(fields);
 
   for (let attempt = 0; ; attempt += 1) {
-    const res = await fetch(url, {
+    const res = await fetchFromAirtable(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -454,9 +458,9 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
     });
 
     if (res.ok) {
-      const json = await res.json() as AirtableListResponse<AirtablePeopleFields>;
+      const json = await readAirtableJson(res) as AirtableListResponse<AirtablePeopleFields>;
       const created = json.records?.[0] ?? null;
-      if (created && omissions.length > 0) reportRefusedPersonSelectFields(omissions);
+      if (created && omissions.length > 0) reportPersonReviewFallback(omissions);
       return created;
     }
 
@@ -468,12 +472,9 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
     // A refused select option (schema drift in Airtable) should not block the applicant:
     // create the person without that field and report it so staff can fix the option.
     const refusedFields = selectFieldsHoldingRefusedOption(d, attemptFields);
-    let dropFields: readonly string[] = refusedFields.length > 0 && refusedFields.every((field) => OPTIONAL_PERSON_SELECT_FIELDS.has(field))
+    const dropFields: readonly string[] = refusedFields.length > 0 && refusedFields.every((field) => OPTIONAL_PERSON_SELECT_FIELDS.has(field))
       ? refusedFields
       : [];
-    if (dropFields.length === 0 && shouldRetryPersonCreateWithoutSchemaVariableFields(d, attemptFields)) {
-      dropFields = SCHEMA_VARIABLE_PERSON_FIELDS.filter((field) => field in attemptFields);
-    }
     if (dropFields.length === 0) {
       throw toAirtableWriteError('Airtable create person failed', d, res.status);
     }
@@ -485,24 +486,22 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
     for (const field of dropFields) delete attemptFields[field];
     // Save the original answers atomically with the new person. If notes cannot be
     // written, creation fails; never accept an unflagged omission or overwrite an existing person's notes.
-    attemptFields[PERSON_REVIEW_NOTES_FIELD] = [
-      PERSON_REVIEW_MARKER,
-      'The following submitted answers could not be saved in their structured fields.',
-      'Staff: correct the configuration or linked-record mapping, restore these answers, then change the header to [Opportunity Board: REVIEW RESOLVED].',
-      ...omissions.map(({ field }) => `${field}: ${String(fields[field])}`),
-    ].join('\n');
+    attemptFields = withReviewNotes(attemptFields);
   }
 }
 
-function reportRefusedPersonSelectFields(omissions: Array<{ field: string; airtableErrorType: string; status: number }>) {
+function reportPersonReviewFallback(omissions: Array<{ field: string; airtableErrorType: string; status?: number }>) {
   const meta = {
     context: '/api/applications',
-    operation: 'create_person_select_option_fallback',
-    omissions,
+    operation: 'create_person_review_fallback',
+    // Flat primitive arrays survive Sentry's default context normalization depth.
+    omittedFields: omissions.map(item => item.field),
+    airtableErrorTypes: omissions.map(item => item.airtableErrorType),
+    omissionStatuses: omissions.flatMap(item => item.status === undefined ? [] : [item.status]),
   };
-  console.warn('Airtable refused People select options; person created without them', meta);
+  console.warn('People profile needs staff review; submitted answers preserved in notes', meta);
   captureServerException(
-    new Error('Airtable refused People select options; person created without them'),
+    new Error('People profile needs staff review; submitted answers preserved in notes'),
     meta
   );
 }
@@ -516,14 +515,14 @@ async function findApplicationByIdempotencyKey(idempotencyKey: string): Promise<
   const escapedKey = escapeFormulaValue(idempotencyKey);
   const formula = `({${APPLICATION_IDEMPOTENCY_FIELD}} = '${escapedKey}')`;
   const url = `${airtableBaseUrl(baseId, appsTable)}?maxRecords=1&filterByFormula=${encodeURIComponent(formula)}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetchFromAirtable(url, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
 
   if (!res.ok) {
     const details = await res.text();
-    throw new Error(`Airtable idempotency lookup failed: ${details}`);
+    throw airtableRequestError('Airtable idempotency lookup failed', res.status, details);
   }
 
-  const json = await res.json() as AirtableListResponse<AirtableApplicationFields>;
+  const json = await readAirtableJson(res) as AirtableListResponse<AirtableApplicationFields>;
   return json.records && json.records.length > 0 ? json.records[0] : null;
 }
 
@@ -533,7 +532,7 @@ async function createApplicationRecord(
   jobTitle?: string | null,
   extras?: Record<string, unknown>,
   idempotencyKey?: string | null
-): Promise<AirtableRecord<AirtableApplicationFields> | null> {
+): Promise<AirtableRecord<AirtableApplicationFields>> {
   const token = process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const appsTable = process.env.AIRTABLE_APPLICATIONS_TABLE;
@@ -551,49 +550,18 @@ async function createApplicationRecord(
   if (jobId && jobId.trim() !== '') baseFields[APPLICATION_JOB_LINK_FIELD] = [jobId];
   if (idempotencyKey) baseFields[APPLICATION_IDEMPOTENCY_FIELD] = idempotencyKey;
 
-  const removedFields = new Set<string>();
-  let lastError: any = null;
-
-  while (true) {
-    const fields: Record<string, unknown> = { ...baseFields };
-    for (const f of removedFields) delete fields[f];
-
-    try {
-      const res = await fetch(baseUrl, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ records: [{ fields }] }),
-      });
-      if (!res.ok) {
-        const d = await res.text();
-        // If Airtable reports unknown field name, extract it and retry without that non-critical field
-        const m = d && d.match(/Unknown field name:\s*"([^"]+)"/i);
-        if (m && m[1]) {
-          const unknown = m[1];
-          if (
-            unknown === APPLICATION_PERSON_LINK_FIELD ||
-            unknown === APPLICATION_JOB_LINK_FIELD ||
-            unknown === APPLICATION_IDEMPOTENCY_FIELD
-          ) {
-            throw new Error(`Airtable create application failed: required field "${unknown}" is missing.`);
-          }
-          removedFields.add(unknown);
-          lastError = d;
-          continue;
-        }
-        throw toAirtableWriteError('Airtable create application failed', d, res.status);
-      }
-      const json = await res.json() as AirtableListResponse<AirtableApplicationFields>;
-      return json.records && json.records.length > 0 ? json.records[0] : null;
-    } catch (err) {
-      // Keep friendly AppErrors (e.g. a refused select option) intact instead of turning them into a 500.
-      if (err instanceof AppError) throw err;
-      lastError = err;
-      break;
-    }
-  }
-
-  throw new Error(`Airtable create application failed: ${lastError}`);
+  // Every field currently written here is required for a complete application.
+  // A renamed column must fail visibly instead of removing an applicant's answer.
+  const res = await fetchFromAirtable(baseUrl, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ records: [{ fields: baseFields }] }),
+  });
+  if (!res.ok) throw toAirtableWriteError('Airtable create application failed', await res.text(), res.status);
+  const json = await readAirtableJson(res) as AirtableListResponse<AirtableApplicationFields>;
+  const record = json.records?.[0];
+  if (!record?.id || !record.fields) throw new Error('Airtable application create returned no record');
+  return record;
 }
 
 async function uploadAttachmentToAirtable(recordId: string, fieldName: string, attachment: AttachmentInput) {
@@ -602,7 +570,7 @@ async function uploadAttachmentToAirtable(recordId: string, fieldName: string, a
   if (!token || !baseId) throw new Error('Missing Airtable env vars for attachments');
 
   const uploadUrl = `https://content.airtable.com/v0/${baseId}/${recordId}/${encodeURIComponent(fieldName)}/uploadAttachment`;
-  const res = await fetch(uploadUrl, {
+  const res = await fetchFromAirtable(uploadUrl, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -613,56 +581,66 @@ async function uploadAttachmentToAirtable(recordId: string, fieldName: string, a
   });
   if (!res.ok) {
     const d = await res.text();
-    throw new Error(`Airtable upload attachment failed: ${d}`);
+    throw airtableRequestError('Airtable upload attachment failed', res.status, d);
   }
-  const data = await res.json() as {
+  const data = await readAirtableJson(res) as {
     attachment?: AirtableAttachment;
     fields?: Record<string, unknown>;
-    [key: string]: unknown;
+    id?: string;
+    url?: string;
   };
-  // The API can return { attachment: {...} } or a record with fields
-  const attachmentObj =
-    (data && (data.attachment || data)) as Record<string, unknown>;
-  let chosen = attachmentObj;
+  // The content API writes the target attachment field itself. Do not PATCH a
+  // stale attachment array over its result, or infer a CV from unrelated fields.
+  if (data?.fields && data.id !== recordId) throw new Error('Airtable CV upload returned a different record');
+  const target = data?.fields?.[fieldName];
+  const uploaded = Array.isArray(target)
+    ? target.filter(isSavedAttachment)
+    : isSavedAttachment(data?.attachment) ? [data.attachment]
+      : isSavedAttachment(data) ? [data] : [];
+  if (uploaded.length > 0) return uploaded;
 
-  // If we got a record with fields, try target field first, then any field containing attachments
-  if (data && data.fields) {
-    const target = (data.fields as Record<string, unknown>)[fieldName];
-    if (Array.isArray(target) && target.length > 0) {
-      chosen = target[0] as Record<string, unknown>;
-    } else {
-      for (const value of Object.values(data.fields as Record<string, unknown>)) {
-        if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
-          chosen = value[0] as Record<string, unknown>;
-          break;
-        }
-      }
-    }
+  // Airtable's official upload response keys fields by ID. Read the known
+  // record back by field name instead of guessing which ID represents its CV.
+  if (data?.id === recordId && data.fields && typeof data.fields === 'object') {
+    const baseId = process.env.AIRTABLE_BASE_ID;
+    const appsTable = process.env.AIRTABLE_APPLICATIONS_TABLE;
+    if (!baseId || !appsTable) throw new Error('Missing Airtable configuration for CV verification');
+    const verification = await fetchFromAirtable(`${airtableBaseUrl(baseId, appsTable)}/${encodeURIComponent(recordId)}`, {
+      headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+    });
+    if (!verification.ok) throw airtableRequestError('Airtable CV verification failed', verification.status, await verification.text());
+    const saved = await readAirtableJson(verification) as AirtableRecord<AirtableApplicationFields>;
+    const cv = saved?.fields?.[fieldName];
+    if (saved?.id === recordId && Array.isArray(cv) && cv.some(isSavedAttachment)) return cv.filter(isSavedAttachment);
   }
-
-  const attachmentUrl = chosen?.url as string | undefined;
-  if (!attachmentUrl) {
-    const keys = chosen ? Object.keys(chosen) : [];
-    const fieldKeys = data?.fields ? Object.keys(data.fields) : [];
-    throw new Error(`Attachment upload response missing url (keys: ${keys.join(',')}; fieldKeys: ${fieldKeys.join(',')})`);
-  }
-  return chosen;
+  throw new Error('Airtable CV upload could not be verified in the target field');
 }
 
-function asAttachmentPatchItem(value: unknown): Record<string, string> | null {
-  if (!value || typeof value !== 'object') return null;
-  const obj = value as Record<string, unknown>;
-  if (typeof obj.id === 'string' && obj.id.trim() !== '') {
-    return { id: obj.id };
+function isSavedAttachment(value: unknown): value is AirtableAttachment {
+  if (!value || typeof value !== 'object') return false;
+  const attachment = value as AirtableAttachment;
+  return (typeof attachment.id === 'string' && /^att[A-Za-z0-9]+$/.test(attachment.id)) || Boolean(normalizeDocumentUrl(attachment.url));
+}
+
+function submissionConflict() {
+  return new AppError('This submission conflicts with an earlier attempt. Your answers are still on this page. Please contact the Global Encounters team if this continues.', {
+    status: 409, code: 'SUBMISSION_CONFLICT',
+  });
+}
+
+function assertSameSubmissionScope(actual: string, expected: string) {
+  if (actual !== expected) throw submissionConflict();
+}
+
+function assertMatchingApplication(app: AirtableRecord<AirtableApplicationFields>, personId: string | undefined, jobId: string | null, whyText: unknown) {
+  const people = app.fields?.[APPLICATION_PERSON_LINK_FIELD];
+  const roles = app.fields?.[APPLICATION_JOB_LINK_FIELD];
+  const matchingRole = jobId ? Array.isArray(roles) && roles.includes(jobId) : !roles || roles.length === 0;
+  const normalizeAnswer = (value: unknown) => typeof value === 'string' ? value.normalize('NFKC').replace(/\s+/g, ' ').trim() : null;
+  const savedAnswer = normalizeAnswer(app.fields?.['Why are you interested in or qualified for this job?']);
+  if (!personId || !Array.isArray(people) || !people.includes(personId) || !matchingRole || !savedAnswer || savedAnswer !== normalizeAnswer(whyText)) {
+    throw submissionConflict();
   }
-  if (typeof obj.url === 'string' && obj.url.trim() !== '') {
-    const item: Record<string, string> = { url: obj.url };
-    if (typeof obj.filename === 'string' && obj.filename.trim() !== '') {
-      item.filename = obj.filename;
-    }
-    return item;
-  }
-  return null;
 }
 
 export async function submitApplication(payload: {
@@ -676,100 +654,83 @@ export async function submitApplication(payload: {
   const { person, jobId, jobTitle, extras, attachments } = payload;
   if (!person || !person.emailAddress) throw new Error('Person email is required');
 
+  const normalized = person.emailAddress.trim().toLowerCase();
+  const roleId = jobId?.trim() || null;
+  const sorted = (values: Record<string, unknown>) => Object.fromEntries(Object.entries(values).sort(([left], [right]) => left.localeCompare(right)));
+  const cv = attachments?.cvResume;
+  // Keep only a fingerprint in cache metadata. Changed requests cannot reuse a
+  // completed/in-flight success merely because their email and role are the same.
+  const scope = createHash('sha256').update(JSON.stringify({
+    person: sorted({ ...person, emailAddress: normalized, normalizedEmail: normalized }),
+    roleId,
+    extras: sorted(extras ?? {}),
+    cv: cv ? { filename: cv.filename, contentType: cv.contentType, hash: createHash('sha256').update(cv.bytes).digest('hex') } : null,
+  })).digest('hex');
   const idempotencyKey = normalizeIdempotencyKey(payload.idempotencyKey);
   if (idempotencyKey) {
-    const cachedResult = getCompletedIdempotencyResult(idempotencyKey);
+    const cachedResult = getCompletedIdempotencyResult(idempotencyKey, scope);
     if (cachedResult) return cachedResult;
     const inFlight = inFlightIdempotency.get(idempotencyKey);
-    if (inFlight) return inFlight;
+    if (inFlight) {
+      assertSameSubmissionScope(inFlight.scope, scope);
+      return inFlight.request;
+    }
   }
 
   const run = async (): Promise<SubmitApplicationResult> => {
-    const normalized = (person.normalizedEmail || person.emailAddress).trim().toLowerCase();
-    // Ensure base application status metadata is always set
-    const baseExtras = {
-      Status: APPLICANT_STATUS,
-      Source: OPPORTUNITY_BOARD_SOURCE,
-    };
-    const mergedExtras = { ...baseExtras, ...(extras ?? {}) };
+    const mergedExtras = { ...extras, Status: APPLICANT_STATUS, Source: OPPORTUNITY_BOARD_SOURCE };
     delete (mergedExtras as Record<string, unknown>)['status'];
     delete (mergedExtras as Record<string, unknown>)['source'];
 
-    // Find existing person
     const existing = await findPersonByNormalizedEmail(normalized);
+    let app = idempotencyKey ? await findApplicationByIdempotencyKey(idempotencyKey) : null;
     let personRecordId: string;
-    if (existing) {
-      personRecordId = existing.id;
+    if (app) {
+      // Check both links before any write, including when a new applicant reuses someone else's key.
+      assertMatchingApplication(app, existing?.id, roleId, mergedExtras['Why are you interested in or qualified for this job?']);
+      personRecordId = existing!.id;
     } else {
-      const created = await createPerson({ ...person, normalizedEmail: normalized });
-      if (!created) throw new Error('Failed to create person');
-      personRecordId = created.id;
+      const savedPerson = existing ?? await createPerson({ ...person, normalizedEmail: normalized });
+      if (!savedPerson) throw new Error('Failed to create person');
+      personRecordId = savedPerson.id;
+      app = await createApplicationRecord(personRecordId, roleId, jobTitle, mergedExtras, idempotencyKey);
     }
 
-    if (idempotencyKey) {
-      const existingApplication = await findApplicationByIdempotencyKey(idempotencyKey);
-      if (existingApplication) {
-        return { personRecordId, applicationRecord: existingApplication };
-      }
+    // A retry may find the application created before a failed upload. Finish
+    // that record; success is cached only after the CV is already saved or uploaded.
+    const cv = app.fields[APPLICATION_ATTACHMENT_FIELD];
+    if (!Array.isArray(cv) || !cv.some(isSavedAttachment)) {
+      if (!attachments?.cvResume) throw new Error('A CV is required to complete the application');
+      const uploaded = await uploadAttachmentToAirtable(app.id, APPLICATION_ATTACHMENT_FIELD, attachments.cvResume);
+      app = { ...app, fields: { ...app.fields, [APPLICATION_ATTACHMENT_FIELD]: uploaded } };
     }
-
-    // Create application record linked to person
-    const app = await createApplicationRecord(personRecordId, jobId, jobTitle, mergedExtras, idempotencyKey);
-    // Attach CV / Resume via Airtable content API (requires existing record id)
-    if (attachments?.cvResume && app?.id) {
-      const attachmentField = APPLICATION_ATTACHMENT_FIELD;
-      const attachmentObj = await uploadAttachmentToAirtable(app.id, attachmentField, attachments.cvResume);
-      try {
-        const token = process.env.AIRTABLE_TOKEN;
-        const baseId = process.env.AIRTABLE_BASE_ID;
-        const appsTable = process.env.AIRTABLE_APPLICATIONS_TABLE;
-        if (!token || !baseId || !appsTable) throw new Error('Missing Airtable env vars for applications');
-        const updateUrl = airtableBaseUrl(baseId, appsTable);
-        // Keep this patch best-effort. The content API upload already writes the attachment.
-        const existing = app.fields?.[attachmentField] ?? [];
-        const existingItems = Array.isArray(existing)
-          ? existing.map(asAttachmentPatchItem).filter(Boolean) as Record<string, string>[]
-          : [];
-        const uploadedItem = asAttachmentPatchItem(attachmentObj);
-        const newArray = uploadedItem ? [...existingItems, uploadedItem] : existingItems;
-        if (newArray.length === 0) {
-          return { personRecordId, applicationRecord: app };
-        }
-        const res = await fetch(updateUrl, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            records: [
-              {
-                id: app.id,
-                fields: { [attachmentField]: newArray },
-              },
-            ],
-          }),
-        });
-        if (!res.ok) {
-          const d = await res.text();
-          console.warn(`Airtable attachment patch warning: ${d}`);
-        }
-      } catch (err) {
-        console.warn('Airtable attachment patch warning:', err);
-      }
-    }
-
     return { personRecordId, applicationRecord: app };
   };
 
   if (!idempotencyKey) return run();
-
   const request = run()
-    .then((result) => {
-      setCompletedIdempotencyResult(idempotencyKey, result);
+    .then(result => {
+      setCompletedIdempotencyResult(idempotencyKey, scope, result);
       return result;
     })
-    .finally(() => {
-      inFlightIdempotency.delete(idempotencyKey);
-    });
-
-  inFlightIdempotency.set(idempotencyKey, request);
+    .finally(() => { inFlightIdempotency.delete(idempotencyKey); });
+  inFlightIdempotency.set(idempotencyKey, { scope, request });
   return request;
+}
+
+async function fetchFromAirtable(...args: Parameters<typeof fetch>) {
+  try {
+    return await fetch(...args);
+  } catch {
+    throw new Error('Airtable network request failed');
+  }
+}
+
+async function readAirtableJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    // JSON parser messages can include a snippet of the private response body.
+    throw new Error('Airtable returned invalid JSON');
+  }
 }

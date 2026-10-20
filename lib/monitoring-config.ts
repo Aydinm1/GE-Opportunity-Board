@@ -33,15 +33,25 @@ export function getMonitoringEnvironment() {
   return process.env.SENTRY_ENVIRONMENT || process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
 }
 
+// Keep fixed diagnostic text; strip values that upstream errors may quote or embed.
+export function sanitizeMonitoringMessage(message: string) {
+  return message
+    .replace(/"[^"\\]*(?:\\.[^"\\]*)*"/g, REDACTED_VALUE)
+    .replace(/(^|[\s=:([{])'[^'\\]*(?:\\.[^'\\]*)*'(?=$|[\s.,;:!?)\]}])/g, (_match, prefix) => `${prefix}${REDACTED_VALUE}`)
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, REDACTED_VALUE)
+    .replace(/Bearer\s+[^\s,;]+/gi, `Bearer ${REDACTED_VALUE}`)
+    .replace(/https?:\/\/[^\s<>]+/gi, '[redacted URL]')
+    .slice(0, 2000);
+}
+
 export function sanitizeMonitoringValue(value: unknown, key = ''): unknown {
   if (key && shouldRedactKey(key)) {
     return REDACTED_VALUE;
   }
 
   if (value === null || value === undefined) return value;
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return value;
-  }
+  if (typeof value === 'string') return sanitizeMonitoringMessage(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
 
   if (Array.isArray(value)) {
     return value.map((item) => sanitizeMonitoringValue(item, key));
@@ -50,8 +60,8 @@ export function sanitizeMonitoringValue(value: unknown, key = ''): unknown {
   if (value instanceof Error) {
     return {
       name: value.name,
-      message: value.message,
-      stack: value.stack,
+      message: sanitizeMonitoringMessage(value.message),
+      stack: value.stack ? sanitizeMonitoringMessage(value.stack) : undefined,
       cause: sanitizeMonitoringValue(value.cause, 'cause'),
     };
   }
@@ -69,6 +79,25 @@ export function sanitizeMonitoringValue(value: unknown, key = ''): unknown {
 
 export function sanitizeSentryEvent(event: any) {
   const sanitized = { ...event };
+  if (typeof sanitized.message === 'string') sanitized.message = sanitizeMonitoringMessage(sanitized.message);
+  if (sanitized.logentry) sanitized.logentry = sanitizeMonitoringValue(sanitized.logentry, 'logentry');
+  if (Array.isArray(sanitized.exception?.values)) {
+    sanitized.exception = {
+      ...sanitized.exception,
+      values: sanitized.exception.values.map((exception: any) => ({
+        ...exception,
+        ...(typeof exception.value === 'string' ? { value: sanitizeMonitoringMessage(exception.value) } : {}),
+        ...(exception.mechanism ? { mechanism: sanitizeMonitoringValue(exception.mechanism, 'mechanism') } : {}),
+      })),
+    };
+  }
+  if (Array.isArray(sanitized.breadcrumbs)) {
+    sanitized.breadcrumbs = sanitized.breadcrumbs.map((breadcrumb: any) => ({
+      ...breadcrumb,
+      ...(typeof breadcrumb.message === 'string' ? { message: sanitizeMonitoringMessage(breadcrumb.message) } : {}),
+      ...(breadcrumb.data ? { data: sanitizeMonitoringValue(breadcrumb.data, 'data') } : {}),
+    }));
+  }
 
   if (sanitized.user) {
     sanitized.user = {};
@@ -78,6 +107,15 @@ export function sanitizeSentryEvent(event: any) {
     const request = { ...sanitized.request };
     delete request.data;
     delete request.cookies;
+    delete request.query_string;
+    if (typeof request.url === 'string') {
+      try {
+        const url = new URL(request.url);
+        request.url = `${url.origin}${url.pathname}`;
+      } catch {
+        request.url = '[redacted URL]';
+      }
+    }
     if (request.headers) {
       request.headers = sanitizeMonitoringValue(request.headers, 'headers');
     }

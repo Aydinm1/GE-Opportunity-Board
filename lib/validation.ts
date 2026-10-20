@@ -16,7 +16,13 @@ const WHY_FIELD = 'Why are you interested in or qualified for this job?';
 const SAFE_IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,128}$/;
 const CONTROL_CHARS = /[\u0000-\u001F\u007F]/g;
 
-const ALLOWED_EXTENSIONS = new Set(['.pdf', '.doc', '.docx', '.txt']);
+const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.txt': 'text/plain',
+};
+const ALLOWED_EXTENSIONS = new Set(Object.keys(CONTENT_TYPE_BY_EXTENSION));
 const ALLOWED_CONTENT_TYPES = new Set([
   'application/pdf',
   'application/msword',
@@ -118,6 +124,9 @@ function validateAttachmentMetadata(filenameValue: unknown, contentTypeValue: un
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
     throw new AppError('CV / Resume content type is not allowed.');
   }
+  if (contentType !== CONTENT_TYPE_BY_EXTENSION[extension]) {
+    throw new AppError('CV / Resume content type does not match its filename.');
+  }
 
   return { filename, contentType };
 }
@@ -141,6 +150,25 @@ function validateAttachmentBytes(filename: string, contentType: string, bytesVal
   }
   if (sizeBytes > MAX_APPLICATION_ATTACHMENT_BYTES) {
     throw new AppError(`CV / Resume must be ${MAX_APPLICATION_ATTACHMENT_LABEL} or smaller.`);
+  }
+
+  const extension = getExtension(filename);
+  const signatures: Record<string, number[]> = {
+    '.pdf': [0x25, 0x50, 0x44, 0x46, 0x2d],
+    '.docx': [0x50, 0x4b, 0x03, 0x04],
+    '.doc': [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1],
+  };
+  const signature = signatures[extension];
+  if (signature && !signature.every((value, index) => bytes[index] === value)) {
+    throw new AppError('CV / Resume contents do not match its file type.');
+  }
+  if (extension === '.txt') {
+    try {
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/.test(text)) throw new Error('Binary content');
+    } catch {
+      throw new AppError('CV / Resume text files must contain UTF-8 text without binary control characters.');
+    }
   }
 
   return { filename, contentType, bytes };
@@ -252,7 +280,8 @@ function validateApplicationBody(body: Record<string, unknown>, cvResume: Attach
     candidateStatus: optionalString(personRaw.candidateStatus, 128) ?? APPLICANT_STATUS,
   };
 
-  const jobId = optionalString(body.jobId, 128) ?? null;
+  const jobId = requireString(body.jobId, 'Role', 128);
+  if (!/^rec[A-Za-z0-9]+$/.test(jobId)) throw new AppError('Please select a valid role.');
   const jobTitle = optionalString(body.jobTitle, 256) ?? null;
   const extras: Record<string, unknown> = {
     Status: APPLICANT_STATUS,

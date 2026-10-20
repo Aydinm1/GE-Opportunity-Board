@@ -48,12 +48,14 @@ Airtable acts as operational datastore:
 
 ## Primary (current)
 
-Application submission includes base64 attachment payload:
+Application submission uses multipart form data:
 - frontend -> `POST /api/applications`
-- backend creates application record
-- backend uploads attachment via Airtable content API
-- backend patches attachment onto application record
-- backend applies idempotency key checks to avoid duplicate submissions
+- backend finds or creates the Person and creates the linked application, or recovers a matching application using its submission key
+- backend base64-encodes the file for the Airtable content API and uploads it to the application's `CV / Resume` field when missing
+- backend verifies the saved attachment before returning `{ "ok": true }`
+- a matching retry resumes a missing upload on the same application
+
+Submission key checks reject conflicting requests, but creation is not atomic across instances. See [submission recovery](submission-recovery.md) for limits and failure handling.
 
 ## Hosting / Deployment
 

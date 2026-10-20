@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { AppError } from './errors';
 import { captureServerException } from './monitoring';
+import { sanitizeMonitoringValue } from './monitoring-config';
 
 export function jsonOk<T>(body: T, status = 200, headers?: HeadersInit) {
   return NextResponse.json(body, { status, headers });
@@ -33,11 +34,11 @@ export function jsonError(
         }
       : { value: err };
 
-  const logPayload = {
+  const logPayload = sanitizeMonitoringValue({
     context,
     status: resolvedStatus,
     details: errorDetails,
-  };
+  });
 
   if (resolvedStatus >= 500) {
     captureServerException(err, {

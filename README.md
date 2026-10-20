@@ -140,3 +140,5 @@ postcss.config.js
 ## Parent iframe script
 
 The canonical parent-side reference is [`integrations/iframe/parent-script.txt`](integrations/iframe/parent-script.txt), installed separately on `https://the.ismaili/globalencounters/opportunities`. It expects iframe ID `division-fixtures-iframe` and child origin `https://ge-opp-board.the.ismaili`. It handles resize, parent-URL requests, and share-copy requests, checking both origin and iframe source. Repository changes do not automatically update the script installed on the parent site.
+
+Embed configuration, security headers, and rollout checks: [iframe integration](docs/iframe-integration.md).

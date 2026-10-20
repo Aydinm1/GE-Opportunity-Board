@@ -72,7 +72,7 @@ Set in `config/host-origin.json`:
 {"HOST_ORIGIN": "https://the.ismaili"}
 ```
 
-Imported by `lib/host-config.ts` for React parent messaging. The resize script currently derives its target from the referrer; pinning it to the trusted host is tracked in #42. There is no separate public JSON copy.
+Imported by `lib/host-config.ts` for React parent messaging. The layout also passes this value through the resize script’s `data-parent-origin` attribute. The resize script only messages that exact configured HTTPS origin. There is no separate public JSON copy. See `docs/iframe-integration.md` for headers and embed verification.
 
 ## Airtable Integration
 

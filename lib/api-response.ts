@@ -1,3 +1,4 @@
+import { getApplicationFailureStep } from './application-tracing';
 import { NextResponse } from 'next/server';
 import { AppError } from './errors';
 import { captureServerException } from './monitoring';
@@ -21,6 +22,7 @@ export function jsonError(
     headers?: HeadersInit;
   }
 ) {
+  const applicationStep = getApplicationFailureStep(err);
   const isAppError = err instanceof AppError;
   const resolvedStatus = isAppError ? err.status : status;
   const exposedError = isAppError && err.expose && resolvedStatus < 500 ? err : null;
@@ -37,6 +39,7 @@ export function jsonError(
   const logPayload = sanitizeMonitoringValue({
     context,
     status: resolvedStatus,
+    applicationStep,
     details: errorDetails,
   });
 
@@ -45,6 +48,7 @@ export function jsonError(
       context,
       status: resolvedStatus,
       errorCode: isAppError ? err.code : undefined,
+      applicationStep,
     });
     console.error('API request failed', logPayload);
   } else {

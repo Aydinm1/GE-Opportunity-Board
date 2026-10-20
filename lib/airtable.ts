@@ -1,3 +1,4 @@
+import { traceApplicationStep } from './application-tracing';
 import { createHash } from 'node:crypto';
 import { CURRENT_COUNTRY_FIELD, resolveCountryRecord } from './country-records';
 import type { Person } from './types';
@@ -429,7 +430,7 @@ async function createPerson(person: Person): Promise<AirtableRecord<AirtablePeop
   const submittedFields = { ...fields };
   const omissions: Array<{ field: string; airtableErrorType: string; status?: number }> = [];
   if (typeof fields[CURRENT_COUNTRY_FIELD] === 'string') {
-    const country = await resolveCountryRecord(fields[CURRENT_COUNTRY_FIELD] as string);
+    const country = await traceApplicationStep('country_lookup', () => resolveCountryRecord(fields[CURRENT_COUNTRY_FIELD] as string));
     if (country.kind === 'resolved') fields[CURRENT_COUNTRY_FIELD] = [country.id];
     else {
       delete fields[CURRENT_COUNTRY_FIELD];
@@ -605,13 +606,16 @@ async function uploadAttachmentToAirtable(recordId: string, fieldName: string, a
     const baseId = process.env.AIRTABLE_BASE_ID;
     const appsTable = process.env.AIRTABLE_APPLICATIONS_TABLE;
     if (!baseId || !appsTable) throw new Error('Missing Airtable configuration for CV verification');
-    const verification = await fetchFromAirtable(`${airtableBaseUrl(baseId, appsTable)}/${encodeURIComponent(recordId)}`, {
-      headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+    return traceApplicationStep('cv_verify', async () => {
+      const verification = await fetchFromAirtable(`${airtableBaseUrl(baseId, appsTable)}/${encodeURIComponent(recordId)}`, {
+        headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+      });
+      if (!verification.ok) throw airtableRequestError('Airtable CV verification failed', verification.status, await verification.text());
+      const saved = await readAirtableJson(verification) as AirtableRecord<AirtableApplicationFields>;
+      const cv = saved?.fields?.[fieldName];
+      if (saved?.id === recordId && Array.isArray(cv) && cv.some(isSavedAttachment)) return cv.filter(isSavedAttachment);
+      throw new Error('Airtable CV upload could not be verified in the target field');
     });
-    if (!verification.ok) throw airtableRequestError('Airtable CV verification failed', verification.status, await verification.text());
-    const saved = await readAirtableJson(verification) as AirtableRecord<AirtableApplicationFields>;
-    const cv = saved?.fields?.[fieldName];
-    if (saved?.id === recordId && Array.isArray(cv) && cv.some(isSavedAttachment)) return cv.filter(isSavedAttachment);
   }
   throw new Error('Airtable CV upload could not be verified in the target field');
 }
@@ -682,18 +686,21 @@ export async function submitApplication(payload: {
     delete (mergedExtras as Record<string, unknown>)['status'];
     delete (mergedExtras as Record<string, unknown>)['source'];
 
-    const existing = await findPersonByNormalizedEmail(normalized);
-    let app = idempotencyKey ? await findApplicationByIdempotencyKey(idempotencyKey) : null;
+    const existing = await traceApplicationStep('person_lookup', () => findPersonByNormalizedEmail(normalized));
+    let app = idempotencyKey ? await traceApplicationStep('idempotency_lookup', () => findApplicationByIdempotencyKey(idempotencyKey)) : null;
     let personRecordId: string;
     if (app) {
       // Check both links before any write, including when a new applicant reuses someone else's key.
       assertMatchingApplication(app, existing?.id, roleId, mergedExtras['Why are you interested in or qualified for this job?']);
       personRecordId = existing!.id;
     } else {
-      const savedPerson = existing ?? await createPerson({ ...person, normalizedEmail: normalized });
-      if (!savedPerson) throw new Error('Failed to create person');
+      const savedPerson = existing ?? await traceApplicationStep('person_create', async () => {
+        const created = await createPerson({ ...person, normalizedEmail: normalized });
+        if (!created) throw new Error('Failed to create person');
+        return created;
+      });
       personRecordId = savedPerson.id;
-      app = await createApplicationRecord(personRecordId, roleId, jobTitle, mergedExtras, idempotencyKey);
+      app = await traceApplicationStep('application_create', () => createApplicationRecord(personRecordId, roleId, jobTitle, mergedExtras, idempotencyKey));
     }
 
     // A retry may find the application created before a failed upload. Finish
@@ -701,7 +708,9 @@ export async function submitApplication(payload: {
     const cv = app.fields[APPLICATION_ATTACHMENT_FIELD];
     if (!Array.isArray(cv) || !cv.some(isSavedAttachment)) {
       if (!attachments?.cvResume) throw new Error('A CV is required to complete the application');
-      const uploaded = await uploadAttachmentToAirtable(app.id, APPLICATION_ATTACHMENT_FIELD, attachments.cvResume);
+      const applicationId = app.id;
+      const resume = attachments.cvResume;
+      const uploaded = await traceApplicationStep('cv_upload', () => uploadAttachmentToAirtable(applicationId, APPLICATION_ATTACHMENT_FIELD, resume));
       app = { ...app, fields: { ...app.fields, [APPLICATION_ATTACHMENT_FIELD]: uploaded } };
     }
     return { personRecordId, applicationRecord: app };

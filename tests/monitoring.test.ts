@@ -79,7 +79,7 @@ describe('monitoring', () => {
       operation: 'submit_application',
       pageHideCount: 1,
       pagePath: '/',
-      pageSearch: '?job=rec123&view=apply',
+      pageSearch: '[redacted]',
       status: undefined,
       uploadBytes: 1024,
       uploadExtension: '.pdf',

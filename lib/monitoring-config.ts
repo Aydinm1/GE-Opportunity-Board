@@ -1,5 +1,11 @@
+import type { spanToJSON } from '@sentry/nextjs';
+type SerializedSpan = ReturnType<typeof spanToJSON>;
+
 const REDACTED_VALUE = '[redacted]';
 const REDACTED_KEY_PATTERNS = [
+  /^(?:.*[._])?(?:query|query_string|search|target)$/i,
+  /pageSearch/i,
+  /filterByFormula/i,
   /attachment/i,
   /attachments/i,
   /authorization/i,
@@ -50,7 +56,10 @@ export function sanitizeMonitoringValue(value: unknown, key = ''): unknown {
   }
 
   if (value === null || value === undefined) return value;
-  if (typeof value === 'string') return sanitizeMonitoringMessage(value);
+  if (typeof value === 'string') {
+    const text = /(?:^|[._])(?:url|uri|path)(?:$|[._])/i.test(key) ? value.split('?')[0].split('#')[0] : value;
+    return sanitizeMonitoringMessage(text);
+  }
   if (typeof value === 'number' || typeof value === 'boolean') return value;
 
   if (Array.isArray(value)) {
@@ -79,6 +88,8 @@ export function sanitizeMonitoringValue(value: unknown, key = ''): unknown {
 
 export function sanitizeSentryEvent(event: any) {
   const sanitized = { ...event };
+  if (Array.isArray(sanitized.spans)) sanitized.spans = sanitized.spans.map(sanitizeSentrySpan);
+  if (typeof sanitized.transaction === 'string') sanitized.transaction = sanitizeMonitoringMessage(sanitized.transaction.split('?')[0]);
   if (typeof sanitized.message === 'string') sanitized.message = sanitizeMonitoringMessage(sanitized.message);
   if (sanitized.logentry) sanitized.logentry = sanitizeMonitoringValue(sanitized.logentry, 'logentry');
   if (Array.isArray(sanitized.exception?.values)) {
@@ -137,13 +148,36 @@ export function sanitizeSentryEvent(event: any) {
   return sanitized;
 }
 
+export function sanitizeSentrySpan(span: SerializedSpan): SerializedSpan {
+  return {
+    ...span,
+    ...(span.description ? { description: sanitizeMonitoringMessage(span.description.split('?')[0].split('#')[0]) } : {}),
+    data: sanitizeMonitoringValue(span.data) as SerializedSpan['data'],
+  };
+}
+
+export function getTracingSampleRate(runtime: 'client' | 'server' | 'edge') {
+  const configured = runtime === 'client'
+    ? process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE
+    : process.env.SENTRY_TRACES_SAMPLE_RATE?.trim() ? process.env.SENTRY_TRACES_SAMPLE_RATE : process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE;
+  if (configured === undefined || configured.trim() === '') return 1;
+  const rate = Number(configured);
+  return Number.isFinite(rate) && rate >= 0 && rate <= 1 ? rate : 0;
+}
+
 export function getSentryInitOptions(runtime: 'client' | 'server' | 'edge') {
   return {
     dsn: getSentryDsn(),
     enabled: Boolean(getSentryDsn()),
     environment: getMonitoringEnvironment(),
     sendDefaultPii: false,
-    tracesSampleRate: 0,
+    dataCollection: { userInfo: false, cookies: false, httpHeaders: false, httpBodies: [], urlQueryParams: false, stackFrameVariables: false },
+    tracesSampleRate: getTracingSampleRate(runtime),
+    // Browser SDK matches relative paths and same-origin URL pathnames. Do not
+    // propagate trace headers to Airtable, document CDNs or third-party services.
+    tracePropagationTargets: runtime === 'client' ? [/^\/api\//] : [],
+    beforeSendSpan: sanitizeSentrySpan,
+    beforeSendTransaction: sanitizeSentryEvent,
     beforeSend: sanitizeSentryEvent,
     initialScope: {
       tags: {

@@ -1,3 +1,4 @@
+import { traceApplicationStep } from '../lib/application-tracing';
 import React, { useEffect, useState, useRef } from 'react';
 import { Person, Job } from '../lib/types';
 import { COUNTRY_OPTIONS, PERSON_AGE_OPTIONS, PERSON_GENDER_OPTIONS, PERSON_GENDER_LABELS } from '../lib/application-select-options';
@@ -213,6 +214,7 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
     }
     inFlightSubmitRef.current = true;
     setLoading(true);
+    const submitStartedAt = Date.now();
     try {
       const formData = new FormData();
       formData.append('fullName', person.fullName);
@@ -233,18 +235,20 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
       formData.append('formStartedAt', String(formStartedAtRef.current));
       formData.append('submittedAt', String(Date.now()));
       formData.append('cvResume', coverLetterFile);
-      const res = await fetch('/api/applications', {
-        method: 'POST',
-        headers: { 'x-idempotency-key': submissionKey },
-        body: formData,
+      await traceApplicationStep('submit', async () => {
+        const res = await fetch('/api/applications', {
+          method: 'POST',
+          headers: { 'x-idempotency-key': submissionKey },
+          body: formData,
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          const requestError = new Error(parseErrorResponseMessage(txt, 'Failed to submit application')) as SubmitRequestError;
+          requestError.endpoint = '/api/applications';
+          requestError.status = res.status;
+          throw requestError;
+        }
       });
-      if (!res.ok) {
-        const txt = await res.text();
-        const requestError = new Error(parseErrorResponseMessage(txt, 'Failed to submit application')) as SubmitRequestError;
-        requestError.endpoint = '/api/applications';
-        requestError.status = res.status;
-        throw requestError;
-      }
       setSuccess('Application submitted. Thank you!');
       const nextSubmissionKey = createSubmissionKey();
       setSubmissionKey(nextSubmissionKey);
@@ -276,7 +280,8 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
           lastVisibilityState: lastVisibilityStateRef.current,
           pageHideCount: pageHideCountRef.current,
           visibilityChangeCount: visibilityChangeCountRef.current,
-          submitElapsedMs: Date.now() - formStartedAtRef.current,
+          submitElapsedMs: Date.now() - submitStartedAt,
+          formAgeMs: Date.now() - formStartedAtRef.current,
           uploadBytes: coverLetterFile?.size ?? null,
           uploadMimeType: coverLetterFile?.type || '',
           uploadExtension: coverLetterFile ? getFileExtension(coverLetterFile.name) : '',

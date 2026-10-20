@@ -24,8 +24,19 @@ whitespace normalization and case folding. There is no fuzzy country matching.
 - Network, permission, malformed-response and later-page failures: fail before
   creating People or Applications; do not treat an unavailable directory as empty.
 
-The directory is cached with the existing five-minute read policy. The optional
-`AIRTABLE_COUNTRIES_TABLE` setting accepts the directory name or ID; the default
+Only the complete, validated directory is cached in process memory for five minutes.
+Every Airtable page is fetched with `cache: 'no-store'`: pagination cursors are
+temporary and must never be retained in the Next.js fetch cache. Concurrent reads
+share a complete refresh; cold starts simply load the directory again. Snapshots
+are scoped to the token/base/table configuration. Live schema checks bypass this
+snapshot. An expired snapshot is never served after a failed refresh.
+
+If a later page returns `422 LIST_RECORDS_ITERATOR_NOT_AVAILABLE`, discard every
+record and cursor from that traversal and restart from page one once. A second
+cursor error, unrelated 422, or other failure still stops before People or
+Application writes. Failed and partial traversals are never cached.
+
+The optional `AIRTABLE_COUNTRIES_TABLE` setting accepts the directory name or ID; the default
 matches the configured base, so no environment change is required there. The
 production Airtable token must have read access to this table.
 
@@ -47,8 +58,10 @@ Staff-review diagnostics use operation `create_person_review_fallback` for both
 country-mapping and refused-select fallbacks, with flat primitive arrays: `omittedFields`,
 `airtableErrorTypes`, and `omissionStatuses`. This avoids nested objects becoming
 `[Object]` in Sentry. Names, email addresses and submitted demographic values remain
-in Airtable, not diagnostic metadata. Alerts describe a profile requiring review,
-not a failed application or a removed answer.
+in Airtable, not diagnostic metadata. Country-directory failures retain only
+HTTP status and a bounded Airtable error type, never response text or cursors.
+Profile-review alerts describe an answer requiring staff review, not a failed
+application or a removed answer. Directory-read failures do fail the submission.
 
 ## Existing profiles and rollout
 

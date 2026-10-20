@@ -694,8 +694,11 @@ export async function submitApplication(payload: {
       assertMatchingApplication(app, existing?.id, roleId, mergedExtras['Why are you interested in or qualified for this job?']);
       personRecordId = existing!.id;
     } else {
-      const savedPerson = existing ?? await traceApplicationStep('person_create', () => createPerson({ ...person, normalizedEmail: normalized }));
-      if (!savedPerson) throw new Error('Failed to create person');
+      const savedPerson = existing ?? await traceApplicationStep('person_create', async () => {
+        const created = await createPerson({ ...person, normalizedEmail: normalized });
+        if (!created) throw new Error('Failed to create person');
+        return created;
+      });
       personRecordId = savedPerson.id;
       app = await traceApplicationStep('application_create', () => createApplicationRecord(personRecordId, roleId, jobTitle, mergedExtras, idempotencyKey));
     }

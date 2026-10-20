@@ -83,7 +83,7 @@ function request() {
   form.set('cvResume', new File(['Synthetic CV'], 'cv.txt', { type: 'text/plain' }));
   return new Request('http://localhost/api/applications', { method: 'POST', headers: { 'x-forwarded-for': `192.0.2.${++ip}` }, body: form });
 }
-function mockApplication(directoryRows: unknown[], options: { directoryStatus?: number; returning?: boolean; notesFail?: boolean; directoryPages?: Array<{ records?: unknown[]; offset?: string; error?: { type: string }; status?: number }> } = {}) {
+function mockApplication(directoryRows: unknown[], options: { directoryStatus?: number; returning?: boolean; notesFail?: boolean; emptyPersonResponse?: boolean; directoryPages?: Array<{ records?: unknown[]; offset?: string; error?: { type: string }; status?: number }> } = {}) {
   const writes: Array<{ path: string; body: any }> = []; const countryReads: string[] = [];
   const mock = vi.fn(async (input: string, init: RequestInit = {}) => {
     const url = new URL(input);
@@ -99,6 +99,7 @@ function mockApplication(directoryRows: unknown[], options: { directoryStatus?: 
     if (url.pathname.endsWith('/People') && !init.method) return json({ records: options.returning ? [{ id: 'recPerson', fields: { 'Notes RE: Candidate': 'Existing notes' } }] : [] });
     const body = JSON.parse(String(init.body)); writes.push({ path: url.pathname, body });
     if (url.pathname.endsWith('/People')) {
+      if (options.emptyPersonResponse) return json({ records: [] });
       if (options.notesFail && body.records[0].fields['Notes RE: Candidate']) return json({ error: { type: 'UNKNOWN_FIELD_NAME', message: 'Unknown field name: "Notes RE: Candidate"' } }, 422);
       return json({ records: [{ id: 'recPerson', fields: body.records[0].fields }] });
     }
@@ -170,6 +171,13 @@ describe('country record mapping through the application API', () => {
     expect((await POST(request())).status).toBe(500);
     expect(countryReads).toHaveLength(4); expect(writes).toHaveLength(0);
     expect(captureServerException).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: 'create_person_review_fallback' }));
+  });
+  it('labels an empty People create response as person_create and never writes an application or CV', async () => {
+    const { writes } = mockApplication([row('recCanada', 'Canada')], { emptyPersonResponse: true });
+    expect((await POST(request())).status).toBe(500);
+    expect(captureServerException).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ applicationStep: 'person_create' }));
+    expect(writes.filter(write => write.path.endsWith('/People'))).toHaveLength(1);
+    expect(writes.filter(write => write.path.endsWith('/Applications') || write.path.endsWith('/uploadAttachment'))).toHaveLength(0);
   });
   it('does not accept a fallback if its review note cannot be saved', async () => {
     const { writes } = mockApplication([], { notesFail: true }); expect((await POST(request())).status).toBe(500);

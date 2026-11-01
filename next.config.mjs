@@ -23,6 +23,11 @@ const nextConfig = {
 const sentryTunnelRoute = process.env.NODE_ENV === "production" ? "/_board" : undefined;
 
 export default withSentryConfig(nextConfig, {
+  org: 'global-encounters',
+  project: 'ge-job-board',
+  // SENTRY_AUTH_TOKEN is build-only. Never expose source maps publicly.
+  widenClientFileUpload: true,
+  sourcemaps: { deleteSourcemapsAfterUpload: true },
   // Keep the browser tunnel in production, but avoid Next's local rewrite/proxy
   // deprecation warning on Node 22+ during development.
   tunnelRoute: sentryTunnelRoute,

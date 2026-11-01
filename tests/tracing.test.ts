@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const sdk = vi.hoisted(() => ({ startSpan: vi.fn(), setStatus: vi.fn() }));
-vi.mock('@sentry/nextjs', () => ({ startSpan: sdk.startSpan }));
-import { traceApplicationStep, getApplicationFailureStep } from '../lib/application-tracing';
+const sdk = vi.hoisted(() => ({ startSpan: vi.fn(), setStatus: vi.fn(), getActiveSpan: vi.fn(), setAttribute: vi.fn() }));
+vi.mock('@sentry/nextjs', () => ({ startSpan: sdk.startSpan, getActiveSpan: sdk.getActiveSpan }));
+import { annotateApplicationRequest, traceApplicationStep, getApplicationFailureStep } from '../lib/application-tracing';
 import { getSentryInitOptions, getTracingSampleRate, sanitizeSentryEvent } from '../lib/monitoring-config';
 
 beforeEach(() => {
@@ -55,6 +55,14 @@ describe('trace privacy', () => {
 });
 
 describe('application trace steps', () => {
+  it('adds correlation to the active server trace, including successful requests', () => {
+    sdk.getActiveSpan.mockReturnValue({ setAttribute: sdk.setAttribute });
+    annotateApplicationRequest('12345678-1234-4234-8234-123456789abc', 'aabbccddeeff0011-KHI');
+    expect(sdk.setAttribute).toHaveBeenCalledWith('application.request_id', '12345678-1234-4234-8234-123456789abc');
+    expect(sdk.setAttribute).toHaveBeenCalledWith('application.edge_request_id', 'aabbccddeeff0011-KHI');
+    sdk.getActiveSpan.mockReturnValue(undefined);
+    expect(() => annotateApplicationRequest('12345678-1234-4234-8234-123456789abc')).not.toThrow();
+  });
   it('returns the work result and uses only a fixed operation label', async () => {
     expect(await traceApplicationStep('person_lookup', async () => 'result')).toBe('result');
     expect(sdk.startSpan).toHaveBeenLastCalledWith({ name: 'application.person_lookup', op: 'application.step', attributes: { 'application.step': 'person_lookup' } }, expect.any(Function));

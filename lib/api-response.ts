@@ -15,11 +15,13 @@ export function jsonError(
     fallbackMessage,
     status = 500,
     headers,
+    diagnostics,
   }: {
     context: string;
     fallbackMessage: string;
     status?: number;
     headers?: HeadersInit;
+    diagnostics?: { requestId: string; edgeRequestId?: string };
   }
 ) {
   const applicationStep = getApplicationFailureStep(err);
@@ -40,6 +42,7 @@ export function jsonError(
     context,
     status: resolvedStatus,
     applicationStep,
+    ...diagnostics,
     details: errorDetails,
   });
 
@@ -49,6 +52,7 @@ export function jsonError(
       status: resolvedStatus,
       errorCode: isAppError ? err.code : undefined,
       applicationStep,
+      ...diagnostics,
     });
     console.error('API request failed', logPayload);
   } else {

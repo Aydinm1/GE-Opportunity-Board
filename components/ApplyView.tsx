@@ -6,7 +6,8 @@ import { MAX_APPLICATION_ATTACHMENT_BYTES, MAX_APPLICATION_ATTACHMENT_LABEL } fr
 import { captureClientException } from '../lib/monitoring';
 import { requestIframeResize } from '../lib/request-iframe-resize';
 import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
-import { parseErrorResponseMessage } from '../lib/utils';
+import { sendApplicationRequest, type ApplicationRequestError } from '../lib/application-request';
+import { createRequestId } from '../lib/request-diagnostics';
 
 export interface ApplyDraft {
   person: Person;
@@ -49,11 +50,6 @@ const createSubmissionKey = () => {
 
 const ATTACHMENT_SIZE_ERROR = `CV / Resume must be ${MAX_APPLICATION_ATTACHMENT_LABEL} or smaller.`;
 
-type SubmitRequestError = Error & {
-  endpoint?: string;
-  status?: number;
-};
-
 function getFileExtension(name: string) {
   const idx = name.lastIndexOf('.');
   return idx === -1 ? '' : name.slice(idx).toLowerCase();
@@ -69,6 +65,7 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
   const [submissionKey, setSubmissionKey] = useState<string>(() => initialDraft?.submissionKey || createSubmissionKey());
   const [website, setWebsite] = useState('');
   const inFlightSubmitRef = useRef(false);
+  const submitAttemptRef = useRef(0);
   const formStartedAtRef = useRef<number>(Date.now());
   const pageHideCountRef = useRef(0);
   const visibilityChangeCountRef = useRef(0);
@@ -105,6 +102,7 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
     setCoverLetterFile(initialDraft?.coverLetterFile || null);
     setWhyText(initialDraft?.whyText || '');
     setError(null);
+    submitAttemptRef.current = 0;
     setSuccess(null);
     setLoading(false);
     inFlightSubmitRef.current = false;
@@ -215,6 +213,8 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
     inFlightSubmitRef.current = true;
     setLoading(true);
     const submitStartedAt = Date.now();
+    const requestId = createRequestId();
+    const attempt = ++submitAttemptRef.current;
     try {
       const formData = new FormData();
       formData.append('fullName', person.fullName);
@@ -235,20 +235,7 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
       formData.append('formStartedAt', String(formStartedAtRef.current));
       formData.append('submittedAt', String(Date.now()));
       formData.append('cvResume', coverLetterFile);
-      await traceApplicationStep('submit', async () => {
-        const res = await fetch('/api/applications', {
-          method: 'POST',
-          headers: { 'x-idempotency-key': submissionKey },
-          body: formData,
-        });
-        if (!res.ok) {
-          const txt = await res.text();
-          const requestError = new Error(parseErrorResponseMessage(txt, 'Failed to submit application')) as SubmitRequestError;
-          requestError.endpoint = '/api/applications';
-          requestError.status = res.status;
-          throw requestError;
-        }
-      });
+      await traceApplicationStep('submit', () => sendApplicationRequest(formData, submissionKey, requestId));
       setSuccess('Application submitted. Thank you!');
       const nextSubmissionKey = createSubmissionKey();
       setSubmissionKey(nextSubmissionKey);
@@ -259,10 +246,11 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
         onBackToDetails();
       }, 900);
     } catch (err: any) {
-      const requestError = err as SubmitRequestError;
+      const requestError = err as ApplicationRequestError;
       if (
         err instanceof TypeError ||
-        (typeof requestError?.status === 'number' && requestError.status >= 500)
+        (typeof requestError?.status === 'number' && requestError.status >= 500) ||
+        requestError.diagnostics?.phase === 'invalid_response'
       ) {
         const currentLocation = typeof window !== 'undefined' ? window.location : null;
         const currentNavigator = typeof navigator !== 'undefined' ? navigator : null;
@@ -271,6 +259,9 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
           jobId: job.id,
           operation: 'submit_application',
           status: requestError.status,
+          requestId,
+          attempt,
+          ...requestError.diagnostics,
           isEmbedded,
           isMobile,
           pagePath: currentLocation?.pathname || '',
@@ -287,7 +278,7 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
           uploadExtension: coverLetterFile ? getFileExtension(coverLetterFile.name) : '',
         });
       }
-      setError(err?.message || 'Submission failed');
+      setError(requestError.userMessage || err?.message || 'Submission failed');
       setLoading(false);
       inFlightSubmitRef.current = false;
     }
@@ -483,7 +474,9 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
               <div className="text-xs text-gray-500 mt-1">{countWords(whyText)} / {WORD_LIMIT} words</div>
             </div>
 
-            {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
+            {error && <div role="alert" className="text-sm text-red-600 mt-3">
+              <p>{error}</p>
+            </div>}
             {success && <p className="text-sm text-primary mt-3">{success}</p>}
           </div>
 

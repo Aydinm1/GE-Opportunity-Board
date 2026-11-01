@@ -11,6 +11,7 @@ import { captureClientException } from '../lib/monitoring';
 import { isTrustedParentMessage, parseTrustedRedirectUrl } from '../lib/message-security';
 import { requestIframeResize } from '../lib/request-iframe-resize';
 import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
+import { trackBoardPageview } from '../lib/analytics';
 
 type InitialParentParams = {
     jobParam: string | null;
@@ -101,11 +102,14 @@ function OpportunityBoard() {
     const [isMobileViewport, setIsMobileViewport] = useState(false);
     const [mobileScreen, setMobileScreen] = useState<'list' | 'details'>('list');
     const [isEmbedded, setIsEmbedded] = useState(false);
+    const [viewportReady, setViewportReady] = useState(false);
+    const [initialNavigationResolved, setInitialNavigationResolved] = useState(false);
     const mobileListScrollRef = useRef<HTMLDivElement | null>(null);
 
     useScrollBoundaryTransfer(mobileListScrollRef, !isMobileViewport && !isEmbedded);
 
     useEffect(() => {
+        trackBoardPageview();
         if (typeof window === 'undefined') return;
         setIsEmbedded(window.parent !== window);
     }, []);
@@ -123,6 +127,7 @@ function OpportunityBoard() {
         const mediaQuery = window.matchMedia('(max-width: 1023px)');
         const syncViewport = (event?: MediaQueryListEvent) => {
             setIsMobileViewport(event ? event.matches : mediaQuery.matches);
+            setViewportReady(true);
         };
 
         syncViewport();
@@ -156,6 +161,7 @@ function OpportunityBoard() {
                 const resolvedInitialView = viewParam === 'apply' ? 'apply' : 'details';
                 setInitialViewMode(resolvedInitialView);
                 setInitialViewRequestId((current) => current + 1);
+                setInitialNavigationResolved(true);
 
                 if (loadedJobs.length > 0) {
                     if (jobParam && loadedJobs.find((j: Job) => j.id === jobParam)) {
@@ -500,6 +506,7 @@ function OpportunityBoard() {
                                     initialViewRequestId={initialViewRequestId}
                                     isEmbedded={isEmbedded}
                                     isMobile={isMobileViewport}
+                                    analyticsVisible={initialNavigationResolved && viewportReady && (!isMobileViewport || mobileScreen === 'details')}
                                     onBackToList={isMobileViewport ? () => {
                                         setMobileScreen('list');
                                     } : undefined}

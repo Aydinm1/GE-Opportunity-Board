@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Job } from '../lib/types';
 import { getTorLinks } from '../lib/tor';
 import { parseErrorResponseMessage } from '../lib/utils';
+import { trackTorClicked } from '../lib/analytics';
 
 export default function TorSection({ job }: { job: Job }) {
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -20,9 +21,10 @@ export default function TorSection({ job }: { job: Job }) {
                 download={link.download ? filename || 'TOR' : undefined}
                 aria-disabled={link.download && downloading !== null ? true : undefined}
                 onClick={async (event) => {
-                  if (!link.download) return;
+                  if (!link.download) { trackTorClicked(job, 'link'); return; }
                   event.preventDefault();
                   if (downloading) return;
+                  trackTorClicked(job, 'upload');
                   setDownloading(link.key);
                   setError(null);
                   try {

@@ -9,6 +9,7 @@ import TorSection from './TorSection';
 import { getRoleLocation, normalizeQualificationItems } from '../lib/role-content';
 import ApplyView, { ApplyDraft } from './ApplyView';
 import { trackRoleViewed } from '../lib/analytics';
+import { intersectsViewport } from '../lib/analytics-visibility';
 
 interface JobDetailsProps {
     job: Job;
@@ -89,18 +90,26 @@ const JobDetails: React.FC<JobDetailsProps> = ({
         const element = analyticsRootRef.current;
         if (!element) return;
         let intersecting = false;
+        let observer: IntersectionObserver | null = null;
         const report = () => {
-            if (intersecting && document.visibilityState === 'visible') trackRoleViewed(job);
+            const visible = observer ? intersecting : intersectsViewport(element, { width: window.innerWidth, height: window.innerHeight });
+            if (visible && document.visibilityState === 'visible') trackRoleViewed(job);
         };
-        const observer = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(([entry]) => {
+        observer = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(([entry]) => {
             intersecting = entry.isIntersecting;
             report();
         }) : null;
         if (observer) observer.observe(element);
-        else { intersecting = element.getClientRects().length > 0; report(); }
+        else {
+            report();
+            window.addEventListener('scroll', report, { capture: true, passive: true });
+            window.addEventListener('resize', report);
+        }
         document.addEventListener('visibilitychange', report);
         return () => {
             observer?.disconnect();
+            window.removeEventListener('scroll', report, true);
+            window.removeEventListener('resize', report);
             document.removeEventListener('visibilitychange', report);
         };
     }, [analyticsVisible, viewMode, appliedInitialRequestId, initialViewRequestId, job.id, job.roleTitle]);

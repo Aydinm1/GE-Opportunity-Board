@@ -8,7 +8,6 @@ import { requestIframeResize } from '../lib/request-iframe-resize';
 import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
 import { sendApplicationRequest, type ApplicationRequestError } from '../lib/application-request';
 import { createRequestId } from '../lib/request-diagnostics';
-import { trackApplicationStarted, trackSubmissionConfirmed } from '../lib/analytics';
 
 export interface ApplyDraft {
   person: Person;
@@ -237,7 +236,6 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
       formData.append('submittedAt', String(Date.now()));
       formData.append('cvResume', coverLetterFile);
       await traceApplicationStep('submit', () => sendApplicationRequest(formData, submissionKey, requestId));
-      trackSubmissionConfirmed(job, submissionKey);
       setSuccess('Application submitted. Thank you!');
       const nextSubmissionKey = createSubmissionKey();
       setSubmissionKey(nextSubmissionKey);
@@ -318,9 +316,7 @@ const ApplyView: React.FC<ApplyViewProps> = ({ job, isEmbedded = false, isMobile
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} onChangeCapture={(event) => {
-          if ((event.target as HTMLElement).id !== 'website-field') trackApplicationStarted(job);
-        }} className={`${usesFormPaneLayout ? 'flex-1 flex flex-col overflow-hidden' : 'flex flex-col overflow-visible'}`}>
+        <form onSubmit={handleSubmit} className={`${usesFormPaneLayout ? 'flex-1 flex flex-col overflow-hidden' : 'flex flex-col overflow-visible'}`}>
           <div ref={contentRef} className={`${usesFormPaneLayout ? 'flex-1 overflow-y-scroll' : 'overflow-visible'} px-4 pb-24 pt-5 sm:p-6`} style={{ WebkitOverflowScrolling: 'touch' }}>
             <div className="hidden" aria-hidden="true">
               <label htmlFor="website-field">Website</label>

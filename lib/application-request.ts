@@ -73,8 +73,9 @@ export async function sendApplicationRequest(
     diagnostics.status = response.status;
     diagnostics.serverRequestId = safeRequestId(response.headers.get('x-request-id')) || undefined;
     diagnostics.edgeRequestId = safeEdgeRequestId(response.headers.get('cf-ray')) || undefined;
-    const contentType = response.headers.get('content-type') || '';
-    diagnostics.responseContentType = contentType.includes('application/json') ? 'json' : contentType.includes('text/html') ? 'html' : 'other';
+const contentType = response.headers.get('content-type') || '';
+    const mediaType = contentType.split(';', 1)[0].trim().toLowerCase();
+    diagnostics.responseContentType = mediaType === 'application/json' ? 'json' : mediaType === 'text/html' ? 'html' : 'other';
     diagnostics.phase = 'reading_response';
     if (!response.ok) {
       const text = await response.text();

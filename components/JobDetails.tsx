@@ -8,8 +8,6 @@ import { useScrollBoundaryTransfer } from '../lib/useScrollBoundaryTransfer';
 import TorSection from './TorSection';
 import { getRoleLocation, normalizeQualificationItems } from '../lib/role-content';
 import ApplyView, { ApplyDraft } from './ApplyView';
-import { trackRoleViewed } from '../lib/analytics';
-import { intersectsViewport } from '../lib/analytics-visibility';
 
 interface JobDetailsProps {
     job: Job;
@@ -17,7 +15,6 @@ interface JobDetailsProps {
     initialViewRequestId?: number;
     isEmbedded?: boolean;
     isMobile?: boolean;
-    analyticsVisible?: boolean;
     onBackToList?: () => void;
 }
 
@@ -27,7 +24,6 @@ const JobDetails: React.FC<JobDetailsProps> = ({
     initialViewRequestId = 0,
     isEmbedded = false,
     isMobile = false,
-    analyticsVisible = true,
     onBackToList,
 }) => {
     const [viewMode, setViewMode] = useState<'details' | 'apply'>(() => {
@@ -39,8 +35,6 @@ const JobDetails: React.FC<JobDetailsProps> = ({
     const [copied, setCopied] = useState(false);
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const detailsScrollRef = useRef<HTMLDivElement | null>(null);
-    const analyticsRootRef = useRef<HTMLDivElement | null>(null);
-    const [appliedInitialRequestId, setAppliedInitialRequestId] = useState(initialViewRequestId);
     const scrollPositionsRef = useRef<Record<string, number>>({});
     const applyDraftsRef = useRef<Record<string, ApplyDraft>>({});
     const previousJobIdRef = useRef<string>(job.id);
@@ -82,37 +76,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({
 
     useEffect(() => {
         setViewMode(initialViewMode);
-        setAppliedInitialRequestId(initialViewRequestId);
     }, [initialViewMode, initialViewRequestId]);
-
-    useEffect(() => {
-        if (!analyticsVisible || viewMode !== 'details' || appliedInitialRequestId !== initialViewRequestId) return;
-        const element = analyticsRootRef.current;
-        if (!element) return;
-        let intersecting = false;
-        let observer: IntersectionObserver | null = null;
-        const report = () => {
-            const visible = observer ? intersecting : intersectsViewport(element, { width: window.innerWidth, height: window.innerHeight });
-            if (visible && document.visibilityState === 'visible') trackRoleViewed(job);
-        };
-        observer = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(([entry]) => {
-            intersecting = entry.isIntersecting;
-            report();
-        }) : null;
-        if (observer) observer.observe(element);
-        else {
-            report();
-            window.addEventListener('scroll', report, { capture: true, passive: true });
-            window.addEventListener('resize', report);
-        }
-        document.addEventListener('visibilitychange', report);
-        return () => {
-            observer?.disconnect();
-            window.removeEventListener('scroll', report, true);
-            window.removeEventListener('resize', report);
-            document.removeEventListener('visibilitychange', report);
-        };
-    }, [analyticsVisible, viewMode, appliedInitialRequestId, initialViewRequestId, job.id, job.roleTitle]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -341,7 +305,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({
         : 'list-none space-y-3.5 pl-0 text-gray-600 dark:text-gray-300';
 
     return (
-        <div ref={analyticsRootRef} className={`flex flex-col min-h-0 ${usesFixedDetailsPane ? 'h-full' : ''} ${usesDetailsPaneScroll ? 'overflow-hidden' : 'overflow-visible'}`}>
+        <div className={`flex flex-col min-h-0 ${usesFixedDetailsPane ? 'h-full' : ''} ${usesDetailsPaneScroll ? 'overflow-hidden' : 'overflow-visible'}`}>
             {viewMode === 'apply' ? (
                 <ApplyView
                     job={job}

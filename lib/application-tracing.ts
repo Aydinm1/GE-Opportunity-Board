@@ -3,6 +3,12 @@ import * as Sentry from '@sentry/nextjs';
 export type ApplicationStep = 'submit' | 'parse_form' | 'validate' | 'published_roles' | 'person_lookup' | 'idempotency_lookup' | 'country_lookup' | 'person_create' | 'application_create' | 'cv_upload' | 'cv_verify';
 const failures = new WeakMap<object, ApplicationStep>();
 
+export function annotateApplicationRequest(requestId: string, edgeRequestId?: string) {
+  const span = Sentry.getActiveSpan();
+  span?.setAttribute('application.request_id', requestId);
+  if (edgeRequestId) span?.setAttribute('application.edge_request_id', edgeRequestId);
+}
+
 // Labels are a fixed allowlist. Never use applicant data, keys, filenames or URLs.
 export function traceApplicationStep<T>(step: ApplicationStep, work: () => Promise<T>): Promise<T> {
   return Sentry.startSpan({ name: `application.${step}`, op: 'application.step', attributes: { 'application.step': step } }, async span => {

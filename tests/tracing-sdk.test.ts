@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import * as Sentry from '@sentry/nextjs';
 import { getSentryInitOptions } from '../lib/monitoring-config';
+import { annotateApplicationRequest } from '../lib/application-tracing';
 
 it('exports a sampled transaction and correlated error without private query values through the actual SDK', async () => {
   const envelopes: any[] = [];
@@ -11,8 +12,12 @@ it('exports a sampled transaction and correlated error without private query val
   });
   try {
     await Sentry.startSpan({ name: 'application.submit', op: 'application.step', forceTransaction: true }, async () => {
+      annotateApplicationRequest('12345678-1234-4234-8234-123456789abc');
       await Sentry.startSpan({ name: 'application.country_lookup', op: 'application.step', attributes: { 'application.step': 'country_lookup', 'http.query': 'email=PRIVATE_SENTINEL%40example.invalid', 'http.status_code': 422 } }, async () => {
-        Sentry.captureException(new Error('Synthetic tracing check'), { extra: { 'http.query': 'PRIVATE_SENTINEL' } });
+        Sentry.captureException(new Error('Synthetic tracing check'), {
+          extra: { 'http.query': 'PRIVATE_SENTINEL' },
+          contexts: { monitoring: { requestId: '12345678-1234-4234-8234-123456789abc', phase: 'awaiting_response', responseReceived: false, probeOutcome: 'reachable', probeStatus: 200 } },
+        });
       });
     });
     await Sentry.flush(3000);
@@ -21,6 +26,8 @@ it('exports a sampled transaction and correlated error without private query val
     const error = items.find(([header]) => header.type === 'event')?.[1];
     expect(transaction).toBeDefined(); expect(error).toBeDefined();
     expect(transaction.contexts.trace.trace_id).toBe(error.contexts.trace.trace_id);
+    expect(transaction.contexts.trace.data['application.request_id']).toBe('12345678-1234-4234-8234-123456789abc');
+    expect(error.contexts.monitoring).toMatchObject({ requestId: '12345678-1234-4234-8234-123456789abc', phase: 'awaiting_response', responseReceived: false, probeOutcome: 'reachable', probeStatus: 200 });
     expect(transaction.spans).toContainEqual(expect.objectContaining({ description: 'application.country_lookup', data: expect.objectContaining({ 'http.status_code': 422 }) }));
     expect(JSON.stringify(envelopes)).not.toContain('PRIVATE_SENTINEL');
   } finally { await Sentry.close(1000); }

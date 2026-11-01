@@ -88,9 +88,11 @@ document, so this does not promise cross-reload submission-event deduplication.
 
 ## Create the Board overview dashboard
 
-The owner chose to configure the dashboard in PostHog rather than provide a
-management credential. The public tracking token cannot create dashboard tiles.
-The dashboard is **prepared in this repository, not yet created in the account**.
+The [Board overview dashboard](https://us.posthog.com/project/702314/dashboard/2287812)
+is created in the US project with all ten insights. Its saved queries and
+one-hour same-role funnel settings have been verified; rerunning the installer
+created no duplicates. Collection still requires production deployment and the
+enable flag. The public tracking token cannot create dashboard tiles.
 
 In PostHog, select **Dashboards → New dashboard**, name it **Board overview**, and
 add the following insights. Default to the last seven days and daily intervals.
@@ -142,8 +144,9 @@ node --env-file=.env.posthog-admin scripts/posthog-dashboard.mjs --apply
 The installer reuses only a dashboard carrying its management tag and skips
 already-created managed insights. It does not overwrite unrelated dashboards or
 change the project's cookieless setting. After setup, revoke the temporary key.
-The installer has mocked API tests; live account creation requires management
-access and has not been verified with the public tracking token.
+The installer has mocked API tests and was verified with scoped management
+access against the US project. The public tracking token remains insufficient
+for dashboard creation.
 
 ## Validation
 
